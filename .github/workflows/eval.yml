@@ -35,22 +35,6 @@ jobs:
             unzip -q notes.zip -d notes && rm notes.zip
           fi
 
-      - name: Pack a subset for local tuning
-        run: |
-          cd data
-          for d in notes/PS/* notes/ES/*; do echo "$d: $(ls $d | wc -l) e.g. $(ls $d | head -2 | tr '\n' ' ')"; done
-          mkdir -p ../subset/notes
-          find notes -name '*.wav' | sort | awk 'NR % 8 == 0' | while read f; do mkdir -p "../subset/$(dirname "$f")"; cp "$f" "../subset/$f"; done
-          cp -r single ../subset/single
-          du -sh ../subset
-
-      - name: Upload subset
-        uses: actions/upload-artifact@v4
-        with:
-          name: idmt-subset
-          path: subset
-          retention-days: 2
-
       - name: Build evaluator
         run: g++ -O2 -march=native -std=c++17 -pthread tests/eval_idmt.cpp -o eval_idmt
 
@@ -60,7 +44,10 @@ jobs:
           if [ -z "$CFGS" ]; then CFGS="$(cat tests/eval_configs.txt 2>/dev/null)"; fi
           ./eval_idmt data "" $CFGS | tee eval_report.txt
           echo; echo "== error details (default config) =="
-          VERBOSE=1 ./eval_idmt data "" | sed -n '/^    /p' | head -300 | tee -a eval_report.txt
+          VERBOSE=1 ./eval_idmt data "" > details.txt
+          echo "-- single-note errors by group --"; grep '^    NOTE' details.txt | awk '{print $3}' | sed -E 's/BS_[0-9]_EQ_[0-9]_(PS_)?([A-Z]+)_(ES_)?([A-Z]+)_.*/\2_\4/' | sort | uniq -c
+          echo "-- single-note errors (sample) --"; grep '^    NOTE' details.txt | awk 'NR % 3 == 1' | head -120
+          echo "-- bass-line errors --"; grep -v '^    NOTE' details.txt | grep '^    ' | head -260
 
       - name: Upload report
         if: always()

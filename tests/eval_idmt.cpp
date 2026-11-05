@@ -98,10 +98,13 @@ static std::vector<NoteFile> listNotes (const fs::path& dir, int stride)
         // BS_1_EQ_3_PS_FS_ES_BEQ_1_10.wav  -> ... PS_<ps> ES_<es> <string> <fret>
         std::vector<std::string> t; std::stringstream ss (p.stem().string()); std::string tok;
         while (std::getline (ss, tok, '_')) t.push_back (tok);
-        if (t.size() < 10) continue;
+        // two naming schemes:  BS_1_EQ_1_FS_NO_<s>_<f>   and   BS_1_EQ_1_PS_FS_ES_BEQ_<s>_<f>
+        if (t.size() < 8) continue;
+        const bool longForm = t.size() >= 10 && t[4] == "PS";
+        const std::string ps = longForm ? t[5] : t[4], es = longForm ? t[7] : t[5];
         const int str = std::atoi (t[t.size() - 2].c_str()), fret = std::atoi (t.back().c_str());
         if (str < 1 || str > 4) continue;
-        NoteFile nf { p.string(), t[5], t[7], open[str - 1] + fret };
+        NoteFile nf { p.string(), ps, es, open[str - 1] + fret };
         if (nf.es == "HA") continue;                      // harmonics: not needed
         if (k++ % stride) continue;
         v.push_back (nf);
@@ -128,6 +131,8 @@ static double estimateOnset (const std::vector<float>& a, double fs)
     return (j + quiet) / fs;
 }
 
+static bool gVerbose = false;
+
 static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
 {
     NoteStats s;
@@ -149,6 +154,12 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     if (d == 0) { ++s.correct; s.lat.push_back ((first->t - on) * 1000.0); }
     else if (d % 12 == 0) ++s.octave;
     else ++s.wrong;
+    if (gVerbose && d != 0)
+    {
+        std::string seq;
+        for (auto& e : ev) if (e.e.isNoteOn) seq += nn (e.e.note) + "@" + std::to_string ((int) ((e.t - on) * 1000)) + " ";
+        std::printf ("    NOTE %s want %s : %s\n", fs::path (nf.path).filename().string().c_str(), nn (nf.pitch).c_str(), seq.c_str());
+    }
     // glitches: any further note-on that is not the target pitch (bends/slides may move +-2)
     const int tol = (nf.es == "SLU" || nf.es == "SLD") ? 12 : (nf.es.rfind ("BE", 0) == 0 || nf.es.rfind ("VI", 0) == 0) ? 2 : 0;
     for (auto& e : ev)
@@ -236,6 +247,16 @@ static LineStats evalLine (const fs::path& wav, const fs::path& csv, const Confi
             std::printf ("    %s %7.3f miss %-4s (%s/%s)\n", wav.stem().string().c_str(), g.on, nn (g.pitch).c_str(), g.ps.c_str(), g.es.c_str());
     }
     for (size_t k = 0; k < ev.size(); ++k) if (ev[k].e.isNoteOn && ! ignore[k]) ++s.det;
+    if (verbose)
+        for (size_t k = 0; k < ev.size(); ++k)
+        {
+            if (! ev[k].e.isNoteOn || ignore[k] || used[k]) continue;
+            // nearest annotated note before this detection
+            const GtNote* prev = nullptr;
+            for (auto& g : gt) if (g.on <= ev[k].t - off + 0.05) prev = &g;
+            std::printf ("    %s %7.3f EXTRA %-4s  (last gt: %s @%.3f-%.3f %s/%s)\n", wav.stem().string().c_str(), ev[k].t, nn (ev[k].e.note).c_str(),
+                         prev ? nn (prev->pitch).c_str() : "-", prev ? prev->on : 0.0, prev ? prev->off : 0.0, prev ? prev->ps.c_str() : "", prev ? prev->es.c_str() : "");
+        }
     return s;
 }
 
@@ -259,6 +280,7 @@ int main (int argc, char** argv)
     for (int i = 2; i < argc; ++i) cfgs.push_back (parseConfig (argv[i]));
     if (cfgs.empty()) cfgs.push_back (parseConfig (""));
     const bool verbose = std::getenv ("VERBOSE") != nullptr;
+    gVerbose = verbose;
     const int stride = std::getenv ("STRIDE") ? std::atoi (std::getenv ("STRIDE")) : 1;
 
     auto notes = listNotes (root / "notes", stride);
