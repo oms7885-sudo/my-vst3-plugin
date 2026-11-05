@@ -1,5 +1,3 @@
-skip=30
-skip=60
-skip=100
-wmin=0.15
-wmin=0.4
+amb=0.6,bias=0
+yt=0.3,amb=0.6,bias=0
+fast=0.05

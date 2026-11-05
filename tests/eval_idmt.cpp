@@ -93,7 +93,7 @@ struct NoteFile { std::string path, ps, es; int pitch; };
 struct NoteStats
 {
     int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0, settled = 0;
-    std::vector<double> lat, onsetErr, detLat;   // latency; tracker onset - true onset; note-on - tracker onset
+    std::vector<double> lat, onsetErr, detLat, firstVoiced, firstRight;   // latency; tracker onset - true onset; note-on - tracker onset
     std::map<int, std::vector<double>> latByString;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
     std::map<int, int> diffs;                            // first-note error in semitones
@@ -104,6 +104,8 @@ struct NoteStats
         glitch += o.glitch; deadFired += o.deadFired; deadFiles += o.deadFiles;
         lat.insert (lat.end(), o.lat.begin(), o.lat.end());
         onsetErr.insert (onsetErr.end(), o.onsetErr.begin(), o.onsetErr.end());
+        firstVoiced.insert (firstVoiced.end(), o.firstVoiced.begin(), o.firstVoiced.end());
+        firstRight.insert (firstRight.end(), o.firstRight.begin(), o.firstRight.end());
         detLat.insert (detLat.end(), o.detLat.begin(), o.detLat.end());
         for (auto& [k, v] : o.latByString) latByString[k].insert (latByString[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
@@ -189,6 +191,9 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
                 if (std::abs (c2) < 150) cs.push_back (c2);
             }
         if (cs.size() > 5) s.cents[fs::path (nf.path).filename().string().substr (0, 4)].push_back (pct (cs, 0.5));
+        for (auto& [t, f] : fr) if (f > 0 && t > on) { s.firstVoiced.push_back ((t - on) * 1000.0); break; }
+        for (auto& [t, f] : fr)
+            if (f > 0 && t > on && std::abs (1200.0 * std::log2 (f / hz (nf.pitch))) < 50) { s.firstRight.push_back ((t - on) * 1000.0); break; }
         static const double edges[] = { 0.02, 0.04, 0.07, 0.12, 0.25, 0.5 };
         for (int w = 0; w < 5; ++w)
         {
@@ -396,6 +401,8 @@ int main (int argc, char** argv)
         std::printf ("  correct pitch 150 ms after note-on: %.1f%%\n", all.files ? 100.0 * all.settled / all.files : 0.0);
         std::printf ("  latency split: tracker onset - audio onset med %.1f ms (p10 %.1f, p90 %.1f); note-on - tracker onset med %.1f ms (p90 %.1f)\n",
                      pct (all.onsetErr, 0.5), pct (all.onsetErr, 0.1), pct (all.onsetErr, 0.9), pct (all.detLat, 0.5), pct (all.detLat, 0.9));
+        std::printf ("  pitch tracker: first voiced frame med %.1f ms, first frame within 50c of target med %.1f ms (p90 %.1f)\n",
+                     pct (all.firstVoiced, 0.5), pct (all.firstRight, 0.5), pct (all.firstRight, 0.9));
         std::printf ("  latency by pitch range (E1-D#2 / A1.. / D2.. / G2..):");
         for (auto& [k, v] : all.latByString) std::printf ("  %.1f", pct (v, 0.5));
         std::printf ("\n");
