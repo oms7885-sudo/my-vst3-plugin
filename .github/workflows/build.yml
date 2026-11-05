@@ -1,0 +1,28 @@
+name: Build VST3 (Windows)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test pitch tracker
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: BassToMIDI-VST3-Windows
+          path: build/BassToMidi_artefacts/Release/VST3/
+          if-no-files-found: error
