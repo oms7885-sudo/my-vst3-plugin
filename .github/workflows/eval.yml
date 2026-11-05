@@ -1,0 +1,58 @@
+name: Evaluate on real bass recordings
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths: [ 'Source/BassTracker.h', 'tests/**', '.github/workflows/eval.yml' ]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache datasets
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: idmt-bass-v1
+
+      - name: Download IDMT-SMT-Bass datasets (Fraunhofer IDMT, CC BY-NC-ND 4.0)
+        run: |
+          mkdir -p data && cd data
+          if [ ! -d single ]; then
+            curl -sSL -o single.zip "https://zenodo.org/records/7544099/files/IDMT-SMT-BASS-SINGLE-TRACKS.zip?download=1"
+            unzip -q single.zip -d single && rm single.zip
+          fi
+          if [ ! -d notes ]; then
+            curl -sSL -o notes.zip "https://zenodo.org/records/7188892/files/IDMT-SMT-BASS.zip?download=1"
+            unzip -q notes.zip -d notes && rm notes.zip
+          fi
+
+      - name: Inspect dataset layout
+        run: |
+          cd data
+          echo "== single tracks =="; find single | head -80
+          echo "== notes: dirs =="; find notes -maxdepth 4 -type d | head -60
+          echo "== notes: file types =="; find notes -type f | sed 's/.*\.//' | sort | uniq -c
+          echo "== notes: sample files =="; find notes -type f | head -20
+          echo "== sample annotation files =="
+          for f in $(find single notes -type f \( -name '*.xml' -o -name '*.txt' -o -name '*.csv' -o -name '*.lab' -o -name '*.json' \) | head -4); do
+            echo "--- $f"; head -c 2500 "$f"; echo
+          done
+
+      - name: Build evaluator
+        run: g++ -O2 -std=c++17 tests/eval_idmt.cpp -o eval_idmt || echo "evaluator not ready yet"
+
+      - name: Run evaluation
+        run: |
+          if [ -x ./eval_idmt ]; then ./eval_idmt data | tee eval_report.txt; fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval_report.txt
+          if-no-files-found: ignore
