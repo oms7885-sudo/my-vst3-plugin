@@ -33,14 +33,12 @@ jobs:
       - name: Inspect dataset layout
         run: |
           cd data
-          echo "== single tracks =="; find single | head -80
-          echo "== notes: dirs =="; find notes -maxdepth 4 -type d | head -60
-          echo "== notes: file types =="; find notes -type f | sed 's/.*\.//' | sort | uniq -c
-          echo "== notes: sample files =="; find notes -type f | head -20
-          echo "== sample annotation files =="
-          for f in $(find single notes -type f \( -name '*.xml' -o -name '*.txt' -o -name '*.csv' -o -name '*.lab' -o -name '*.json' \) | head -4); do
-            echo "--- $f"; head -c 2500 "$f"; echo
-          done
+          find single -maxdepth 2 | grep -v misc/ | head -40
+          find single -name '*.wav' | head -5
+          for f in $(find single -name '*note_parameters.csv' | head -2); do echo "--- $f"; head -15 "$f"; done
+          find notes -name '*.mat' -o -name '*.pdf'
+          python3 -c "import scipy.io as s,sys; m=s.loadmat(sys.argv[1]); print({k:(getattr(v,'shape',None)) for k,v in m.items()})" $(find notes -name '*.mat' | head -1) || true
+          ls notes/PS/FS | head -5; ls notes/PS/FS | wc -l
 
       - name: Build evaluator
         run: g++ -O2 -std=c++17 tests/eval_idmt.cpp -o eval_idmt || echo "evaluator not ready yet"
