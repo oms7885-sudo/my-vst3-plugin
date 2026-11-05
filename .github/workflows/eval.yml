@@ -2,6 +2,11 @@ name: Evaluate on real bass recordings
 
 on:
   workflow_dispatch:
+    inputs:
+      configs:
+        description: 'Space separated tracker configs, e.g. "st=2 yt=0.2,rt=4"'
+        required: false
+        default: ''
   push:
     branches: [ main ]
     paths: [ 'Source/BassTracker.h', 'tests/**', '.github/workflows/eval.yml' ]
@@ -30,22 +35,16 @@ jobs:
             unzip -q notes.zip -d notes && rm notes.zip
           fi
 
-      - name: Inspect dataset layout
-        run: |
-          cd data
-          find single -maxdepth 2 | grep -v misc/ | head -40
-          find single -name '*.wav' | head -5
-          for f in $(find single -name '*note_parameters.csv' | head -2); do echo "--- $f"; head -15 "$f"; done
-          find notes -name '*.mat' -o -name '*.pdf'
-          python3 -c "import scipy.io as s,sys; m=s.loadmat(sys.argv[1]); print({k:(getattr(v,'shape',None)) for k,v in m.items()})" $(find notes -name '*.mat' | head -1) || true
-          ls notes/PS/FS | head -5; ls notes/PS/FS | wc -l
-
       - name: Build evaluator
-        run: g++ -O2 -std=c++17 tests/eval_idmt.cpp -o eval_idmt || echo "evaluator not ready yet"
+        run: g++ -O2 -march=native -std=c++17 -pthread tests/eval_idmt.cpp -o eval_idmt
 
       - name: Run evaluation
         run: |
-          if [ -x ./eval_idmt ]; then ./eval_idmt data | tee eval_report.txt; fi
+          CFGS="${{ github.event.inputs.configs }}"
+          if [ -z "$CFGS" ]; then CFGS="$(cat tests/eval_configs.txt 2>/dev/null)"; fi
+          ./eval_idmt data "" $CFGS | tee eval_report.txt
+          echo; echo "== error details (default config) =="
+          VERBOSE=1 ./eval_idmt data "" | sed -n '/^    /p' | head -300 | tee -a eval_report.txt
 
       - name: Upload report
         if: always()
