@@ -1,6 +1,2 @@
-rise=-2
-rise=3
-reqon=0
-sub=1.5
-sub=3
-legato=100
+rt=4
+yt=0.2

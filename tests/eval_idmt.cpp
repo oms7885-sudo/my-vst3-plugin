@@ -82,12 +82,14 @@ struct NoteStats
     int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0;
     std::vector<double> lat;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
+    std::map<int, int> diffs;                            // first-note error in semitones
     void add (const NoteStats& o)
     {
         files += o.files; correct += o.correct; octave += o.octave; wrong += o.wrong; missed += o.missed;
         glitch += o.glitch; deadFired += o.deadFired; deadFiles += o.deadFiles;
         lat.insert (lat.end(), o.lat.begin(), o.lat.end());
         for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
+        for (auto& [k, v] : o.diffs) diffs[k] += v;
     }
 };
 
@@ -171,6 +173,7 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     for (auto& e : ev) if (e.e.isNoteOn) { first = &e; break; }
     if (! first) { ++s.missed; return s; }
     const int d = first->e.note - nf.pitch;
+    if (d != 0) ++s.diffs[d];
     if (d == 0) { ++s.correct; s.lat.push_back ((first->t - on) * 1000.0); }
     else if (d % 12 == 0) ++s.octave;
     else ++s.wrong;
@@ -335,8 +338,12 @@ int main (int argc, char** argv)
                 if (s.deadFiles) std::printf ("  %-18s %6d  dead notes that fired a note: %.1f%%\n", name.c_str(), s.deadFiles, 100.0 * s.deadFired / s.deadFiles);
                 return;
             }
-            std::printf ("  %-18s %6d %6.1f %5d %6d %5d %7d  %5.1f / %5.1f\n", name.c_str(), s.files, 100.0 * s.correct / s.files,
-                         s.octave, s.wrong, s.missed, s.glitch, pct (s.lat, 0.5), pct (s.lat, 0.9));
+            std::string top;
+            std::vector<std::pair<int, int>> dv; for (auto& [k, v] : s.diffs) dv.push_back ({ v, k });
+            std::sort (dv.rbegin(), dv.rend());
+            for (size_t i = 0; i < dv.size() && i < 4; ++i) top += (dv[i].second > 0 ? "+" : "") + std::to_string (dv[i].second) + ":" + std::to_string (dv[i].first) + " ";
+            std::printf ("  %-18s %6d %6.1f %5d %6d %5d %7d  %5.1f / %5.1f   %s\n", name.c_str(), s.files, 100.0 * s.correct / s.files,
+                         s.octave, s.wrong, s.missed, s.glitch, pct (s.lat, 0.5), pct (s.lat, 0.9), top.c_str());
         };
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);

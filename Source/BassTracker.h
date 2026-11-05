@@ -567,9 +567,9 @@ private:
     int retrigFrames = 0, retrigTimeoutFrames = 55, onsetStartWindow = 2750;
 public:
     bool requireOnset = true;
-    float retrigRiseDb = 1.0f;
+    float retrigRiseDb = 3.0f;
     float legatoRangeDb = 24.0f;
-    float subFactor = 0.0f;      // sub-harmonic correction (0 = off)
+    float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
     float muteDropDb = 18.0f;
     float hysteresis = 0.75f;   // semitones
     float hfFactor = 1.0f;
