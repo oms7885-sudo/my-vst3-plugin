@@ -103,6 +103,7 @@ public:
         refractory = (int) std::lround (fsd * 0.035);
         onsetStartWindow = (int) std::lround (fsd * 0.25);
         ambigMaxWait = (int) std::lround (fsd * ambigWaitMs * 0.001);
+        attackBiasLen = (int) std::lround (fsd * attackBiasMs * 0.001);
         hfHp1.setHighpass (fs, 1500.0, 0.541);
         hfHp2.setHighpass (fs, 1500.0, 1.307);
         hfRelease = std::exp (-1.0 / (0.004 * fs));
@@ -239,7 +240,11 @@ private:
         bool ambiguous = false;
         if (freq > 0.0f)
         {
-            const double fm = 69.0 + 12.0 * std::log2 (freq / 440.0);
+            double fm = 69.0 + 12.0 * std::log2 (freq / 440.0);
+            // A hard pluck / slap pop starts sharp and settles within ~70 ms (measured on
+            // real recordings: pops are +20..+40 cents early on). Lean towards the lower note then.
+            if (decimTotal - lastOnsetAt < attackBiasLen)
+                fm -= attackBias;
             // between two semitones (attack pitch glide of a hard pluck / slap pop, bends)
             ambiguous = std::abs (fm - std::round (fm)) > ambigSemis;
             int raw = (int) std::lround (fm);
@@ -572,7 +577,7 @@ private:
     int framePos = 0;
     float prevLevelDb = -140.0f, notePeakDb = -140.0f, retrigPreLevel = -140.0f, retrigPeak = -140.0f;
     bool retrigPending = false;
-    int retrigFrames = 0, retrigTimeoutFrames = 55, onsetStartWindow = 2750, ambigMaxWait = 400;
+    int retrigFrames = 0, retrigTimeoutFrames = 55, onsetStartWindow = 2750, ambigMaxWait = 400, attackBiasLen = 800;
 public:
     bool requireOnset = true;
     float retrigRiseDb = 3.0f;
@@ -580,6 +585,8 @@ public:
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
     float ambigSemis = 0.5f;     // > 0.5 disables the ambiguity wait
     float ambigWaitMs = 40.0f;
+    float attackBias = 0.0f;     // semitones
+    float attackBiasMs = 70.0f;
     float muteDropDb = 18.0f;
     float hysteresis = 0.75f;   // semitones
     float hfFactor = 1.0f;

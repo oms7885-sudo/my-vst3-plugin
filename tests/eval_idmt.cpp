@@ -59,6 +59,8 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "sub") tr.subFactor = v;
         else if (k == "amb") tr.ambigSemis = v;
         else if (k == "ambwait") { tr.ambigWaitMs = v; }
+        else if (k == "bias") tr.attackBias = v;
+        else if (k == "biasms") tr.attackBiasMs = v;
     }
 }
 
