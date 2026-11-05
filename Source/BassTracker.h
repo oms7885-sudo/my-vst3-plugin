@@ -374,7 +374,9 @@ private:
         // into tune: give it a little time before committing (bounded wait).
         const bool waitForPitch = ambiguous && decimTotal - lastOnsetAt < ambigMaxWait;
 
-        if (note == candidateNote) { if (! waitForPitch || candidateCount + 1 < params.stableFrames) ++candidateCount; }
+        // a very clean periodicity counts double (faster lock on clean attacks)
+        const int inc = (fastLockDip > 0.0f && lastDip < fastLockDip) ? 2 : 1;
+        if (note == candidateNote) { if (! waitForPitch || candidateCount + inc < params.stableFrames) candidateCount += inc; }
         else { candidateNote = note; candidateCount = 1; peakSinceCandidate = levelDb; }
         peakSinceCandidate = std::max (peakSinceCandidate, levelDb);
 
@@ -558,6 +560,8 @@ private:
                 return 0.0f;
         }
 
+        lastDip = diff[(size_t) best];
+
         // Parabolic interpolation
         double t = best;
         if (best > 1 && best < tauLimit)
@@ -600,6 +604,8 @@ public:
     float ambigSemis = 0.25f;    // > 0.5 disables the ambiguity wait
     float ambigWaitMs = 60.0f;
     float attackBias = 0.15f;    // semitones
+    float fastLockDip = 0.0f;    // 0 = off
+    float lastDip = 1.0f;
     float attackBiasMs = 70.0f;
     float muteDropDb = 18.0f;
     float hysteresis = 0.75f;   // semitones
