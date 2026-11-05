@@ -59,15 +59,17 @@ static void applyExtra (BassTracker& tr, const Config& c)
     }
 }
 
-static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Config& c)
+static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Config& c,
+                               std::vector<std::pair<double, float>>* freqs = nullptr)
 {
     BassTracker tr; tr.prepare (fs); tr.setParams (c.p); applyExtra (tr, c);
     std::vector<Ev> ev;
-    const int block = 256;
+    const int block = freqs ? 64 : 256;
     for (int pos = 0; pos < (int) a.size(); pos += block)
     {
         const int n = std::min (block, (int) a.size() - pos);
         tr.process (a.data() + pos, n, [&] (const NoteEvent& e) { ev.push_back ({ e, (pos + e.sampleOffset) / fs }); });
+        if (freqs) freqs->push_back ({ (pos + n) / fs, tr.getLastFreq() });
     }
     return ev;
 }
@@ -79,11 +81,13 @@ struct NoteStats
 {
     int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0;
     std::vector<double> lat;
+    std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
     void add (const NoteStats& o)
     {
         files += o.files; correct += o.correct; octave += o.octave; wrong += o.wrong; missed += o.missed;
         glitch += o.glitch; deadFired += o.deadFired; deadFiles += o.deadFiles;
         lat.insert (lat.end(), o.lat.begin(), o.lat.end());
+        for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
     }
 };
 
@@ -142,7 +146,8 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     NoteStats s;
     std::vector<float> a; double fs;
     if (! readWav (nf.path.c_str(), a, fs)) return s;
-    auto ev = runCfg (a, fs, c);
+    std::vector<std::pair<double, float>> fr;
+    auto ev = runCfg (a, fs, c, nf.es == "NO" ? &fr : nullptr);
     if (nf.es == "DN")
     {
         ++s.deadFiles;
@@ -151,6 +156,17 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     }
     ++s.files;
     const double on = estimateOnset (a, fs);
+    if (! fr.empty())
+    {
+        std::vector<double> cs;
+        for (auto& [t, f] : fr)
+            if (f > 0 && t > on + 0.1 && t < on + 0.6)
+            {
+                double c2 = 1200.0 * std::log2 (f / hz (nf.pitch));
+                if (std::abs (c2) < 150) cs.push_back (c2);
+            }
+        if (cs.size() > 5) s.cents[fs::path (nf.path).filename().string().substr (0, 4)].push_back (pct (cs, 0.5));
+    }
     const Ev* first = nullptr;
     for (auto& e : ev) if (e.e.isNoteOn) { first = &e; break; }
     if (! first) { ++s.missed; return s; }
@@ -324,6 +340,11 @@ int main (int argc, char** argv)
         };
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);
+        for (auto& [b, v] : all.cents)
+        {
+            int out = 0; for (double x : v) if (std::abs (x) > 35) ++out;
+            std::printf ("  tuning %s: median %+.0f cents, p10 %+.0f, p90 %+.0f, >35c off: %.0f%%\n", b.c_str(), pct (v, 0.5), pct (v, 0.1), pct (v, 0.9), 100.0 * out / v.size());
+        }
 
         // bass lines
         std::vector<LineStats> ls (lines.size());
