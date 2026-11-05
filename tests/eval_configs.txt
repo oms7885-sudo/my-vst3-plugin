@@ -1,4 +1,0 @@
-amb=0.3
-amb=0.35,ambwait=25
-amb=0.25,ambwait=60
-amb=0.3,rt=4

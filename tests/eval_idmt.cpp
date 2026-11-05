@@ -356,6 +356,22 @@ int main (int argc, char** argv)
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);
         std::printf ("  correct pitch 150 ms after note-on: %.1f%%\n", all.files ? 100.0 * all.settled / all.files : 0.0);
+        {
+            // semitone errors by recording session (bass / pickup setting / style)
+            std::map<std::string, std::pair<int, int>> sess;   // key -> (errors +-1, files)
+            for (size_t i = 0; i < notes.size(); ++i)
+            {
+                if (notes[i].es != "NO") continue;
+                const std::string fn = fs::path (notes[i].path).filename().string();
+                const std::string key = fn.substr (0, 9) + "_" + notes[i].ps;
+                auto& e = sess[key];
+                ++e.second;
+                for (auto& [d, n] : per[i].diffs) if (std::abs (d) == 1) e.first += n;
+            }
+            std::string line;
+            for (auto& [k, v] : sess) if (v.first >= 3) line += k + ":" + std::to_string (v.first) + "/" + std::to_string (v.second) + "  ";
+            std::printf ("  +-1 semitone errors by session: %s\n", line.c_str());
+        }
         for (auto& [b, v] : all.cents)
         {
             int out = 0; for (double x : v) if (std::abs (x) > 35) ++out;
