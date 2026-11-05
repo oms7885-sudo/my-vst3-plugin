@@ -231,7 +231,11 @@ private:
         int note = -1;
         if (freq > 0.0f)
         {
-            const int raw = (int) std::lround (69.0 + 12.0 * std::log2 (freq / 440.0));
+            const double fm = 69.0 + 12.0 * std::log2 (freq / 440.0);
+            int raw = (int) std::lround (fm);
+            // Hysteresis: vibrato / small bends / slightly out-of-tune strings stay on the held note
+            if (activeNote >= 0 && std::abs (fm - (activeNote - params.transpose)) < hysteresis)
+                raw = activeNote - params.transpose;
             if (raw >= params.lowestNote && raw <= params.highestNote)
                 note = std::clamp (raw + params.transpose, 0, 127);
         }
@@ -482,6 +486,7 @@ private:
     int framePos = 0;
 public:
     float muteDropDb = 18.0f;
+    float hysteresis = 0.75f;   // semitones
     float hfFactor = 1.0f;
     float wMinFactor = 0.25f;
     bool confirmOctave = false;

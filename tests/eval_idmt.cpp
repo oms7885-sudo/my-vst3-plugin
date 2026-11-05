@@ -51,6 +51,7 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "oct") tr.confirmOctave = v != 0;
         else if (k == "skip") tr.skipAfterOnset = (int) v;
         else if (k == "mute") tr.muteDropDb = v;
+        else if (k == "hyst") tr.hysteresis = v;
     }
 }
 
