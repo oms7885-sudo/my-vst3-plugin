@@ -102,6 +102,7 @@ public:
         hfRecent = std::max (2, (int) std::lround (fsd * 0.004));
         refractory = (int) std::lround (fsd * 0.035);
         onsetStartWindow = (int) std::lround (fsd * 0.25);
+        ambigMaxWait = (int) std::lround (fsd * ambigWaitMs * 0.001);
         hfHp1.setHighpass (fs, 1500.0, 0.541);
         hfHp2.setHighpass (fs, 1500.0, 1.307);
         hfRelease = std::exp (-1.0 / (0.004 * fs));
@@ -235,9 +236,12 @@ private:
         lastFreq = freq;
 
         int note = -1;
+        bool ambiguous = false;
         if (freq > 0.0f)
         {
             const double fm = 69.0 + 12.0 * std::log2 (freq / 440.0);
+            // between two semitones (attack pitch glide of a hard pluck / slap pop, bends)
+            ambiguous = std::abs (fm - std::round (fm)) > ambigSemis;
             int raw = (int) std::lround (fm);
             // Hysteresis: vibrato / small bends / slightly out-of-tune strings stay on the held note
             if (activeNote >= 0 && std::abs (fm - (activeNote - params.transpose)) < hysteresis)
@@ -360,11 +364,15 @@ private:
             return;
         }
 
-        if (note == candidateNote) ++candidateCount;
+        // An attack whose pitch sits between two semitones is usually still gliding
+        // into tune: give it a little time before committing (bounded wait).
+        const bool waitForPitch = ambiguous && decimTotal - lastOnsetAt < ambigMaxWait;
+
+        if (note == candidateNote) { if (! waitForPitch || candidateCount + 1 < params.stableFrames) ++candidateCount; }
         else { candidateNote = note; candidateCount = 1; peakSinceCandidate = levelDb; }
         peakSinceCandidate = std::max (peakSinceCandidate, levelDb);
 
-        if (candidateCount >= params.stableFrames)
+        if (candidateCount >= params.stableFrames && ! waitForPitch)
         {
             startNote (note, velocityFor (peakSinceCandidate), levelDb, sampleOffset, emit);
             candidateCount = 0;
@@ -564,12 +572,14 @@ private:
     int framePos = 0;
     float prevLevelDb = -140.0f, notePeakDb = -140.0f, retrigPreLevel = -140.0f, retrigPeak = -140.0f;
     bool retrigPending = false;
-    int retrigFrames = 0, retrigTimeoutFrames = 55, onsetStartWindow = 2750;
+    int retrigFrames = 0, retrigTimeoutFrames = 55, onsetStartWindow = 2750, ambigMaxWait = 400;
 public:
     bool requireOnset = true;
     float retrigRiseDb = 3.0f;
     float legatoRangeDb = 24.0f;
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
+    float ambigSemis = 0.5f;     // > 0.5 disables the ambiguity wait
+    float ambigWaitMs = 40.0f;
     float muteDropDb = 18.0f;
     float hysteresis = 0.75f;   // semitones
     float hfFactor = 1.0f;

@@ -56,13 +56,15 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "rise") tr.retrigRiseDb = v;
         else if (k == "legato") tr.legatoRangeDb = v;
         else if (k == "sub") tr.subFactor = v;
+        else if (k == "amb") tr.ambigSemis = v;
+        else if (k == "ambwait") { tr.ambigWaitMs = v; }
     }
 }
 
 static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Config& c,
                                std::vector<std::pair<double, float>>* freqs = nullptr)
 {
-    BassTracker tr; tr.prepare (fs); tr.setParams (c.p); applyExtra (tr, c);
+    BassTracker tr; applyExtra (tr, c); tr.prepare (fs); tr.setParams (c.p);
     std::vector<Ev> ev;
     const int block = freqs ? 64 : 256;
     for (int pos = 0; pos < (int) a.size(); pos += block)
@@ -79,13 +81,13 @@ struct NoteFile { std::string path, ps, es; int pitch; };
 
 struct NoteStats
 {
-    int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0;
+    int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0, settled = 0;
     std::vector<double> lat;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
     std::map<int, int> diffs;                            // first-note error in semitones
     void add (const NoteStats& o)
     {
-        files += o.files; correct += o.correct; octave += o.octave; wrong += o.wrong; missed += o.missed;
+        files += o.files; correct += o.correct; settled += o.settled; octave += o.octave; wrong += o.wrong; missed += o.missed;
         glitch += o.glitch; deadFired += o.deadFired; deadFiles += o.deadFiles;
         lat.insert (lat.end(), o.lat.begin(), o.lat.end());
         for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
@@ -174,6 +176,12 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     if (! first) { ++s.missed; return s; }
     const int d = first->e.note - nf.pitch;
     if (d != 0) ++s.diffs[d];
+    {
+        // which note is sounding 150 ms after the first note-on (did it settle on the right pitch?)
+        int cur = -1;
+        for (auto& e : ev) { if (e.t > first->t + 0.15) break; if (e.e.isNoteOn) cur = e.e.note; else if (e.e.note == cur) cur = -1; }
+        if (cur == nf.pitch) ++s.settled;
+    }
     if (d == 0) { ++s.correct; s.lat.push_back ((first->t - on) * 1000.0); }
     else if (d % 12 == 0) ++s.octave;
     else ++s.wrong;
@@ -347,6 +355,7 @@ int main (int argc, char** argv)
         };
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);
+        std::printf ("  correct pitch 150 ms after note-on: %.1f%%\n", all.files ? 100.0 * all.settled / all.files : 0.0);
         for (auto& [b, v] : all.cents)
         {
             int out = 0; for (double x : v) if (std::abs (x) > 35) ++out;
