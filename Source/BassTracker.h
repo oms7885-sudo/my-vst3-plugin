@@ -430,7 +430,14 @@ private:
         if (newest - older >= hfFactor * params.retriggerDb && newest > params.thresholdDb - 30.0f)
         {
             pendingOnset = true;
-            lastOnsetAt = decimTotal - hfRecent;
+            // place the onset where the transient actually crossed the threshold
+            int back = 0;
+            for (int k = hfRecent - 1; k >= 0; --k)
+            {
+                const int idx = (hfPos - 1 - k + hfHistLen) % hfHistLen;
+                if (hfHist[(size_t) idx] - older >= hfFactor * params.retriggerDb) { back = k; break; }
+            }
+            lastOnsetAt = decimTotal - back;
            #ifdef B2M_DEBUG
             std::printf ("    [hf onset %.3f  new %.1f old %.1f]\n", decimTotal / fsd, newest, older);
            #endif
@@ -500,6 +507,12 @@ private:
             diff[(size_t) tau] = running > 0.0 ? (float) (diff[(size_t) tau] * tau / running) : 1.0f;
         }
 
+       #ifdef B2M_DEBUG
+        {
+            int mi = tauMin; for (int t = tauMin; t <= tauLimit; ++t) if (diff[(size_t) t] < diff[(size_t) mi]) mi = t;
+            std::printf ("      [yin avail %d tauLimit %d min %.3f at %d (%.1f Hz)]\n", avail, tauLimit, diff[(size_t) mi], mi, fsd / mi);
+        }
+       #endif
         // First dip below threshold, then walk to its local minimum
         int best = -1;
         for (int tau = tauMin; tau < tauLimit; ++tau)
