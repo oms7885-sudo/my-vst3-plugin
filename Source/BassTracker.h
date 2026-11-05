@@ -101,11 +101,13 @@ public:
         hfHistLen = (int) std::lround (fsd * 0.045);
         hfRecent = std::max (2, (int) std::lround (fsd * 0.004));
         refractory = (int) std::lround (fsd * 0.035);
+        onsetStartWindow = (int) std::lround (fsd * 0.25);
         hfHp1.setHighpass (fs, 1500.0, 0.541);
         hfHp2.setHighpass (fs, 1500.0, 1.307);
         hfRelease = std::exp (-1.0 / (0.004 * fs));
         bufLen = window + tauMax + 2;
         hop = std::max (8, (int) std::lround (fsd * 0.0027)); // ~2.7 ms
+        retrigTimeoutFrames = std::max (4, (int) std::lround (0.15 * fsd / hop));
 
         ring.assign ((size_t) bufLen, 0.0f);
         lin.assign ((size_t) bufLen, 0.0f);
@@ -122,7 +124,7 @@ public:
         hfEnv = 0.0f; hfPos = 0; decimTotal = 0; lastOnsetAt = -1000000; pendingOnset = false;
         writePos = 0; decimCounter = 0; hopCounter = 0; filled = 0;
         activeNote = -1; candidateNote = -1; candidateCount = 0;
-        quietCount = 0; framesSinceOn = 0;
+        quietCount = 0; framesSinceOn = 0; retrigPending = false; prevLevelDb = -140.0f;
         lastFreq = 0.0f; lastLevelDb = -120.0f;
     }
 
@@ -208,7 +210,11 @@ private:
             else if (newPk - oldPk >= params.retriggerDb && decimTotal - lastOnsetAt > gateLen + onsetLen)
             {
                 onset = true;
-                lastOnsetAt = decimTotal - onsetLen / 2;
+                // locate where the signal first rose above the previous peak
+                const float thrAmp = std::pow (10.0f, oldPk / 20.0f);
+                int k = std::max (0, bufLen - 2 * onsetLen);
+                while (k < bufLen - 1 && std::abs (lin[(size_t) k]) <= thrAmp) ++k;
+                lastOnsetAt = decimTotal - (bufLen - k);
             }
         }
         pendingOnset = false;
@@ -240,9 +246,13 @@ private:
                 note = std::clamp (raw + params.transpose, 0, 127);
         }
 
+        const float prevLevel = prevLevelDb;
+        prevLevelDb = levelDb;
+
         if (activeNote >= 0)
         {
             ++framesSinceOn;
+            notePeakDb = std::max (notePeakDb, levelDb);
 
             // Muting: the level dropped fast (natural decay is ~10-20 dB/s, a mute is
             // tens of dB within a few ms) -> release right away.
@@ -251,10 +261,7 @@ private:
             pushFrameLevel (levelDb);
             if (levelDb < recentMax - muteDropDb)
             {
-                emit (NoteEvent { false, activeNote, 0, sampleOffset });
-                activeNote = -1;
-                candidateNote = -1;
-                candidateCount = 0;
+                release (sampleOffset, emit);
                 return;
             }
 
@@ -262,28 +269,55 @@ private:
             if (levelDb < params.thresholdDb - 3.0f)
             {
                 if (++quietCount >= 3)
-                {
-                    emit (NoteEvent { false, activeNote, 0, sampleOffset });
-                    activeNote = -1;
-                    candidateNote = -1;
-                    candidateCount = 0;
-                }
+                    release (sampleOffset, emit);
                 return;
             }
             quietCount = 0;
 
-            // New pluck on top of a ringing note -> release, then re-detect
+            // A transient on top of a ringing note: maybe a new pluck, maybe just the
+            // finger touching the string to mute it. Keep the note and decide once the
+            // pitch after the transient is known.
+            const long long sinceOnset = decimTotal - lastOnsetAt;
+            const int onsetIdx = sinceOnset < bufLen ? bufLen - (int) sinceOnset : 0;
             if (onset && framesSinceOn > 4)
             {
-                emit (NoteEvent { false, activeNote, 0, sampleOffset });
-                activeNote = -1;
+                retrigPending = true;
+                // level just before the transient vs. level after it
+                retrigPreLevel = onsetIdx > 0 ? toDb (peak (onsetIdx - gl, onsetIdx)) : prevLevel;
+                retrigPeak = -140.0f;
+                retrigFrames = 0;
                 candidateNote = -1;
                 candidateCount = 0;
+            }
+
+            if (retrigPending)
+            {
+                retrigPeak = std::max (retrigPeak, onsetIdx > 0 ? toDb (peak (std::max (onsetIdx, bufLen - gl), bufLen)) : levelDb);
+                if (++retrigFrames > retrigTimeoutFrames)
+                {
+                    retrigPending = false;
+                }
+                else if (note >= 0)
+                {
+                    if (note == candidateNote) ++candidateCount;
+                    else { candidateNote = note; candidateCount = 1; }
+
+                    const int need = params.stableFrames + (std::abs (note - activeNote) == 12 ? 2 : 0);
+                    if (candidateCount >= need)
+                    {
+                        retrigPending = false;
+                        candidateCount = 0;
+                        // same pitch: only a real re-pluck if the level actually rose
+                        if (note != activeNote || retrigPeak > retrigPreLevel + retrigRiseDb)
+                            startNote (note, velocityFor (retrigPeak), levelDb, sampleOffset, emit);
+                    }
+                }
                 return;
             }
 
-            // Pitch change (slide / hammer-on / pull-off)
-            if (note >= 0 && note != activeNote)
+            // Pitch change without a new pluck (slide / hammer-on / pull-off).
+            // Ignored in the quiet tail of a note, where the pitch estimate drifts.
+            if (note >= 0 && note != activeNote && levelDb > notePeakDb - legatoRangeDb)
             {
                 if (note == candidateNote) ++candidateCount;
                 else { candidateNote = note; candidateCount = 1; }
@@ -292,10 +326,7 @@ private:
                 const int need = params.stableFrames + (std::abs (note - activeNote) == 12 ? 4 : 1);
                 if (candidateCount >= need)
                 {
-                    emit (NoteEvent { false, activeNote, 0, sampleOffset });
-                    activeNote = note;
-                    framesSinceOn = 0;
-                    emit (NoteEvent { true, activeNote, velocityFor (levelDb), sampleOffset });
+                    startNote (note, velocityFor (levelDb), levelDb, sampleOffset, emit);
                     candidateCount = 0;
                 }
             }
@@ -320,19 +351,48 @@ private:
             return;
         }
 
+        // A note only starts on a pluck: noise, other strings ringing and the
+        // decaying tail of a released note never start one.
+        if (requireOnset && params.retriggerDb > 0.0f && decimTotal - lastOnsetAt > onsetStartWindow)
+        {
+            candidateNote = -1;
+            candidateCount = 0;
+            return;
+        }
+
         if (note == candidateNote) ++candidateCount;
         else { candidateNote = note; candidateCount = 1; peakSinceCandidate = levelDb; }
         peakSinceCandidate = std::max (peakSinceCandidate, levelDb);
 
         if (candidateCount >= params.stableFrames)
         {
-            activeNote = note;
-            framesSinceOn = 0;
-            quietCount = 0;
-            frameLevels.fill (levelDb);
-            emit (NoteEvent { true, activeNote, velocityFor (peakSinceCandidate), sampleOffset });
+            startNote (note, velocityFor (peakSinceCandidate), levelDb, sampleOffset, emit);
             candidateCount = 0;
         }
+    }
+
+    template <typename Emit>
+    void startNote (int note, int velocity, float levelDb, int sampleOffset, Emit&& emit)
+    {
+        if (activeNote >= 0)
+            emit (NoteEvent { false, activeNote, 0, sampleOffset });
+        activeNote = note;
+        framesSinceOn = 0;
+        quietCount = 0;
+        notePeakDb = levelDb;
+        retrigPending = false;
+        frameLevels.fill (levelDb);
+        emit (NoteEvent { true, activeNote, velocity, sampleOffset });
+    }
+
+    template <typename Emit>
+    void release (int sampleOffset, Emit&& emit)
+    {
+        emit (NoteEvent { false, activeNote, 0, sampleOffset });
+        activeNote = -1;
+        candidateNote = -1;
+        candidateCount = 0;
+        retrigPending = false;
     }
 
     void detectTransient()
@@ -443,6 +503,24 @@ private:
         if (best < 0)
             return 0.0f;
 
+        // Sub-harmonic correction: if half (or a third) of the found period also
+        // fits nearly as well, the shorter period is the real one (octave-down error).
+        if (subFactor > 0.0f)
+        {
+            for (int k = 3; k >= 2; --k)
+            {
+                const int c = (int) std::lround ((double) best / k);
+                if (c - 2 < tauMin) continue;
+                int m = c;
+                for (int t = c - 2; t <= c + 2; ++t) if (diff[(size_t) t] < diff[(size_t) m]) m = t;
+                if (diff[(size_t) m] < std::min (0.4f, subFactor * diff[(size_t) best] + 0.05f))
+                {
+                    best = m;
+                    break;
+                }
+            }
+        }
+
         // Octave-up guard: a strong 2nd harmonic dips at half the true period.
         // If the octave below is a playable note but its lag can't be checked yet, wait.
         if (confirmOctave)
@@ -484,7 +562,14 @@ private:
     bool pendingOnset = false;
     std::array<float, 16> frameLevels {};   // ~43 ms of frame levels
     int framePos = 0;
+    float prevLevelDb = -140.0f, notePeakDb = -140.0f, retrigPreLevel = -140.0f, retrigPeak = -140.0f;
+    bool retrigPending = false;
+    int retrigFrames = 0, retrigTimeoutFrames = 55, onsetStartWindow = 2750;
 public:
+    bool requireOnset = true;
+    float retrigRiseDb = 1.0f;
+    float legatoRangeDb = 24.0f;
+    float subFactor = 0.0f;      // sub-harmonic correction (0 = off)
     float muteDropDb = 18.0f;
     float hysteresis = 0.75f;   // semitones
     float hfFactor = 1.0f;

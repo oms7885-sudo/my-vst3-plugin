@@ -52,6 +52,10 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "skip") tr.skipAfterOnset = (int) v;
         else if (k == "mute") tr.muteDropDb = v;
         else if (k == "hyst") tr.hysteresis = v;
+        else if (k == "reqon") tr.requireOnset = v != 0;
+        else if (k == "rise") tr.retrigRiseDb = v;
+        else if (k == "legato") tr.legatoRangeDb = v;
+        else if (k == "sub") tr.subFactor = v;
     }
 }
 
