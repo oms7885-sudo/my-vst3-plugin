@@ -64,16 +64,23 @@ static void applyExtra (BassTracker& tr, const Config& c)
     }
 }
 
+static thread_local std::vector<double> tlOnsetAtNoteOn;   // tracker's own onset time for each note-on
+
 static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Config& c,
                                std::vector<std::pair<double, float>>* freqs = nullptr)
 {
+    tlOnsetAtNoteOn.clear();
     BassTracker tr; applyExtra (tr, c); tr.prepare (fs); tr.setParams (c.p);
     std::vector<Ev> ev;
     const int block = freqs ? 64 : 256;
     for (int pos = 0; pos < (int) a.size(); pos += block)
     {
         const int n = std::min (block, (int) a.size() - pos);
-        tr.process (a.data() + pos, n, [&] (const NoteEvent& e) { ev.push_back ({ e, (pos + e.sampleOffset) / fs }); });
+        tr.process (a.data() + pos, n, [&] (const NoteEvent& e)
+        {
+            ev.push_back ({ e, (pos + e.sampleOffset) / fs });
+            tlOnsetAtNoteOn.push_back (e.isNoteOn ? tr.getLastOnsetSeconds() : -1.0);
+        });
         if (freqs) freqs->push_back ({ (pos + n) / fs, tr.getLastFreq() });
     }
     return ev;
@@ -85,7 +92,8 @@ struct NoteFile { std::string path, ps, es; int pitch; };
 struct NoteStats
 {
     int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0, settled = 0;
-    std::vector<double> lat;
+    std::vector<double> lat, onsetErr, detLat;   // latency; tracker onset - true onset; note-on - tracker onset
+    std::map<int, std::vector<double>> latByString;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
     std::map<int, int> diffs;                            // first-note error in semitones
     std::map<std::string, std::array<std::vector<double>, 5>> glide;  // per style: cents vs time after onset
@@ -94,6 +102,9 @@ struct NoteStats
         files += o.files; correct += o.correct; settled += o.settled; octave += o.octave; wrong += o.wrong; missed += o.missed;
         glitch += o.glitch; deadFired += o.deadFired; deadFiles += o.deadFiles;
         lat.insert (lat.end(), o.lat.begin(), o.lat.end());
+        onsetErr.insert (onsetErr.end(), o.onsetErr.begin(), o.onsetErr.end());
+        detLat.insert (detLat.end(), o.detLat.begin(), o.detLat.end());
+        for (auto& [k, v] : o.latByString) latByString[k].insert (latByString[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.diffs) diffs[k] += v;
         for (auto& [k, arr] : o.glide) for (int w = 0; w < 5; ++w) glide[k][(size_t) w].insert (glide[k][(size_t) w].end(), arr[(size_t) w].begin(), arr[(size_t) w].end());
@@ -201,7 +212,14 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
         for (auto& e : ev) { if (e.t > first->t + 0.15) break; if (e.e.isNoteOn) cur = e.e.note; else if (e.e.note == cur) cur = -1; }
         if (cur == nf.pitch) ++s.settled;
     }
-    if (d == 0) { ++s.correct; s.lat.push_back ((first->t - on) * 1000.0); }
+    if (d == 0)
+    {
+        ++s.correct; s.lat.push_back ((first->t - on) * 1000.0);
+        const double trOn = tlOnsetAtNoteOn[(size_t) (first - ev.data())];
+        s.onsetErr.push_back ((trOn - on) * 1000.0);
+        s.detLat.push_back ((first->t - trOn) * 1000.0);
+        s.latByString[(nf.pitch >= 43) ? 4 : (nf.pitch >= 38) ? 3 : (nf.pitch >= 33) ? 2 : 1].push_back ((first->t - on) * 1000.0);
+    }
     else if (d % 12 == 0) ++s.octave;
     else ++s.wrong;
     if (gVerbose && d != 0)
@@ -375,6 +393,11 @@ int main (int argc, char** argv)
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);
         std::printf ("  correct pitch 150 ms after note-on: %.1f%%\n", all.files ? 100.0 * all.settled / all.files : 0.0);
+        std::printf ("  latency split: tracker onset - audio onset med %.1f ms (p10 %.1f, p90 %.1f); note-on - tracker onset med %.1f ms (p90 %.1f)\n",
+                     pct (all.onsetErr, 0.5), pct (all.onsetErr, 0.1), pct (all.onsetErr, 0.9), pct (all.detLat, 0.5), pct (all.detLat, 0.9));
+        std::printf ("  latency by pitch range (E1-D#2 / A1.. / D2.. / G2..):");
+        for (auto& [k, v] : all.latByString) std::printf ("  %.1f", pct (v, 0.5));
+        std::printf ("\n");
         std::printf ("  pitch glide (median cents | %% beyond +-50c) at 20-40, 40-70, 70-120, 120-250, 250-500 ms:\n");
         for (auto& [k, arr] : all.glide)
         {

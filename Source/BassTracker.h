@@ -178,6 +178,7 @@ public:
     int   getActiveNote() const   { return activeNote; }
     float getLastFreq() const     { return lastFreq; }
     float getLastLevelDb() const  { return lastLevelDb; }
+    double getLastOnsetSeconds() const { return (double) lastOnsetAt / fsd; }
     int   getLatencySamples() const { return (window + tauMax) * decim / 2; }
 
 private:
@@ -583,9 +584,9 @@ public:
     float retrigRiseDb = 3.0f;
     float legatoRangeDb = 24.0f;
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
-    float ambigSemis = 0.5f;     // > 0.5 disables the ambiguity wait
-    float ambigWaitMs = 40.0f;
-    float attackBias = 0.0f;     // semitones
+    float ambigSemis = 0.25f;    // > 0.5 disables the ambiguity wait
+    float ambigWaitMs = 60.0f;
+    float attackBias = 0.15f;    // semitones
     float attackBiasMs = 70.0f;
     float muteDropDb = 18.0f;
     float hysteresis = 0.75f;   // semitones
