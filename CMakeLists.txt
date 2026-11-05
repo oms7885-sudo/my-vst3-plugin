@@ -59,6 +59,7 @@ target_link_libraries(BassToMidi
 option(BASS2MIDI_TESTS "Build tracker test" ON)
 if(BASS2MIDI_TESTS)
     add_executable(test_tracker tests/test_tracker.cpp)
+    add_executable(bench tests/bench.cpp)   # bench [file.wav]: accuracy/latency report
     enable_testing()
     add_test(NAME tracker COMMAND test_tracker 48000)
 endif()
