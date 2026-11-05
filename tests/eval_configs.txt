@@ -1,3 +1,4 @@
-amb=0.6,bias=0
-yt=0.3,amb=0.6,bias=0
-fast=0.05
+glide=0.1
+glide=0.2
+glide=0.1,bias=0
+glide=0.2,ambwait=40

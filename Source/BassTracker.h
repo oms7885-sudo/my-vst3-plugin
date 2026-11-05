@@ -248,6 +248,16 @@ private:
                 fm -= attackBias;
             // between two semitones (attack pitch glide of a hard pluck / slap pop, bends)
             ambiguous = std::abs (fm - std::round (fm)) > ambigSemis;
+            // pitch still gliding (attack settling, slide into the note)?
+            if (onset) fmCount = 0;
+            fmHist[(size_t) (fmCount++ % 3)] = (float) fm;
+            if (glideSemis > 0.0f && fmCount >= 2)
+            {
+                const int n = std::min (fmCount, 3);
+                float lo = fmHist[0], hi = fmHist[0];
+                for (int k = 1; k < n; ++k) { lo = std::min (lo, fmHist[(size_t) k]); hi = std::max (hi, fmHist[(size_t) k]); }
+                if (hi - lo > glideSemis) ambiguous = true;
+            }
             int raw = (int) std::lround (fm);
             // Hysteresis: vibrato / small bends / slightly out-of-tune strings stay on the held note
             if (activeNote >= 0 && std::abs (fm - (activeNote - params.transpose)) < hysteresis)
@@ -312,7 +322,7 @@ private:
                     if (note == candidateNote) ++candidateCount;
                     else { candidateNote = note; candidateCount = 1; }
 
-                    const int need = params.stableFrames + (std::abs (note - activeNote) == 12 ? 2 : 0);
+                    const int need = params.stableFrames + (std::abs (note - activeNote) == 12 ? 4 : 0);
                     if (candidateCount >= need)
                     {
                         retrigPending = false;
@@ -605,12 +615,15 @@ public:
     float ambigWaitMs = 60.0f;
     float attackBias = 0.15f;    // semitones
     float fastLockDip = 0.0f;    // 0 = off
+    float glideSemis = 0.0f;     // 0 = off
+    std::array<float, 3> fmHist {};
+    int fmCount = 0;
     float lastDip = 1.0f;
     float attackBiasMs = 70.0f;
     float muteDropDb = 18.0f;
     float hysteresis = 0.75f;   // semitones
     float hfFactor = 1.0f;
-    float wMinFactor = 0.25f;
+    float wMinFactor = 0.4f;
     bool confirmOctave = false;
     int skipAfterOnset = 0;
 private:
