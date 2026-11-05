@@ -14,6 +14,7 @@
 #include <atomic>
 #include <mutex>
 #include <map>
+#include <array>
 
 namespace fs = std::filesystem;
 
@@ -85,6 +86,7 @@ struct NoteStats
     std::vector<double> lat;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
     std::map<int, int> diffs;                            // first-note error in semitones
+    std::map<std::string, std::array<std::vector<double>, 5>> glide;  // per style: cents vs time after onset
     void add (const NoteStats& o)
     {
         files += o.files; correct += o.correct; settled += o.settled; octave += o.octave; wrong += o.wrong; missed += o.missed;
@@ -92,6 +94,7 @@ struct NoteStats
         lat.insert (lat.end(), o.lat.begin(), o.lat.end());
         for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.diffs) diffs[k] += v;
+        for (auto& [k, arr] : o.glide) for (int w = 0; w < 5; ++w) glide[k][(size_t) w].insert (glide[k][(size_t) w].end(), arr[(size_t) w].begin(), arr[(size_t) w].end());
     }
 };
 
@@ -118,6 +121,8 @@ static std::vector<NoteFile> listNotes (const fs::path& dir, int stride)
         if (str < 1 || str > 4) continue;
         NoteFile nf { p.string(), ps, es, open[str - 1] + fret };
         if (nf.es == "HA") continue;                      // harmonics: not needed
+        // this session reads a steady semitone off its labels on ~half the files (labeling / tuning issue)
+        if (p.filename().string().rfind ("BS_3_EQ_1_FS_NO", 0) == 0) continue;
         if (k++ % stride) continue;
         v.push_back (nf);
     }
@@ -170,6 +175,18 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
                 if (std::abs (c2) < 150) cs.push_back (c2);
             }
         if (cs.size() > 5) s.cents[fs::path (nf.path).filename().string().substr (0, 4)].push_back (pct (cs, 0.5));
+        static const double edges[] = { 0.02, 0.04, 0.07, 0.12, 0.25, 0.5 };
+        for (int w = 0; w < 5; ++w)
+        {
+            std::vector<double> c3;
+            for (auto& [t, f] : fr)
+                if (f > 0 && t > on + edges[w] && t <= on + edges[w + 1])
+                {
+                    const double c2 = 1200.0 * std::log2 (f / hz (nf.pitch));
+                    if (std::abs (c2) < 150) c3.push_back (c2);
+                }
+            if (! c3.empty()) s.glide[nf.ps][(size_t) w].push_back (pct (c3, 0.5));
+        }
     }
     const Ev* first = nullptr;
     for (auto& e : ev) if (e.e.isNoteOn) { first = &e; break; }
@@ -356,6 +373,17 @@ int main (int argc, char** argv)
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);
         std::printf ("  correct pitch 150 ms after note-on: %.1f%%\n", all.files ? 100.0 * all.settled / all.files : 0.0);
+        std::printf ("  pitch glide (median cents | %% beyond +-50c) at 20-40, 40-70, 70-120, 120-250, 250-500 ms:\n");
+        for (auto& [k, arr] : all.glide)
+        {
+            std::printf ("    %s:", k.c_str());
+            for (int w = 0; w < 5; ++w)
+            {
+                int o = 0; for (double x : arr[(size_t) w]) if (std::abs (x) > 50) ++o;
+                std::printf ("  %+4.0f|%2.0f%%", pct (arr[(size_t) w], 0.5), arr[(size_t) w].empty() ? 0.0 : 100.0 * o / arr[(size_t) w].size());
+            }
+            std::printf ("\n");
+        }
         {
             // semitone errors by recording session (bass / pickup setting / style)
             std::map<std::string, std::pair<int, int>> sess;   // key -> (errors +-1, files)
