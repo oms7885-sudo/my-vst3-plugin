@@ -1,3 +1,5 @@
-yt=0.2
-st=2
-yt=0.2,st=2
+skip=30
+skip=60
+skip=100
+wmin=0.15
+wmin=0.4
