@@ -1,1 +1,7 @@
 thr=-34
+thr=-34,drop=6
+thr=-34,drop=3
+thr=-34,octleg=20
+thr=-34,rel=24,reldecay=3
+thr=-34,drop=6,octleg=20,rel=24,reldecay=3
+thr=-40,drop=6,octleg=20,rel=24,reldecay=3

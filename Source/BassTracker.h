@@ -206,7 +206,7 @@ private:
         const float newPk = toDb (peak (bufLen - onsetLen, bufLen));
         const float oldPk = toDb (peak (bufLen - onsetLen - gateLen, bufLen - onsetLen));
         // slowly decaying memory of how loud the playing has been (~6 dB/s)
-        recentPeakDb = std::max (levelDb, recentPeakDb - (float) (6.0 * hop / fsd));
+        recentPeakDb = std::max (levelDb, recentPeakDb - (float) (relDecayDbPerSec * hop / fsd));
         const bool loudEnoughForOnset = onsetRelDb <= 0.0f || levelDb > recentPeakDb - onsetRelDb;
 
         bool onset = false;
@@ -339,8 +339,11 @@ private:
                     {
                         retrigPending = false;
                         candidateCount = 0;
-                        // same pitch: only a real re-pluck if the level actually rose
-                        if (note != activeNote || retrigPeak > retrigPreLevel + retrigRiseDb)
+                        // same pitch: only a real re-pluck if the level actually rose.
+                        // other pitch: a muting finger also makes a transient (and a brief
+                        // odd pitch) but the level falls -> not a new note.
+                        if ((note == activeNote && retrigPeak > retrigPreLevel + retrigRiseDb)
+                            || (note != activeNote && retrigPeak > retrigPreLevel - retrigDropDb))
                             startNote (note, velocityFor (retrigPeak), levelDb, sampleOffset, emit);
                     }
                 }
@@ -355,7 +358,7 @@ private:
                 else { candidateNote = note; candidateCount = 1; }
 
                 // Octave jumps are a typical detection error -> demand more evidence
-                const int need = params.stableFrames + (std::abs (note - activeNote) == 12 ? 4 : 1);
+                const int need = params.stableFrames + (std::abs (note - activeNote) % 12 == 0 ? octLegatoExtra : 1);
                 if (candidateCount >= need)
                 {
                     startNote (note, velocityFor (levelDb), levelDb, sampleOffset, emit);
@@ -633,6 +636,9 @@ public:
     float tailDb = 0.0f;         // release when this far below the note's peak (0 = off)
     float onsetRelDb = 0.0f;     // a pluck must be within this of the recent playing level (0 = off)
     float recentPeakDb = -140.0f;
+    float relDecayDbPerSec = 6.0f;
+    float retrigDropDb = 100.0f;  // 100 = off
+    int octLegatoExtra = 4;
     std::array<float, 3> fmHist {};
     int fmCount = 0;
     float lastDip = 1.0f;
