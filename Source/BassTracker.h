@@ -699,7 +699,7 @@ private:
 public:
     bool requireOnset = true;
     float retrigRiseDb = 3.0f;
-    float legatoRangeDb = 24.0f;
+    float legatoRangeDb = 18.0f;
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
     float ambigSemis = 0.25f;    // > 0.5 disables the ambiguity wait
     float ambigWaitMs = 60.0f;
