@@ -206,7 +206,7 @@ private:
         const float newPk = toDb (peak (bufLen - onsetLen, bufLen));
         const float oldPk = toDb (peak (bufLen - onsetLen - gateLen, bufLen - onsetLen));
         bool onset = false;
-        if (params.retriggerDb > 0.0f && levelDb > params.thresholdDb)
+        if (params.retriggerDb > 0.0f && levelDb > params.thresholdDb + onsetMarginDb)
         {
             if (pendingOnset)
                 onset = true;
@@ -439,7 +439,8 @@ private:
             if (k < hfRecent) newest = std::max (newest, v);
             else older = std::max (older, v);
         }
-        if (newest - older >= hfFactor * params.retriggerDb && newest > params.thresholdDb - 30.0f)
+        if (newest - older >= hfFactor * params.retriggerDb && newest > params.thresholdDb - 30.0f
+            && lastLevelDb > params.thresholdDb + onsetMarginDb)
         {
             pendingOnset = true;
             // place the onset where the transient actually crossed the threshold
@@ -616,6 +617,7 @@ public:
     float attackBias = 0.15f;    // semitones
     float fastLockDip = 0.0f;    // 0 = off
     float glideSemis = 0.0f;     // 0 = off
+    float onsetMarginDb = 0.0f;  // a pluck must be this much above the gate
     std::array<float, 3> fmHist {};
     int fmCount = 0;
     float lastDip = 1.0f;

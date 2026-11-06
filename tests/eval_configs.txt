@@ -1,0 +1,5 @@
+margin=6
+margin=12
+legato=16
+margin=6,legato=16
+thr=-34
