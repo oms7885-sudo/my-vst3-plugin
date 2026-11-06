@@ -226,6 +226,7 @@ private:
                 int k = std::max (0, bufLen - 2 * onsetLen);
                 while (k < bufLen - 1 && std::abs (lin[(size_t) k]) <= thrAmp) ++k;
                 lastOnsetAt = decimTotal - (bufLen - k);
+                onsetHfMinusLevel = -140.0f;
             }
         }
         pendingOnset = false;
