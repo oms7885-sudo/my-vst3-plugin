@@ -72,7 +72,8 @@ static void applyExtra (BassTracker& tr, const Config& c)
 static thread_local std::vector<double> tlOnsetAtNoteOn;   // tracker's own onset time for each note-on
 
 static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Config& c,
-                               std::vector<std::pair<double, float>>* freqs = nullptr)
+                               std::vector<std::pair<double, float>>* freqs = nullptr,
+                               std::vector<float>* levels = nullptr)
 {
     tlOnsetAtNoteOn.clear();
     BassTracker tr; applyExtra (tr, c); tr.prepare (fs); tr.setParams (c.p);
@@ -87,6 +88,7 @@ static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Con
             tlOnsetAtNoteOn.push_back (e.isNoteOn ? tr.getLastOnsetSeconds() : -1.0);
         });
         if (freqs) freqs->push_back ({ (pos + n) / fs, tr.getLastFreq() });
+        if (levels) levels->push_back (tr.getLastLevelDb());
     }
     return ev;
 }
@@ -178,7 +180,8 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     std::vector<float> a; double fs;
     if (! readWav (nf.path.c_str(), a, fs)) return s;
     std::vector<std::pair<double, float>> fr;
-    auto ev = runCfg (a, fs, c, nf.es == "NO" ? &fr : nullptr);
+    std::vector<float> lv;
+    auto ev = runCfg (a, fs, c, (nf.es == "NO" || gVerbose) ? &fr : nullptr, gVerbose ? &lv : nullptr);
     if (nf.es == "DN")
     {
         ++s.deadFiles;
@@ -252,6 +255,18 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
             const std::string ivs = std::abs (iv) == 1 || std::abs (iv) == 2 ? "+-1/2" : std::abs (iv) % 12 == 0 ? "oct" : std::abs (iv) == 7 || std::abs (iv) == 19 ? "5th" : "other";
             ++s.glitchKinds[ivs + "@" + b];
         }
+    if (gVerbose && s.glitch > 0 && ! lv.empty())
+    {
+        float pk = -140; for (float l : lv) pk = std::max (pk, l);
+        std::string seq;
+        for (auto& e : ev)
+        {
+            const size_t idx = std::min (lv.size() - 1, (size_t) (e.t * fs / 64));
+            char buf[64]; std::snprintf (buf, sizeof buf, "%s%s@%d(%.0fdB) ", e.e.isNoteOn ? "+" : "-", nn (e.e.note).c_str(), (int) ((e.t - on) * 1000), lv[idx]);
+            seq += buf;
+        }
+        std::printf ("    GLITCH %s want %s peak %.0fdB len %.1fs : %s\n", fs::path (nf.path).filename().string().c_str(), nn (nf.pitch).c_str(), pk, a.size() / fs, seq.c_str());
+    }
     return s;
 }
 

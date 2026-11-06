@@ -47,6 +47,7 @@ jobs:
           VERBOSE=1 ./eval_idmt data "" > details.txt
           echo "-- single-note errors by group --"; grep '^    NOTE' details.txt | awk '{print $3}' | sed -E 's/BS_[0-9]_EQ_[0-9]_(PS_)?([A-Z]+)_(ES_)?([A-Z]+)_.*/\2_\4/' | sort | uniq -c
           echo "-- single-note errors (sample) --"; grep '^    NOTE' details.txt | awk 'NR % 3 == 1' | head -120
+          echo "-- glitch examples --"; grep '^    GLITCH' details.txt | awk 'NR % 7 == 1' | head -80
           echo "-- bass-line errors --"; grep -v '^    NOTE' details.txt | grep '^    ' | head -260
 
       - name: Upload report
