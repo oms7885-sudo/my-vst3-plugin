@@ -98,6 +98,7 @@ struct NoteStats
     std::map<int, std::vector<double>> latByString;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
     std::map<int, int> diffs;                            // first-note error in semitones
+    std::map<std::string, int> glitchKinds;              // "interval@timebucket" -> count
     std::map<std::string, std::array<std::vector<double>, 5>> glide;  // per style: cents vs time after onset
     void add (const NoteStats& o)
     {
@@ -111,6 +112,7 @@ struct NoteStats
         for (auto& [k, v] : o.latByString) latByString[k].insert (latByString[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.diffs) diffs[k] += v;
+        for (auto& [k, v] : o.glitchKinds) glitchKinds[k] += v;
         for (auto& [k, arr] : o.glide) for (int w = 0; w < 5; ++w) glide[k][(size_t) w].insert (glide[k][(size_t) w].end(), arr[(size_t) w].begin(), arr[(size_t) w].end());
     }
 };
@@ -238,7 +240,15 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     // glitches: any further note-on that is not the target pitch (bends/slides may move +-2)
     const int tol = (nf.es == "SLU" || nf.es == "SLD") ? 12 : (nf.es.rfind ("BE", 0) == 0 || nf.es.rfind ("VI", 0) == 0) ? 2 : 0;
     for (auto& e : ev)
-        if (e.e.isNoteOn && &e != first && std::abs (e.e.note - nf.pitch) > tol) ++s.glitch;
+        if (e.e.isNoteOn && &e != first && std::abs (e.e.note - nf.pitch) > tol)
+        {
+            ++s.glitch;
+            const double dt = e.t - on;
+            const char* b = dt < 0 ? "pre" : dt < 0.1 ? "<100ms" : dt < 0.5 ? "<500ms" : "late";
+            const int iv = e.e.note - nf.pitch;
+            const std::string ivs = std::abs (iv) == 1 || std::abs (iv) == 2 ? "+-1/2" : std::abs (iv) % 12 == 0 ? "oct" : std::abs (iv) == 7 || std::abs (iv) == 19 ? "5th" : "other";
+            ++s.glitchKinds[ivs + "@" + b];
+        }
     return s;
 }
 
@@ -400,6 +410,11 @@ int main (int argc, char** argv)
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);
         std::printf ("  correct pitch 150 ms after note-on: %.1f%%\n", all.files ? 100.0 * all.settled / all.files : 0.0);
+        {
+            std::vector<std::pair<int, std::string>> gk; for (auto& [k, v] : all.glitchKinds) gk.push_back ({ v, k });
+            std::sort (gk.rbegin(), gk.rend());
+            std::printf ("  glitch kinds:"); for (auto& [v, k] : gk) std::printf ("  %s:%d", k.c_str(), v); std::printf ("\n");
+        }
         std::printf ("  latency split: tracker onset - audio onset med %.1f ms (p10 %.1f, p90 %.1f); note-on - tracker onset med %.1f ms (p90 %.1f)\n",
                      pct (all.onsetErr, 0.5), pct (all.onsetErr, 0.1), pct (all.onsetErr, 0.9), pct (all.detLat, 0.5), pct (all.detLat, 0.9));
         std::printf ("  pitch tracker: first voiced frame med %.1f ms, first frame within 50c of target med %.1f ms (p90 %.1f)\n",
