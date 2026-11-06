@@ -208,9 +208,12 @@ private:
         // slowly decaying memory of how loud the playing has been (~6 dB/s)
         recentPeakDb = std::max (levelDb, recentPeakDb - (float) (relDecayDbPerSec * hop / fsd));
         const bool loudEnoughForOnset = onsetRelDb <= 0.0f || levelDb > recentPeakDb - onsetRelDb;
+        // gate: the user's threshold, raised for hot inputs to stay a fixed distance
+        // below the recent playing level
+        gateDb = relGateDb > 0.0f ? std::max (params.thresholdDb, recentPeakDb - relGateDb) : params.thresholdDb;
 
         bool onset = false;
-        if (params.retriggerDb > 0.0f && levelDb > params.thresholdDb + onsetMarginDb && loudEnoughForOnset)
+        if (params.retriggerDb > 0.0f && levelDb > gateDb + onsetMarginDb && loudEnoughForOnset)
         {
             if (pendingOnset)
                 onset = true;
@@ -236,7 +239,7 @@ private:
 
         // Pitch (YIN)
         float freq = 0.0f;
-        const bool gateOpen = levelDb > params.thresholdDb;
+        const bool gateOpen = levelDb > gateDb;
         if (gateOpen)
             freq = yin (avail);
         lastFreq = freq;
@@ -298,7 +301,7 @@ private:
             }
 
             // Release: level falls below gate (with 3 dB hysteresis) for a few frames
-            if (levelDb < params.thresholdDb - 3.0f)
+            if (levelDb < gateDb - 3.0f)
             {
                 if (++quietCount >= 3)
                     release (sampleOffset, emit);
@@ -454,8 +457,8 @@ private:
             if (k < hfRecent) newest = std::max (newest, v);
             else older = std::max (older, v);
         }
-        if (newest - older >= hfFactor * params.retriggerDb && newest > params.thresholdDb - 30.0f
-            && lastLevelDb > params.thresholdDb + onsetMarginDb)
+        if (newest - older >= hfFactor * params.retriggerDb && newest > gateDb - 30.0f
+            && lastLevelDb > gateDb + onsetMarginDb)
         {
             pendingOnset = true;
             // place the onset where the transient actually crossed the threshold
@@ -634,11 +637,13 @@ public:
     float glideSemis = 0.0f;     // 0 = off
     float onsetMarginDb = 0.0f;  // a pluck must be this much above the gate
     float tailDb = 0.0f;         // release when this far below the note's peak (0 = off)
-    float onsetRelDb = 0.0f;     // a pluck must be within this of the recent playing level (0 = off)
+    float onsetRelDb = 24.0f;    // a pluck must be within this of the recent playing level (0 = off)
     float recentPeakDb = -140.0f;
-    float relDecayDbPerSec = 6.0f;
-    float retrigDropDb = 100.0f;  // 100 = off
-    int octLegatoExtra = 4;
+    float relDecayDbPerSec = 3.0f;
+    float retrigDropDb = 6.0f;
+    int octLegatoExtra = 20;
+    float relGateDb = 0.0f;       // 0 = off
+    float gateDb = -40.0f;
     std::array<float, 3> fmHist {};
     int fmCount = 0;
     float lastDip = 1.0f;
