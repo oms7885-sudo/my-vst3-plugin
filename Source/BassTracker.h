@@ -124,7 +124,7 @@ public:
         std::fill (ring.begin(), ring.end(), 0.0f);
         std::fill (hfHist.begin(), hfHist.end(), -140.0f);
         hfEnv = 0.0f; hfPos = 0; decimTotal = 0; lastOnsetAt = -1000000; pendingOnset = false;
-        writePos = 0; decimCounter = 0; hopCounter = 0; filled = 0;
+        writePos = 0; decimCounter = 0; hopCounter = 0; filled = bufLen;   // the zeroed buffer is just silence
         activeNote = -1; candidateNote = -1; candidateCount = 0;
         quietCount = 0; framesSinceOn = 0; retrigPending = false; prevLevelDb = -140.0f;
         lastFreq = 0.0f; lastLevelDb = -120.0f;
@@ -653,6 +653,18 @@ private:
             }
         }
 
+        // Octave-up correction: with a weak fundamental (thumb slap) the waveform nearly
+        // repeats at half the period; if the double lag fits much better, take it.
+        if (octUpFactor > 0.0f && 2 * best + 2 <= tauLimit)
+        {
+            int m = 2 * best;
+            for (int t = 2 * best - 2; t <= 2 * best + 2; ++t) if (diff[(size_t) t] < diff[(size_t) m]) m = t;
+            const double fLow = fsd / (double) m;
+            const double lowestHz = 440.0 * std::pow (2.0, (params.lowestNote - 0.5 - 69.0) / 12.0);
+            if (fLow >= lowestHz && diff[(size_t) m] < octUpFactor * diff[(size_t) best])
+                best = m;
+        }
+
         // Octave-up guard: a strong 2nd harmonic dips at half the true period.
         // If the octave below is a playable note but its lag can't be checked yet, wait.
         if (confirmOctave)
@@ -703,7 +715,8 @@ public:
     bool requireOnset = true;
     float retrigRiseDb = 3.0f;
     float legatoRangeDb = 14.0f;
-    float legatoFallDb = 100.0f;  // 100 = off
+    float legatoFallDb = 4.0f;    // 100 = off
+    float octUpFactor = 0.0f;     // 0 = off
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
     float ambigSemis = 0.25f;    // > 0.5 disables the ambiguity wait
     float ambigWaitMs = 60.0f;

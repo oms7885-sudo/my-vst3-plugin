@@ -70,6 +70,7 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "octleg") tr.octLegatoExtra = (int) v;
         else if (k == "relgate") tr.relGateDb = v;
         else if (k == "fall") tr.legatoFallDb = v;
+        else if (k == "octup") tr.octUpFactor = v;
         else if (k == "est") tr.estimator = (int) v;
         else if (k == "mpmk") tr.mpmK = v;
         else if (k == "clar") tr.mpmClarityScale = v;
