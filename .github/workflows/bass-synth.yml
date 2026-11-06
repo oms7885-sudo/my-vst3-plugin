@@ -1,0 +1,29 @@
+name: Build Bass Ladder Synth (Windows VST3)
+
+on:
+  push:
+    branches: [ bass-synth ]
+    paths: [ 'BassSynth/**', '.github/workflows/bass-synth.yml' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S BassSynth -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test engine
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: BassLadderSynth-VST3-Windows
+          path: build/BassLadderSynth_artefacts/Release/VST3/
+          if-no-files-found: error
