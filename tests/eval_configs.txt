@@ -1,4 +1,0 @@
-slap=-20
-slap=-12
-slap=-20,slapf=0.5
-slap=-12,slapf=0.5
