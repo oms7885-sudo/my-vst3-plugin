@@ -1,7 +1,8 @@
 # Bass Ladder Synth (VST3)
 
 베이스 DI를 넣으면 무그(모델 D)풍 베이스 신스 소리로 바꿔 주는 큐베이스용 이펙트 플러그인입니다.
-피치 트래킹 없이 입력 파형에서 바로 오실레이터를 만들어서 반응이 즉각적입니다.
+피치 트래킹을 쓰지 않고 DI 파형 자체를 깎고(클리핑), 접고(웨이브폴드), 옥타브를 바꿔서 음색을 만들기 때문에
+지연과 트래킹 실수가 없습니다.
 
 ## 다운로드
 
@@ -18,27 +19,25 @@
 
 ## 신호 흐름
 
-입력 컴프 → 트래킹 LPF + AGC → 슈미트 트리거(사각파·서브) + 동기 톱니파 3개 → 믹서 포화 → 비선형 래더 필터 → RC 엔벨로프
+입력 컴프 → 피킹 게이트 → 톤 LPF → DI 변조(클리핑 · 웨이브폴드 · 옥타브 다운/업 · 디튠 보이스) → 믹서 포화(Overload) → 비선형 래더 필터 → RC 엔벨로프
 
-## 주요 노브
+## 패널
 
-| 노브 | 역할 |
+| 섹션 | 노브 |
 |---|---|
-| Input Gain | 입력 레벨. DI 피크가 0 dBFS 근처에 오도록 맞추면 기본값이 잘 맞습니다 |
-| Tracking LPF | 연주하는 가장 높은 음보다 살짝 위로. 옥타브가 튀면 낮추기 |
-| Gate Threshold | 이보다 작은 소리는 무시 |
-| Pick Sensitivity | 피킹으로 판단하는 문턱. 안 친 음이 트리거되면 올리고, 친 음을 놓치면 내리기 |
-| Retrigger On Pitch Change | 켜면 피킹 없이 음정만 바뀌어도 엔벨로프가 다시 열림 (기본 꺼짐) |
-| Noise Mute | 음정이 반복되지 않는 잡음을 자동으로 끔 |
-| Tail Follow | 줄이 잦아들면 신스도 같이 줄어드는 정도 (0 = 끔) |
-| Square / Sub Octave / Saw | 오실레이터 믹스 |
-| Saw Detune / Drift / Phase Lock | 톱니파 3개의 디튠, 아날로그식 음정 흔들림, 입력에 위상을 맞추는 강도 |
-| Drive | 필터 앞 믹서 포화 |
-| Cutoff / Resonance / Filter Env Amount / Key Tracking | 래더 필터 |
-| Filter / Amp Attack·Decay·Sustain, Amp Release | 엔벨로프 |
-| Output / Dry DI | 출력 레벨, 원음 섞기 |
+| SHAPER | Tone(변조 전 LPF), Clip Drive, Fold Depth, Detune, Drift |
+| MIXER | Clip, Fold, Sub Oct, Oct Up, DI(원래 파형), Detune Voices, Overload |
+| FILTER | Cutoff, Emphasis, Contour Amount, Attack, Decay, Sustain |
+| LOUDNESS | Attack, Decay, Sustain, Release, Dynamics |
+| SETUP | Comp 스위치, Comp Thresh/Ratio, Gate, Pick Sens, Tail Follow, Sub Detect, Sub Hyst |
+| IN / OUT | Input, Output, Dry DI |
 
-프리셋: Model D Bass, Punch Sub, Squelch (큐베이스 프리셋 메뉴의 프로그램 목록)
+- 노브는 위아래로 드래그, 더블클릭하면 기본값.
+- Input은 DI 피크가 0 dBFS 근처에 오도록 맞추면 기본값이 잘 맞습니다.
+- 안 친 음이 트리거되면 Pick Sens를 올리고, 친 음을 놓치면 내리세요.
+- 옥타브 다운이 떨리면 Sub Detect를 낮추세요.
+
+프리셋: Model D Bass, Punch Sub, Squelch, Fuzz Octave
 
 ## 오프라인 테스트
 

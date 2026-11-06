@@ -39,6 +39,7 @@ public:
     // read by the editor
     std::atomic<float> displayFreq { 0.0f };
     std::atomic<bool>  displayGate { false };
+    std::atomic<uint32_t> displayTrig { 0 };
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();

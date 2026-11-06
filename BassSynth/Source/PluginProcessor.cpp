@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "PluginEditor.h"
 
 namespace
 {
@@ -6,52 +7,50 @@ namespace
 
     // centre > 0 = logarithmic-feel knob with that value at 12 o'clock
     const FloatDef floatDefs[] = {
-        // input
-        { "inGain",   "Input Gain",        -24.0f, 24.0f,  5.0f,   0.0f,  "dB" },
-        { "cTh",      "Comp Threshold",    -50.0f,  0.0f, -30.0f,  0.0f,  "dB" },
-        { "cRat",     "Comp Ratio",          1.0f, 20.0f,  8.0f,   0.0f,  ":1" },
-        { "cA",       "Comp Attack",         0.1f, 50.0f,  2.0f,   2.0f,  "ms" },
-        { "cR",       "Comp Release",       10.0f, 800.0f, 150.0f, 100.0f, "ms" },
-        { "trackLP",  "Tracking LPF",       35.0f, 300.0f, 120.0f, 100.0f, "Hz" },
-        { "hyst",     "Hysteresis",          0.0f,  0.5f,  0.15f,  0.0f,  "" },
-        { "gate",     "Gate Threshold",    -70.0f, -15.0f, -45.0f, 0.0f,  "dB" },
-        { "pickSens", "Pick Sensitivity",    1.3f,  6.0f,  2.0f,   2.5f,  "x" },
-        { "tail",     "Tail Follow",         0.0f,  0.8f,  0.4f,   0.0f,  "" },
-        // oscillators
-        { "sq",       "Square",              0.0f,  1.0f,  0.5f,   0.0f,  "" },
-        { "sub",      "Sub Octave",          0.0f,  1.0f,  0.5f,   0.0f,  "" },
-        { "saw",      "Saw",                 0.0f,  1.0f,  0.8f,   0.0f,  "" },
-        { "detune",   "Saw Detune",          0.0f, 20.0f,  7.0f,   0.0f,  "ct" },
-        { "drift",    "Drift",               0.0f, 10.0f,  3.0f,   0.0f,  "ct" },
-        { "pll",      "Phase Lock",          0.02f, 1.0f,  0.25f,  0.0f,  "" },
+        // setup
+        { "inGain",   "Input Gain",        -24.0f, 24.0f,  5.0f,   0.0f,   "dB" },
+        { "cTh",      "Comp Threshold",    -50.0f,  0.0f, -30.0f,  0.0f,   "dB" },
+        { "cRat",     "Comp Ratio",          1.0f, 20.0f,  8.0f,   0.0f,   ":1" },
+        { "gate",     "Gate Threshold",    -70.0f, -15.0f, -45.0f, 0.0f,   "dB" },
+        { "pickSens", "Pick Sensitivity",    1.3f,  6.0f,  2.0f,   2.5f,   "x" },
+        { "tail",     "Tail Follow",         0.0f,  0.8f,  0.4f,   0.0f,   "" },
+        { "subLP",    "Sub Detect LPF",     35.0f, 300.0f, 120.0f, 100.0f, "Hz" },
+        { "hyst",     "Sub Hysteresis",      0.0f,  0.5f,  0.15f,  0.0f,   "" },
+        // shaper
+        { "tone",     "Tone",               60.0f, 2000.0f, 250.0f, 300.0f, "Hz" },
+        { "shapeAmt", "Clip Drive",          0.0f,  1.0f,  0.7f,   0.0f,   "" },
+        { "foldAmt",  "Fold Depth",          0.0f,  1.0f,  0.4f,   0.0f,   "" },
+        { "detune",   "Detune",              0.0f, 25.0f,  7.0f,   0.0f,   "ct" },
+        { "drift",    "Drift",               0.0f, 10.0f,  2.0f,   0.0f,   "ct" },
         // mixer
-        { "drive",    "Drive",               0.0f,  1.0f,  0.45f,  0.0f,  "" },
-        { "dyn",      "Dynamics",            0.0f,  1.0f,  0.35f,  0.0f,  "" },
+        { "satLvl",   "Clip Level",          0.0f,  1.0f,  0.8f,   0.0f,   "" },
+        { "foldLvl",  "Fold Level",          0.0f,  1.0f,  0.25f,  0.0f,   "" },
+        { "subLvl",   "Sub Octave",          0.0f,  1.0f,  0.6f,   0.0f,   "" },
+        { "upLvl",    "Octave Up",           0.0f,  1.0f,  0.0f,   0.0f,   "" },
+        { "cleanLvl", "DI Waveform",         0.0f,  1.0f,  0.0f,   0.0f,   "" },
+        { "detLvl",   "Detune Voices",       0.0f,  1.0f,  0.6f,   0.0f,   "" },
+        { "drive",    "Overload",            0.0f,  1.0f,  0.45f,  0.0f,   "" },
         // filter
         { "cutoff",   "Cutoff",             50.0f, 5000.0f, 160.0f, 500.0f, "Hz" },
-        { "res",      "Resonance",           0.0f,  1.0f,  0.3f,   0.0f,  "" },
-        { "envAmt",   "Filter Env Amount",   0.0f,  6.0f,  3.2f,   0.0f,  "oct" },
-        { "keytrk",   "Key Tracking",        0.0f,  1.0f,  0.5f,   0.0f,  "" },
-        // filter envelope
-        { "fA",       "Filter Attack",       0.5f, 500.0f, 3.0f,   20.0f, "ms" },
+        { "res",      "Emphasis",            0.0f,  1.0f,  0.3f,   0.0f,   "" },
+        { "envAmt",   "Contour Amount",      0.0f,  6.0f,  3.2f,   0.0f,   "oct" },
+        { "fA",       "Filter Attack",       0.5f, 500.0f, 3.0f,   20.0f,  "ms" },
         { "fD",       "Filter Decay",       20.0f, 3000.0f, 320.0f, 250.0f, "ms" },
-        { "fS",       "Filter Sustain",      0.0f,  1.0f,  0.1f,   0.0f,  "" },
-        // amp envelope
-        { "aA",       "Amp Attack",          0.5f, 500.0f, 1.5f,   20.0f, "ms" },
+        { "fS",       "Filter Sustain",      0.0f,  1.0f,  0.1f,   0.0f,   "" },
+        // loudness
+        { "aA",       "Amp Attack",          0.5f, 500.0f, 1.5f,   20.0f,  "ms" },
         { "aD",       "Amp Decay",          20.0f, 4000.0f, 900.0f, 300.0f, "ms" },
-        { "aS",       "Amp Sustain",         0.0f,  1.0f,  0.75f,  0.0f,  "" },
+        { "aS",       "Amp Sustain",         0.0f,  1.0f,  0.75f,  0.0f,   "" },
         { "aR",       "Amp Release",         5.0f, 1500.0f, 90.0f, 100.0f, "ms" },
+        { "dyn",      "Dynamics",            0.0f,  1.0f,  0.35f,  0.0f,   "" },
         // output
-        { "outGain",  "Output",            -24.0f, 12.0f,  0.0f,   0.0f,  "dB" },
-        { "dry",      "Dry DI",              0.0f,  1.0f,  0.0f,   0.0f,  "" },
+        { "outGain",  "Output",            -24.0f, 12.0f,  0.0f,   0.0f,   "dB" },
+        { "dry",      "Dry DI",              0.0f,  1.0f,  0.0f,   0.0f,   "" },
     };
 
     struct BoolDef { const char* id; const char* name; bool def; };
     const BoolDef boolDefs[] = {
-        { "comp",      "Input Comp",              true  },
-        { "retrig",    "Retrigger On Pitch Change", false },
-        { "noiseMute", "Noise Mute",              true  },
-        { "sawInteg",  "Integrated Saw (compare)", false },
+        { "comp", "Input Comp", true },
     };
 
     struct Preset { const char* name; std::vector<std::pair<const char*, float>> values; };
@@ -59,10 +58,12 @@ namespace
     {
         static const std::vector<Preset> p = {
             { "Model D Bass", {} },
-            { "Punch Sub",    { { "sq", 0.2f }, { "sub", 0.9f }, { "saw", 0.4f }, { "cutoff", 120.0f }, { "res", 0.15f },
+            { "Punch Sub",    { { "satLvl", 0.4f }, { "subLvl", 1.0f }, { "foldLvl", 0.0f }, { "cutoff", 120.0f }, { "res", 0.15f },
                                 { "envAmt", 2.2f }, { "fD", 180.0f }, { "fS", 0.0f }, { "drive", 0.3f } } },
             { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.72f }, { "envAmt", 4.6f }, { "fD", 420.0f }, { "fS", 0.05f },
-                                { "drive", 0.6f }, { "saw", 0.9f }, { "sub", 0.3f } } },
+                                { "drive", 0.6f }, { "foldLvl", 0.5f }, { "subLvl", 0.3f } } },
+            { "Fuzz Octave",  { { "shapeAmt", 1.0f }, { "satLvl", 0.7f }, { "foldLvl", 0.6f }, { "foldAmt", 0.7f }, { "subLvl", 0.5f },
+                                { "upLvl", 0.4f }, { "cutoff", 700.0f }, { "envAmt", 2.0f }, { "res", 0.2f }, { "drive", 0.7f } } },
         };
         return p;
     }
@@ -84,8 +85,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
     {
         NormalisableRange<float> range (d.min, d.max);
         if (d.centre > 0.0f) range.setSkewForCentre (d.centre);
+        const String unit (d.label);
+        auto toText = [unit] (float v, int)
+        {
+            const float a = std::abs (v);
+            String t = a >= 100.0f ? String (roundToInt (v)) : a >= 10.0f ? String (v, 1) : String (v, 2);
+            return unit.isEmpty() ? t : t + " " + unit;
+        };
         p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { d.id, 1 }, d.name, range, d.def,
-                         AudioParameterFloatAttributes().withLabel (d.label)));
+                         AudioParameterFloatAttributes().withStringFromValueFunction (toText)));
     }
     for (const auto& d : boolDefs)
         p.push_back (std::make_unique<AudioParameterBool> (ParameterID { d.id, 1 }, d.name, d.def));
@@ -95,18 +103,18 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
 bsyn::Params BassSynthProcessor::readParams() const
 {
     auto f = [this] (const char* id) { return apvts.getRawParameterValue (id)->load(); };
-    auto b = [this] (const char* id) { return apvts.getRawParameterValue (id)->load() > 0.5f; };
     bsyn::Params p;
     p.inGainDb = f ("inGain");
-    p.comp = b ("comp"); p.cTh = f ("cTh"); p.cRat = f ("cRat"); p.cA = f ("cA"); p.cR = f ("cR");
-    p.trackLP = f ("trackLP"); p.hyst = f ("hyst"); p.gateDb = f ("gate"); p.pickSens = f ("pickSens");
-    p.retrig = b ("retrig"); p.noiseMute = b ("noiseMute"); p.tail = f ("tail");
-    p.sq = f ("sq"); p.sub = f ("sub"); p.saw = f ("saw"); p.sawIntegrate = b ("sawInteg");
-    p.detune = f ("detune"); p.drift = f ("drift"); p.pll = f ("pll");
-    p.drive = f ("drive"); p.dyn = f ("dyn");
-    p.cutoff = f ("cutoff"); p.res = f ("res"); p.envAmt = f ("envAmt"); p.keytrk = f ("keytrk");
+    p.comp = f ("comp") > 0.5f; p.cTh = f ("cTh"); p.cRat = f ("cRat");
+    p.gateDb = f ("gate"); p.pickSens = f ("pickSens"); p.tail = f ("tail");
+    p.subLP = f ("subLP"); p.hyst = f ("hyst");
+    p.tone = f ("tone"); p.shapeAmt = f ("shapeAmt"); p.foldAmt = f ("foldAmt");
+    p.detune = f ("detune"); p.drift = f ("drift");
+    p.satLvl = f ("satLvl"); p.foldLvl = f ("foldLvl"); p.subLvl = f ("subLvl"); p.upLvl = f ("upLvl");
+    p.cleanLvl = f ("cleanLvl"); p.detLvl = f ("detLvl"); p.drive = f ("drive");
+    p.cutoff = f ("cutoff"); p.res = f ("res"); p.envAmt = f ("envAmt");
     p.fA = f ("fA"); p.fD = f ("fD"); p.fS = f ("fS");
-    p.aA = f ("aA"); p.aD = f ("aD"); p.aS = f ("aS"); p.aR = f ("aR");
+    p.aA = f ("aA"); p.aD = f ("aD"); p.aS = f ("aS"); p.aR = f ("aR"); p.dyn = f ("dyn");
     p.outGainDb = f ("outGain"); p.dry = f ("dry");
     return p;
 }
@@ -148,6 +156,7 @@ void BassSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     displayFreq.store ((float) engine.currentFreq());
     displayGate.store (engine.gateIsOpen());
+    displayTrig.store (engine.triggers());
 }
 
 int BassSynthProcessor::getNumPrograms() { return (int) presets().size(); }
@@ -184,8 +193,7 @@ void BassSynthProcessor::setStateInformation (const void* data, int sizeInBytes)
 
 juce::AudioProcessorEditor* BassSynthProcessor::createEditor()
 {
-    // First version: JUCE's generic editor (every parameter as a slider/toggle).
-    return new juce::GenericAudioProcessorEditor (*this);
+    return new BassSynthEditor (*this);
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

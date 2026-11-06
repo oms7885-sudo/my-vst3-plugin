@@ -34,6 +34,7 @@ juce_add_plugin(BassLadderSynth
 
 target_sources(BassLadderSynth PRIVATE
     Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp
 )
 
 target_include_directories(BassLadderSynth PRIVATE Source)
