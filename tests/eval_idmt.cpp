@@ -69,6 +69,9 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "drop") tr.retrigDropDb = v;
         else if (k == "octleg") tr.octLegatoExtra = (int) v;
         else if (k == "relgate") tr.relGateDb = v;
+        else if (k == "est") tr.estimator = (int) v;
+        else if (k == "mpmk") tr.mpmK = v;
+        else if (k == "clar") tr.mpmClarityScale = v;
         else if (k == "biasms") tr.attackBiasMs = v;
     }
 }

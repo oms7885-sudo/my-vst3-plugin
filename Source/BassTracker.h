@@ -241,7 +241,7 @@ private:
         float freq = 0.0f;
         const bool gateOpen = levelDb > gateDb;
         if (gateOpen)
-            freq = yin (avail);
+            freq = estimator == 1 ? mpm (avail) : yin (avail);
         lastFreq = freq;
 
         int note = -1;
@@ -504,6 +504,77 @@ private:
         return std::clamp ((int) std::lround (v), 1, 127);
     }
 
+    // McLeod pitch method (normalised square difference). Robust to the amplitude
+    // decay inside the analysis window; picks the first "key maximum" within
+    // mpmK of the highest one (avoids octave-down errors). Returns Hz or 0.
+    float mpm (int avail)
+    {
+        const float* x = lin.data();
+        const int wMinAbs = std::max (4, (int) std::lround (fsd * 0.002));
+
+        int tauLimit = 0;
+        for (int tau = 1; tau <= tauMax; ++tau)
+        {
+            const int n = std::min (window, avail - tau);
+            if (n < std::max (wMinAbs, (int) (wMinFactor * tau)))
+                break;
+            double r = 0.0, m = 0.0;
+            for (int j = bufLen - n; j < bufLen; ++j)
+            {
+                const float a = x[j], b = x[j - tau];
+                r += (double) a * b;
+                m += (double) a * a + (double) b * b;
+            }
+            diff[(size_t) tau] = m > 0.0 ? (float) (2.0 * r / m) : 0.0f;   // nsdf in [-1, 1]
+            tauLimit = tau;
+        }
+        if (tauLimit <= tauMin + 2)
+            return 0.0f;
+
+        // key maxima: highest point of each positive lobe (after the first negative zero crossing)
+        int keyTau[64]; float keyVal[64]; int nk = 0;
+        int t = 1;
+        while (t <= tauLimit && diff[(size_t) t] > 0.0f) ++t;      // leave the lag-0 lobe
+        while (t <= tauLimit && nk < 64)
+        {
+            while (t <= tauLimit && diff[(size_t) t] <= 0.0f) ++t;
+            if (t > tauLimit) break;
+            int best = t;
+            while (t <= tauLimit && diff[(size_t) t] > 0.0f)
+            {
+                if (diff[(size_t) t] > diff[(size_t) best]) best = t;
+                ++t;
+            }
+            if (t > tauLimit && best >= tauLimit - 1) break;          // lobe cut off by the data edge
+            if (best >= tauMin) { keyTau[nk] = best; keyVal[nk] = diff[(size_t) best]; ++nk; }
+        }
+        if (nk == 0)
+            return 0.0f;
+
+        float maxVal = 0.0f;
+        for (int k = 0; k < nk; ++k) maxVal = std::max (maxVal, keyVal[k]);
+        int best = -1;
+        for (int k = 0; k < nk; ++k)
+            if (keyVal[k] >= mpmK * maxVal) { best = keyTau[k]; break; }
+        if (best < 0)
+            return 0.0f;
+
+        const float clarity = diff[(size_t) best];
+        if (clarity < 1.0f - params.yinThreshold * mpmClarityScale)
+            return 0.0f;
+        lastDip = 1.0f - clarity;
+
+        double tt = best;
+        if (best > 1 && best < tauLimit)
+        {
+            const double s0 = diff[(size_t) best - 1], s1 = diff[(size_t) best], s2 = diff[(size_t) best + 1];
+            const double den = 2.0 * (2.0 * s1 - s2 - s0);
+            if (std::abs (den) > 1e-12)
+                tt = best + (s2 - s0) / den;
+        }
+        return (float) (fsd / tt);
+    }
+
     // YIN on the newest `avail` samples of lin (normalised per-lag window, so it can
     // answer as soon as ~one period has been played). Returns Hz, or 0 if not (yet) voiced.
     float yin (int avail)
@@ -642,7 +713,10 @@ public:
     float relDecayDbPerSec = 3.0f;
     float retrigDropDb = 6.0f;
     int octLegatoExtra = 20;
-    float relGateDb = 0.0f;       // 0 = off
+    float relGateDb = 30.0f;      // 0 = off
+    int estimator = 0;            // 0 = YIN, 1 = MPM
+    float mpmK = 0.9f;
+    float mpmClarityScale = 1.0f;
     float gateDb = -40.0f;
     std::array<float, 3> fmHist {};
     int fmCount = 0;
