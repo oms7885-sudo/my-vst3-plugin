@@ -1,3 +1,0 @@
-octup=0.3
-octup=0.5
-octup=0.2

@@ -107,7 +107,7 @@ struct NoteFile { std::string path, ps, es; int pitch; };
 
 struct NoteStats
 {
-    int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0, settled = 0;
+    int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0, settled = 0, preNotes = 0;
     std::vector<double> lat, onsetErr, detLat, firstVoiced, firstRight;   // latency; tracker onset - true onset; note-on - tracker onset
     std::map<int, std::vector<double>> latByString;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
@@ -116,7 +116,7 @@ struct NoteStats
     std::map<std::string, std::array<std::vector<double>, 5>> glide;  // per style: cents vs time after onset
     void add (const NoteStats& o)
     {
-        files += o.files; correct += o.correct; settled += o.settled; octave += o.octave; wrong += o.wrong; missed += o.missed;
+        files += o.files; correct += o.correct; settled += o.settled; preNotes += o.preNotes; octave += o.octave; wrong += o.wrong; missed += o.missed;
         glitch += o.glitch; deadFired += o.deadFired; deadFiles += o.deadFiles;
         lat.insert (lat.end(), o.lat.begin(), o.lat.end());
         onsetErr.insert (onsetErr.end(), o.onsetErr.begin(), o.onsetErr.end());
@@ -226,7 +226,10 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
         }
     }
     const Ev* first = nullptr;
-    for (auto& e : ev) if (e.e.isNoteOn) { first = &e; break; }
+    // the note that answers the pluck: first note-on from 30 ms before the audio onset on;
+    // anything earlier is a false note from pre-roll noise (counted separately)
+    for (auto& e : ev) if (e.e.isNoteOn && e.t >= on - 0.03) { first = &e; break; }
+    for (auto& e : ev) if (e.e.isNoteOn && e.t < on - 0.03) ++s.preNotes;
     if (! first) { ++s.missed; return s; }
     const int d = first->e.note - nf.pitch;
     if (d != 0) ++s.diffs[d];
@@ -255,7 +258,7 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     // glitches: any further note-on that is not the target pitch (bends/slides may move +-2)
     const int tol = (nf.es == "SLU" || nf.es == "SLD") ? 12 : (nf.es.rfind ("BE", 0) == 0 || nf.es.rfind ("VI", 0) == 0) ? 2 : 0;
     for (auto& e : ev)
-        if (e.e.isNoteOn && &e != first && std::abs (e.e.note - nf.pitch) > tol)
+        if (e.e.isNoteOn && &e != first && e.t >= on - 0.03 && std::abs (e.e.note - nf.pitch) > tol)
         {
             ++s.glitch;
             const double dt = e.t - on;
@@ -436,7 +439,7 @@ int main (int argc, char** argv)
         };
         for (auto& [g, s] : groups) row (g, s);
         row ("ALL", all);
-        std::printf ("  correct pitch 150 ms after note-on: %.1f%%\n", all.files ? 100.0 * all.settled / all.files : 0.0);
+        std::printf ("  correct pitch 150 ms after note-on: %.1f%%   false notes before the pluck: %d\n", all.files ? 100.0 * all.settled / all.files : 0.0, all.preNotes);
         {
             std::vector<std::pair<int, std::string>> gk; for (auto& [k, v] : all.glitchKinds) gk.push_back ({ v, k });
             std::sort (gk.rbegin(), gk.rend());
