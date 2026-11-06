@@ -228,6 +228,7 @@ private:
             }
         }
         pendingOnset = false;
+        onsetPeakDb = onset ? levelDb : std::max (onsetPeakDb, levelDb);
        #ifdef B2M_DEBUG
         if (onset) std::printf ("    [onset used %.3f lvl %.1f active %d]\n", decimTotal / fsd, levelDb, activeNote);
        #endif
@@ -413,6 +414,12 @@ private:
 
         if (candidateCount >= params.stableFrames && ! waitForPitch)
         {
+            // dead note / percussive thump: already collapsed by the time the pitch is known
+            if (deadDropDb > 0.0f && levelDb < onsetPeakDb - deadDropDb)
+            {
+                candidateCount = 0;
+                return;
+            }
             startNote (note, velocityFor (peakSinceCandidate), levelDb, sampleOffset, emit);
             candidateCount = 0;
         }
@@ -717,6 +724,8 @@ public:
     float legatoRangeDb = 14.0f;
     float legatoFallDb = 4.0f;    // 100 = off
     float octUpFactor = 0.0f;     // 0 = off
+    float deadDropDb = 0.0f;      // 0 = off
+    float onsetPeakDb = -140.0f;
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
     float ambigSemis = 0.25f;    // > 0.5 disables the ambiguity wait
     float ambigWaitMs = 60.0f;

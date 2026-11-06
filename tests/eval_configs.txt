@@ -1,0 +1,3 @@
+dead=10
+dead=15
+dead=20
