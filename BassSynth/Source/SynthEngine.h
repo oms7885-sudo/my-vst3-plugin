@@ -55,9 +55,10 @@ public:
         tfA = k (0.003); tfR = k (0.01);
         ehL  = (int) std::lround (0.015 * sr);
         ehL2 = (int) std::lround (0.025 * sr);
-        pkR = std::exp (-1.0 / (1.5 * sr));
+        pkR = std::exp (-1.0 / (3.0 * sr));
+        BL = std::max (1, (int) std::lround (0.001 * sr));
         openN = (int) std::lround (0.0015 * sr);
-        hold = 0.06 * sr;
+        hold = 0.05 * sr;
         upA = k (0.008);
         ktA = k (0.03);
         lpCoef (250.0, cs);
@@ -75,7 +76,10 @@ public:
         std::fill (std::begin (hs1), std::end (hs1), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
         hpY = hpX = cEnv = agc = agd = eF = eS = 0;
-        gateOn = false; lastOn = -1e9; pk = notePk = 0; openCnt = 0; tfS = 1;
+        gateOn = false; lastOn = -1e9; pk = notePk = 0; tfS = 1;
+        h0X = h0Y = 0; cbm = 0; bc = 0; bi = 0; PW = 13; pkP = notePkP = 0;
+        std::fill (std::begin (bm), std::end (bm), 0.0f);
+        std::fill (std::begin (phb), std::end (phb), 0.0f);
         s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0; per = sr / 55.0; wnP = 0;
         hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0;
         dr = 0; drT = 0; seed = 777;
@@ -134,26 +138,46 @@ public:
         const double aw = std::abs (w); agd += (aw - agd) * (aw > agd ? agA : agR);
         const double wn = w / (agd + 1e-4);
 
-        // level detection + pick gate
+        // level detection
         const double ax = std::abs (hp);
         eF += (ax - eF) * (ax > eF ? fA_ : fR_);
         eS += (eF - eS) * (eF > eS ? sA_ : sR_);
+
+        // ---- note detector (on the uncompressed signal) ----
+        // peak of |x| over about one cycle of the current note; a note starts when that peak
+        // jumps above the lowest peak of the previous ~40 ms (catches short damped gaps at once)
+        const double hp0 = hpA * (h0Y + x0 - h0X); h0X = x0; h0Y = hp0;
+        {
+            const double a0 = std::abs (hp0);
+            if (a0 > cbm) cbm = a0;
+            if (++bc >= BL)
+            {
+                bc = 0;
+                PW = std::min (28, std::max (6, (int) std::ceil (1.15 * per / BL)));
+                bm[bi & 63] = (float) cbm; cbm = 0;
+                double P_ = 0;
+                for (int q = 0; q < PW; ++q) P_ = std::max (P_, (double) bm[(bi - q) & 63]);
+                phb[bi & 63] = (float) P_;
+                ++bi;
+            }
+        }
+        double Pn = cbm;
+        for (int q = 0; q < PW - 1; ++q) Pn = std::max (Pn, (double) bm[(bi - 1 - q) & 63]);
+        // look back only to after the last note's own attack has settled
+        const int back = std::min (40, (int) std::floor ((i - lastOn) / BL) - PW - 2);
+        double Mn = 1e9;
+        for (int q = 5; q <= back; ++q) Mn = std::min (Mn, (double) phb[(bi - q) & 63]);
+        pkP = Pn > pkP ? Pn : pkP * pkR;
+        if (gateOn && Pn > notePkP) notePkP = Pn;
         pk = eF > pk ? eF : pk * pkR;
         if (gateOn && eF > notePk) notePk = eF;
-        const double openT = std::max (thr, pk * 0.3), closeT = std::max (thr * 0.6, notePk * 0.16);
+
         bool onset = false;
-        eh[i & EHM] = (float) eF;
-        const double rise = eF / (std::min (eh[(i - ehL) & EHM], eh[(i - ehL2) & EHM]) + 1e-6);
-        if (! gateOn && eF > openT && rise > 2.0)
-        {
-            if (++openCnt > openN) { gateOn = true; onset = true; openCnt = 0; }
-        }
-        else openCnt = 0;
-        if (gateOn && ! onset && eF < closeT) { gateOn = false; fs = 3; as = 3; }
-        else if (gateOn && ! onset && rise > p.pickSens && eF > std::max (thr * 2, pk * 0.3) && i - lastOn > hold) onset = true;
+        if (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.15) && i - lastOn > hold) { onset = true; gateOn = true; }
+        else if (gateOn && Pn < std::max (thr, notePkP * 0.12)) { gateOn = false; fs = 3; as = 3; }
         if (onset)
         {
-            notePk = eF; lastOn = (double) i; fs = 1; as = 1;
+            notePk = eF; notePkP = Pn; lastOn = (double) i; fs = 1; as = 1;
         }
 
         // ---- DI modulation ----
@@ -313,7 +337,9 @@ private:
     double hs1[32] {}, hs2[32] {}; double hD1 = 0, hD2 = 0, phP = 0, ktf = 110, thU = 0, thD = 0;
     float eh[4096] {};
     double hpY = 0, hpX = 0, cEnv = 0, agc = 0, agd = 0, eF = 0, eS = 0;
-    bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; int openCnt = 0; double tfS = 1;
+    bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; double tfS = 1;
+    double h0X = 0, h0Y = 0, cbm = 0, pkP = 0, notePkP = 0; int bc = 0, BL = 44, PW = 13; int64_t bi = 0;
+    float bm[64] {}, phb[64] {};
     int s = -1, subv = 1; int64_t lastEdge = -1; double zf = 0, upM = 0, per = 800, wnP = 0;
     double dr = 0; int drT = 0; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0;
