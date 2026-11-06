@@ -63,6 +63,8 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "fast") tr.fastLockDip = v;
         else if (k == "glide") tr.glideSemis = v;
         else if (k == "margin") tr.onsetMarginDb = v;
+        else if (k == "tail") tr.tailDb = v;
+        else if (k == "rel") tr.onsetRelDb = v;
         else if (k == "biasms") tr.attackBiasMs = v;
     }
 }

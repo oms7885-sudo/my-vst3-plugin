@@ -1,5 +1,6 @@
-margin=6
-margin=12
-legato=16
-margin=6,legato=16
 thr=-34
+thr=-34,tail=30
+thr=-34,tail=24
+thr=-34,rel=30
+thr=-40,tail=30,rel=30
+thr=-34,tail=30,rel=30

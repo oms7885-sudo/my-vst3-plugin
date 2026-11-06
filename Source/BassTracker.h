@@ -205,8 +205,12 @@ private:
         // A steady/decaying note can never jump up, a new pluck does.
         const float newPk = toDb (peak (bufLen - onsetLen, bufLen));
         const float oldPk = toDb (peak (bufLen - onsetLen - gateLen, bufLen - onsetLen));
+        // slowly decaying memory of how loud the playing has been (~6 dB/s)
+        recentPeakDb = std::max (levelDb, recentPeakDb - (float) (6.0 * hop / fsd));
+        const bool loudEnoughForOnset = onsetRelDb <= 0.0f || levelDb > recentPeakDb - onsetRelDb;
+
         bool onset = false;
-        if (params.retriggerDb > 0.0f && levelDb > params.thresholdDb + onsetMarginDb)
+        if (params.retriggerDb > 0.0f && levelDb > params.thresholdDb + onsetMarginDb && loudEnoughForOnset)
         {
             if (pendingOnset)
                 onset = true;
@@ -280,6 +284,14 @@ private:
             for (float v : frameLevels) recentMax = std::max (recentMax, v);
             pushFrameLevel (levelDb);
             if (levelDb < recentMax - muteDropDb)
+            {
+                release (sampleOffset, emit);
+                return;
+            }
+
+            // Tail release: far below the note's peak the pitch estimate drifts and noise
+            // starts to matter -> end the note there.
+            if (tailDb > 0.0f && levelDb < notePeakDb - tailDb)
             {
                 release (sampleOffset, emit);
                 return;
@@ -618,6 +630,9 @@ public:
     float fastLockDip = 0.0f;    // 0 = off
     float glideSemis = 0.0f;     // 0 = off
     float onsetMarginDb = 0.0f;  // a pluck must be this much above the gate
+    float tailDb = 0.0f;         // release when this far below the note's peak (0 = off)
+    float onsetRelDb = 0.0f;     // a pluck must be within this of the recent playing level (0 = off)
+    float recentPeakDb = -140.0f;
     std::array<float, 3> fmHist {};
     int fmCount = 0;
     float lastDip = 1.0f;
