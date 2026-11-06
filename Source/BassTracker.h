@@ -355,7 +355,10 @@ private:
 
             // Pitch change without a new pluck (slide / hammer-on / pull-off).
             // Ignored in the quiet tail of a note, where the pitch estimate drifts.
-            if (note >= 0 && note != activeNote && levelDb > notePeakDb - legatoRangeDb)
+            // Also ignored while the level is falling fast: releasing the fretting finger at
+            // the end of a note bends / drops the pitch briefly.
+            if (note >= 0 && note != activeNote && levelDb > notePeakDb - legatoRangeDb
+                && levelDb > recentMax - legatoFallDb)
             {
                 if (note == candidateNote) ++candidateCount;
                 else { candidateNote = note; candidateCount = 1; }
@@ -699,7 +702,8 @@ private:
 public:
     bool requireOnset = true;
     float retrigRiseDb = 3.0f;
-    float legatoRangeDb = 18.0f;
+    float legatoRangeDb = 14.0f;
+    float legatoFallDb = 100.0f;  // 100 = off
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
     float ambigSemis = 0.25f;    // > 0.5 disables the ambiguity wait
     float ambigWaitMs = 60.0f;
@@ -708,7 +712,7 @@ public:
     float glideSemis = 0.0f;     // 0 = off
     float onsetMarginDb = 0.0f;  // a pluck must be this much above the gate
     float tailDb = 0.0f;         // release when this far below the note's peak (0 = off)
-    float onsetRelDb = 24.0f;    // a pluck must be within this of the recent playing level (0 = off)
+    float onsetRelDb = 18.0f;    // a pluck must be within this of the recent playing level (0 = off)
     float recentPeakDb = -140.0f;
     float relDecayDbPerSec = 3.0f;
     float retrigDropDb = 6.0f;

@@ -69,6 +69,7 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "drop") tr.retrigDropDb = v;
         else if (k == "octleg") tr.octLegatoExtra = (int) v;
         else if (k == "relgate") tr.relGateDb = v;
+        else if (k == "fall") tr.legatoFallDb = v;
         else if (k == "est") tr.estimator = (int) v;
         else if (k == "mpmk") tr.mpmK = v;
         else if (k == "clar") tr.mpmClarityScale = v;
@@ -342,7 +343,7 @@ static LineStats evalLine (const fs::path& wav, const fs::path& csv, const Confi
         {
             if (! ev[k].e.isNoteOn || used[k] || ignore[k]) continue;
             const double dt = ev[k].t - g.on - off;
-            if (dt < -0.05 || dt > 0.08) continue;
+            if (dt < -0.07 || dt > 0.08) continue;
             if (ev[k].e.note == g.pitch) { hit = (int) k; break; }
             if (cand < 0) cand = (int) k;
         }
