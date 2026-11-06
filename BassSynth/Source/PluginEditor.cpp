@@ -22,7 +22,7 @@ namespace
         return juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain));
     }
 
-    constexpr int editorW = 1180, editorH = 548, cheekW = 28;
+    constexpr int editorW = 1280, editorH = 548, cheekW = 28;
     constexpr int cellW = 82, cellH = 122, smallCellW = 80;
 }
 
@@ -133,9 +133,9 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
 
     addSection ("Shaper", 3, { { "tone", "Tone" }, { "shapeAmt", "Clip Drive" }, { "foldAmt", "Fold Depth" },
                                { "detune", "Detune" }, { "drift", "Drift" } });
-    addSection ("Mixer", 4, { { "satLvl", "Clip" }, { "foldLvl", "Fold" }, { "subLvl", "Sub Oct" }, { "upLvl", "Oct Up" },
+    addSection ("Mixer", 4, { { "sawLvl", "Saw" }, { "satLvl", "Clip" }, { "foldLvl", "Fold" }, { "subLvl", "Sub Oct" }, { "upLvl", "Oct Up" },
                               { "cleanLvl", "DI" }, { "detLvl", "Detune Voices" }, { "drive", "Overload" } });
-    addSection ("Filter", 3, { { "cutoff", "Cutoff" }, { "res", "Emphasis" }, { "envAmt", "Contour Amount" },
+    addSection ("Filter", 4, { { "cutoff", "Cutoff" }, { "res", "Emphasis" }, { "envAmt", "Contour Amount" }, { "keytrk", "Key Track" },
                                { "fA", "Attack" }, { "fD", "Decay" }, { "fS", "Sustain" } });
     addSection ("Loudness", 3, { { "aA", "Attack" }, { "aD", "Decay" }, { "aS", "Sustain" },
                                  { "aR", "Release" }, { "dyn", "Dynamics" } });

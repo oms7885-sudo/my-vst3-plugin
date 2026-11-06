@@ -29,10 +29,10 @@ struct Params
     float shapeAmt = 0.7f, foldAmt = 0.4f;
     float detune = 7.0f, drift = 2.0f; // cents
     // mixer
-    float satLvl = 0.8f, foldLvl = 0.25f, subLvl = 0.6f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.6f;
+    float sawLvl = 0.8f, satLvl = 0.4f, foldLvl = 0.0f, subLvl = 0.5f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.35f;
     float drive = 0.45f;
     // filter
-    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f;
+    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f, keytrk = 0.5f;
     float fA = 3.0f, fD = 320.0f, fS = 0.1f;          // ms, ms, 0..1
     // loudness
     float aA = 1.5f, aD = 900.0f, aS = 0.75f, aR = 90.0f;
@@ -59,8 +59,8 @@ public:
         openN = (int) std::lround (0.0015 * sr);
         hold = 0.06 * sr;
         upA = k (0.008);
-        dMin = 0.0015 * sr; dMax = 0.04 * sr;
-        xfN = std::round (0.006 * sr); xfL = std::round (0.02 * sr);
+        ktA = k (0.03);
+        lpCoef (250.0, cs);
         dcA = std::exp (-TAU * 15.0 / sr);
         reset();
         haveCoefs = false;
@@ -71,12 +71,13 @@ public:
         std::fill (std::begin (z), std::end (z), 0.0);
         std::fill (std::begin (zd), std::end (zd), 0.0);
         std::fill (std::begin (eh), std::end (eh), 0.0f);
-        std::fill (std::begin (db), std::end (db), 0.0f);
+        std::fill (std::begin (zs), std::end (zs), 0.0);
+        std::fill (std::begin (hs1), std::end (hs1), 0.0);
+        std::fill (std::begin (hs2), std::end (hs2), 0.0);
         hpY = hpX = cEnv = agc = agd = eF = eS = 0;
         gateOn = false; lastOn = -1e9; pk = notePk = 0; openCnt = 0; tfS = 1;
-        s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0;
-        v[0] = { -1, dMin, dMin, dMin, 1, 0 };
-        v[1] = { 1, 0.012 * sr, 0.012 * sr, 0.012 * sr, 1, 0 };
+        s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0; per = sr / 55.0; wnP = 0;
+        hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0;
         dr = 0; drT = 0; seed = 777;
         y1 = y2 = y3 = y4 = 0;
         fe = ae = 0; fs = as = 0;
@@ -153,53 +154,59 @@ public:
         if (onset)
         {
             notePk = eF; lastOn = (double) i; fs = 1; as = 1;
-            for (auto& q : v) { q.o = q.d; q.d = q.st; q.x = 0; q.xi = 1.0 / xfN; }
         }
 
         // ---- DI modulation ----
         const double sat  = th (yn * sG) * sN;          // clipping: soft -> near square
         const double fold = std::sin (yn * fG);         // wavefolder
-        if (s < 0 && wn > p.hyst)
+        if (s < 0 && wn > p.hyst && (lastEdge < 0 || (double) (i - lastEdge) > 0.4 * per))
         {
             s = 1; subv = -subv;
-            if (lastEdge >= 0) { const double d = (double) (i - lastEdge); if (d > sr / 1200.0) zf += (sr / d - zf) * 0.3; }
+            if (lastEdge >= 0)
+            {
+                const double d = (double) (i - lastEdge);
+                if (d > sr / 1200.0 && d < sr / 20.0) { per = d; zf += (sr / d - zf) * 0.3; }
+            }
             lastEdge = i;
         }
         else if (s > 0 && wn < -p.hyst) s = -1;
+        wnP = wn;
+
+        // saw from the DI's instantaneous phase (Hilbert pair on a fixed 250 Hz copy):
+        // follows the waveform at once, no period measuring
+        const double uu = biquad2 (hp, cs, zs);
+        double hI, hQ; hilbert (uu, hs1, hD1, hI, hQ);
+        const double ph = std::atan2 (-hQ, hI) / TAU + 0.5;
+        double dph = ph - phP; if (dph < -0.5) dph += 1; else if (dph > 0.5) dph -= 1;
+        phP = ph;
+        const double dt = std::min (std::max (dph, 1e-4), 0.05);
+        const double saw = 2 * ph - 1 - polyblep (ph, dt);
+        if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
         const double sub = subv * std::abs (sat);       // octave down
         const double ra = std::abs (sat); upM += (ra - upM) * upA;
         const double up = (ra - upM) * 2.0;             // octave up
         const double cln = th (yn * 0.9);               // the DI waveform itself
-        double m = (p.satLvl * sat + p.foldLvl * fold + p.subLvl * sub + p.upLvl * up + p.cleanLvl * cln) * 0.55;
+        double m = (p.satLvl * sat + p.foldLvl * fold + p.subLvl * sub + p.upLvl * up + p.cleanLvl * cln
+                    + p.sawLvl * saw * std::min (1.0, agd * 40.0)) * 0.55;
 
-        // detune voices: doppler pitch-shifted copies (-/+ cents), restarted on picks
-        db[i & DBM] = (float) m;
+        // detune voices: the modulated DI frequency-shifted up and down (no delay, so no flam)
         if (wX > 0)
         {
             if (--drT <= 0) { drT = 2048; dr += (rnd() - dr) * 0.15; }
-            double vs = 0;
-            for (int vi = 0; vi < 2; ++vi)
-            {
-                Voice& q = v[vi];
-                const double dd = 1.0 - std::pow (2.0, (q.sg * p.detune + (vi ? -1 : 1) * p.drift * dr) / 1200.0);
-                q.d += dd; q.o += dd;
-                if (q.x >= 1 && (q.d < dMin || q.d > dMax)) { q.o = q.d; q.d = q.st; q.x = 0; q.xi = 1.0 / xfL; }
-                double y;
-                if (q.x < 1)
-                {
-                    const double a = std::sin (q.x * PI / 2), b = std::cos (q.x * PI / 2);
-                    y = rd (q.d, i) * a + rd (std::min (std::max (q.o, 1.0), (double) DBN - 4), i) * b;
-                    q.x += q.xi;
-                }
-                else y = rd (q.d, i);
-                vs += y;
-            }
-            m = (m + wX * 0.8 * vs) / (1 + wX * 0.9);
+            double mI, mQ; hilbert (m, hs2, hD2, mI, mQ);
+            const double fUp = ktf * (std::pow (2.0, (p.detune + p.drift * dr) / 1200.0) - 1);
+            const double fDn = ktf * (1 - std::pow (2.0, -(p.detune - p.drift * dr) / 1200.0));
+            thU += TAU * fUp / sr; if (thU > TAU) thU -= TAU;
+            thD += TAU * fDn / sr; if (thD > TAU) thD -= TAU;
+            const double vU = mI * std::cos (thU) - mQ * std::sin (thU);
+            const double vD = mI * std::cos (thD) + mQ * std::sin (thD);
+            m = (mI + wX * 0.8 * (vU + vD)) / (1 + wX * 0.9);
         }
         m = th (m * dg) / std::sqrt (dg) * 1.6;
 
         // nonlinear 4-pole ladder, 2x oversampled
-        double fc = p.cutoff * std::pow (2.0, p.envAmt * fe);
+        double fc = p.cutoff * std::pow (2.0, p.envAmt * fe)
+                  * std::pow (std::min (8.0, std::max (0.125, ktf / 110.0)), (double) p.keytrk);
         fc = std::min (fc, sr * 0.45);
         const double g = 1.0 - std::exp (-TAU * fc / (2 * sr));
         for (int o = 0; o < 2; ++o)
@@ -235,9 +242,8 @@ public:
 
 private:
     static constexpr double TAU = 6.283185307179586, PI = 3.141592653589793;
-    static constexpr int DBN = 8192, DBM = DBN - 1, EHM = 4095;
+    static constexpr int EHM = 4095;
 
-    struct Voice { double sg, st, d, o, x, xi; };
 
     static double th (double q) { return q > 3 ? 1 : q < -3 ? -1 : q * (27 + q * q) / (27 + 9 * q * q); }
     double k (double t) const { return 1.0 - std::exp (-1.0 / (std::max (t, 1e-5) * sr)); }
@@ -263,14 +269,30 @@ private:
         }
         return q;
     }
-    double rd (double d, int64_t i) const
+    static double polyblep (double t, double dt)
     {
-        const double t = (double) i - d;
-        const double fl = std::floor (t);
-        const int64_t a = (int64_t) fl;
-        const double f = t - fl;
-        const double A = db[a & DBM], B = db[(a + 1) & DBM];
-        return A + (B - A) * f;
+        if (t < dt) { t /= dt; return t + t - t * t - 1; }
+        if (t > 1 - dt) { t = (t - 1) / dt; return t * t + t + t + 1; }
+        return 0;
+    }
+    // 90-degree allpass pair (Niemitalo). st holds 32 values, dl is the one-sample delay of path A.
+    static void hilbert (double x, double* st, double& dl, double& outI, double& outQ)
+    {
+        static constexpr double HA[4] = { 0.6923878 * 0.6923878, 0.9360654322959 * 0.9360654322959,
+                                          0.9882295226860 * 0.9882295226860, 0.9987488452737 * 0.9987488452737 };
+        static constexpr double HB[4] = { 0.4021921162426 * 0.4021921162426, 0.8561710882420 * 0.8561710882420,
+                                          0.9722909545651 * 0.9722909545651, 0.9952884791278 * 0.9952884791278 };
+        double a = x, b = x;
+        for (int q = 0; q < 4; ++q)
+        {
+            double* o = st + q * 4;
+            const double ya = HA[q] * (a + o[2]) - o[0];
+            o[0] = o[1]; o[1] = a; o[2] = o[3]; o[3] = ya; a = ya;
+            double* o2 = st + 16 + q * 4;
+            const double yb = HB[q] * (b + o2[2]) - o2[0];
+            o2[0] = o2[1]; o2[1] = b; o2[2] = o2[3]; o2[3] = yb; b = yb;
+        }
+        outI = dl; dl = a; outQ = b;
     }
 
     Params P;
@@ -280,20 +302,19 @@ private:
 
     // coefficients
     double hpA = 0, cAt = 0, cRl = 0, agA = 0, agR = 0, fA_ = 0, fR_ = 0, sA_ = 0, sR_ = 0, tfA = 0, tfR = 0;
-    double pkR = 0, hold = 0, upA = 0, dMin = 0, dMax = 0, xfN = 1, xfL = 1, dcA = 0;
+    double pkR = 0, hold = 0, upA = 0, ktA = 0, dcA = 0;
     int ehL = 0, ehL2 = 0, openN = 0;
-    double c[5] {}, cd[5] {};
+    double c[5] {}, cd[5] {}, cs[5] {};
     double mk = 0, thr = 0, sG = 1, sN = 1, fG = 0, wX = 0, dg = 1, kRes = 0;
     double cfA = 0, cfD = 0, caA = 0, caD = 0, caR = 0, inGain = 1, outGain = 1;
 
     // state
-    double z[8] {}, zd[8] {};
+    double z[8] {}, zd[8] {}, zs[8] {};
+    double hs1[32] {}, hs2[32] {}; double hD1 = 0, hD2 = 0, phP = 0, ktf = 110, thU = 0, thD = 0;
     float eh[4096] {};
-    float db[DBN] {};
     double hpY = 0, hpX = 0, cEnv = 0, agc = 0, agd = 0, eF = 0, eS = 0;
     bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; int openCnt = 0; double tfS = 1;
-    int s = -1, subv = 1; int64_t lastEdge = -1; double zf = 0, upM = 0;
-    Voice v[2] {};
+    int s = -1, subv = 1; int64_t lastEdge = -1; double zf = 0, upM = 0, per = 800, wnP = 0;
     double dr = 0; int drT = 0; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;

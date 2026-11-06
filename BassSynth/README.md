@@ -2,7 +2,7 @@
 
 베이스 DI를 넣으면 무그(모델 D)풍 베이스 신스 소리로 바꿔 주는 큐베이스용 이펙트 플러그인입니다.
 피치 트래킹을 쓰지 않고 DI 파형 자체를 깎고(클리핑), 접고(웨이브폴드), 옥타브를 바꿔서 음색을 만들기 때문에
-지연과 트래킹 실수가 없습니다.
+지연과 트래킹 실수가 없습니다. 톱니파는 DI 파형의 순간 위상(힐베르트 변환)에서 바로 그려서 줄의 음정을 즉시 따라갑니다.
 
 ## 다운로드
 
@@ -19,15 +19,15 @@
 
 ## 신호 흐름
 
-입력 컴프 → 피킹 게이트 → 톤 LPF → DI 변조(클리핑 · 웨이브폴드 · 옥타브 다운/업 · 디튠 보이스) → 믹서 포화(Overload) → 비선형 래더 필터 → RC 엔벨로프
+입력 컴프 → 피킹 게이트 → 톤 LPF → DI 변조(위상 기반 톱니파 · 클리핑 · 웨이브폴드 · 옥타브 다운/업 · 주파수 시프트 디튠) → 믹서 포화(Overload) → 비선형 래더 필터 → RC 엔벨로프
 
 ## 패널
 
 | 섹션 | 노브 |
 |---|---|
 | SHAPER | Tone(변조 전 LPF), Clip Drive, Fold Depth, Detune, Drift |
-| MIXER | Clip, Fold, Sub Oct, Oct Up, DI(원래 파형), Detune Voices, Overload |
-| FILTER | Cutoff, Emphasis, Contour Amount, Attack, Decay, Sustain |
+| MIXER | Saw, Clip, Fold, Sub Oct, Oct Up, DI(원래 파형), Detune Voices, Overload |
+| FILTER | Cutoff, Emphasis, Contour Amount, Key Track, Attack, Decay, Sustain |
 | LOUDNESS | Attack, Decay, Sustain, Release, Dynamics |
 | SETUP | Comp 스위치, Comp Thresh/Ratio, Gate, Pick Sens, Tail Follow, Sub Detect, Sub Hyst |
 | IN / OUT | Input, Output, Dry DI |
