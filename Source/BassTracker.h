@@ -178,6 +178,7 @@ public:
     int   getActiveNote() const   { return activeNote; }
     float getLastFreq() const     { return lastFreq; }
     float getLastLevelDb() const  { return lastLevelDb; }
+    float getOnsetHfMinusLevel() const { return onsetHfMinusLevel; }
     double getLastOnsetSeconds() const { return (double) lastOnsetAt / fsd; }
     int   getLatencySamples() const { return (window + tauMax) * decim / 2; }
 
@@ -479,6 +480,7 @@ private:
                 if (hfHist[(size_t) idx] - older >= hfFactor * params.retriggerDb) { back = k; break; }
             }
             lastOnsetAt = decimTotal - back;
+            onsetHfMinusLevel = newest - lastLevelDb;
            #ifdef B2M_DEBUG
             std::printf ("    [hf onset %.3f  new %.1f old %.1f]\n", decimTotal / fsd, newest, older);
            #endif
@@ -674,12 +676,26 @@ private:
 
         // Octave-up guard: a strong 2nd harmonic dips at half the true period.
         // If the octave below is a playable note but its lag can't be checked yet, wait.
-        if (confirmOctave)
+        // Slap attacks (very bright transient, weak fundamental) are prone to locking onto
+        // the 2nd or 3rd harmonic: for those, wait until 2x / 3x the lag can be checked.
+        const bool slapLike = slapHfDb > -100.0f && onsetHfMinusLevel > slapHfDb
+                              && decimTotal - lastOnsetAt < bufLen;
+        if (confirmOctave || slapLike)
         {
-            const double fBelow = fsd / (2.0 * best);
             const double lowestHz = 440.0 * std::pow (2.0, (params.lowestNote - 0.5 - 69.0) / 12.0);
-            if (fBelow >= lowestHz && 2 * best + 1 > tauLimit)
-                return 0.0f;
+            for (int k = 2; k <= (slapLike ? 3 : 2); ++k)
+                if (fsd / ((double) k * best) >= lowestHz && k * best + 1 > tauLimit)
+                    return 0.0f;
+            // and if a longer lag fits nearly as well, it is the real period
+            if (slapLike)
+                for (int k = 3; k >= 2; --k)
+                {
+                    const int c = k * best;
+                    if (c + 2 > tauLimit || fsd / (double) c < lowestHz) continue;
+                    int m = c;
+                    for (int t = c - 2; t <= c + 2; ++t) if (diff[(size_t) t] < diff[(size_t) m]) m = t;
+                    if (diff[(size_t) m] < slapLongerFactor * diff[(size_t) best]) { best = m; break; }
+                }
         }
 
         lastDip = diff[(size_t) best];
@@ -725,6 +741,9 @@ public:
     float legatoFallDb = 4.0f;    // 100 = off
     float octUpFactor = 0.0f;     // 0 = off
     float deadDropDb = 15.0f;     // 0 = off
+    float slapHfDb = -1000.0f;    // HF-minus-level at onset above which an attack counts as slap (-1000 = off)
+    float slapLongerFactor = 0.0f;
+    float onsetHfMinusLevel = -140.0f;
     float onsetPeakDb = -140.0f;
     float subFactor = 3.0f;      // sub-harmonic correction (0 = off)
     float ambigSemis = 0.25f;    // > 0.5 disables the ambiguity wait

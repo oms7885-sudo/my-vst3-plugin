@@ -72,6 +72,8 @@ static void applyExtra (BassTracker& tr, const Config& c)
         else if (k == "fall") tr.legatoFallDb = v;
         else if (k == "octup") tr.octUpFactor = v;
         else if (k == "dead") tr.deadDropDb = v;
+        else if (k == "slap") tr.slapHfDb = v;
+        else if (k == "slapf") tr.slapLongerFactor = v;
         else if (k == "est") tr.estimator = (int) v;
         else if (k == "mpmk") tr.mpmK = v;
         else if (k == "clar") tr.mpmClarityScale = v;
@@ -80,12 +82,14 @@ static void applyExtra (BassTracker& tr, const Config& c)
 }
 
 static thread_local std::vector<double> tlOnsetAtNoteOn;   // tracker's own onset time for each note-on
+static thread_local std::vector<float> tlHfAtNoteOn;        // onset brightness for each note-on
 
 static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Config& c,
                                std::vector<std::pair<double, float>>* freqs = nullptr,
                                std::vector<float>* levels = nullptr)
 {
     tlOnsetAtNoteOn.clear();
+    tlHfAtNoteOn.clear();
     BassTracker tr; applyExtra (tr, c); tr.prepare (fs); tr.setParams (c.p);
     std::vector<Ev> ev;
     const int block = freqs ? 64 : 256;
@@ -96,6 +100,7 @@ static std::vector<Ev> runCfg (const std::vector<float>& a, double fs, const Con
         {
             ev.push_back ({ e, (pos + e.sampleOffset) / fs });
             tlOnsetAtNoteOn.push_back (e.isNoteOn ? tr.getLastOnsetSeconds() : -1.0);
+            tlHfAtNoteOn.push_back (tr.getOnsetHfMinusLevel());
         });
         if (freqs) freqs->push_back ({ (pos + n) / fs, tr.getLastFreq() });
         if (levels) levels->push_back (tr.getLastLevelDb());
@@ -111,6 +116,7 @@ struct NoteStats
     int files = 0, correct = 0, octave = 0, wrong = 0, missed = 0, glitch = 0, deadFired = 0, deadFiles = 0, settled = 0, preNotes = 0;
     std::vector<double> lat, onsetErr, detLat, firstVoiced, firstRight;   // latency; tracker onset - true onset; note-on - tracker onset
     std::map<int, std::vector<double>> latByString;
+    std::map<std::string, std::vector<double>> hfByStyle;
     std::map<std::string, std::vector<double>> cents;   // per bass: tuning deviation of plain notes
     std::map<int, int> diffs;                            // first-note error in semitones
     std::map<std::string, int> glitchKinds;              // "interval@timebucket" -> count
@@ -125,6 +131,7 @@ struct NoteStats
         firstRight.insert (firstRight.end(), o.firstRight.begin(), o.firstRight.end());
         detLat.insert (detLat.end(), o.detLat.begin(), o.detLat.end());
         for (auto& [k, v] : o.latByString) latByString[k].insert (latByString[k].end(), v.begin(), v.end());
+        for (auto& [k, v] : o.hfByStyle) hfByStyle[k].insert (hfByStyle[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.cents) cents[k].insert (cents[k].end(), v.begin(), v.end());
         for (auto& [k, v] : o.diffs) diffs[k] += v;
         for (auto& [k, v] : o.glitchKinds) glitchKinds[k] += v;
@@ -234,6 +241,7 @@ static NoteStats evalNoteFile (const NoteFile& nf, const Config& c)
     if (! first) { ++s.missed; return s; }
     const int d = first->e.note - nf.pitch;
     if (d != 0) ++s.diffs[d];
+    s.hfByStyle[nf.ps].push_back (tlHfAtNoteOn[(size_t) (first - ev.data())]);
     {
         // which note is sounding 150 ms after the first note-on (did it settle on the right pitch?)
         int cur = -1;
@@ -450,6 +458,9 @@ int main (int argc, char** argv)
                      pct (all.onsetErr, 0.5), pct (all.onsetErr, 0.1), pct (all.onsetErr, 0.9), pct (all.detLat, 0.5), pct (all.detLat, 0.9));
         std::printf ("  pitch tracker: first voiced frame med %.1f ms, first frame within 50c of target med %.1f ms (p90 %.1f)\n",
                      pct (all.firstVoiced, 0.5), pct (all.firstRight, 0.5), pct (all.firstRight, 0.9));
+        std::printf ("  onset brightness (HF - level dB) p10/p50/p90 by style:");
+        for (auto& [k, v] : all.hfByStyle) std::printf ("  %s %.0f/%.0f/%.0f", k.c_str(), pct (v, 0.1), pct (v, 0.5), pct (v, 0.9));
+        std::printf ("\n");
         std::printf ("  latency by pitch range (E1-D#2 / A1.. / D2.. / G2..):");
         for (auto& [k, v] : all.latByString) std::printf ("  %.1f", pct (v, 0.5));
         std::printf ("\n");
