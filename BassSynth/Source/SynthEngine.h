@@ -83,7 +83,7 @@ public:
         s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0; per = sr / 55.0; wnP = 0;
         hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0;
         dr = 0; drT = 0; seed = 777;
-        y1 = y2 = y3 = y4 = 0;
+        y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0;
         dcX = dcY = 0;
         n = 0;
@@ -232,12 +232,17 @@ public:
         double fc = p.cutoff * std::pow (2.0, p.envAmt * fe)
                   * std::pow (std::min (8.0, std::max (0.125, ktf / 110.0)), (double) p.keytrk);
         fc = std::min (fc, sr * 0.45);
-        const double g = 1.0 - std::exp (-TAU * fc / (2 * sr));
+        // zero-delay-feedback ladder: the resonance feedback is solved within the same sample,
+        // so the peak stays as strong at 5 kHz as at 150 Hz, like the analog ladder; tanh at the input and each stage
+        const double gz = std::tan (PI * fc / (2 * sr)), Gz = gz / (1 + gz), G2 = Gz * Gz, G4 = G2 * G2;
         for (int o = 0; o < 2; ++o)
         {
-            const double u = th (m - kRes * y4);
-            const double t1 = th (y1), t2 = th (y2), t3 = th (y3);
-            y1 += g * (u - t1); y2 += g * (t1 - t2); y3 += g * (t2 - t3); y4 += g * (t3 - th (y4));
+            const double est = (G4 * m + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kRes * G4);
+            double a = th (m - kRes * est), v, yy;
+            v = (th (a) - l1) * Gz; yy = v + l1; l1 = yy + v; a = yy;
+            v = (th (a) - l2) * Gz; yy = v + l2; l2 = yy + v; a = yy;
+            v = (th (a) - l3) * Gz; yy = v + l3; l3 = yy + v; a = yy;
+            v = (th (a) - l4) * Gz; yy = v + l4; l4 = yy + v; y4 = yy;
         }
 
         // RC envelopes
@@ -342,7 +347,7 @@ private:
     float bm[64] {}, phb[64] {};
     int s = -1, subv = 1; int64_t lastEdge = -1; double zf = 0, upM = 0, per = 800, wnP = 0;
     double dr = 0; int drT = 0; uint32_t seed = 777;
-    double y1 = 0, y2 = 0, y3 = 0, y4 = 0;
+    double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
     double dcX = 0, dcY = 0;
     double lastFreq = 0;
