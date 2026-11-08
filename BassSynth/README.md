@@ -53,6 +53,17 @@
 
 프리셋: Model D Bass, Punch Sub, Squelch, Fuzz Octave
 
+### 내 프리셋 저장
+
+아래쪽 나무 띠의 PRESETS에서 **Save**를 누르면 지금 설정을 저장합니다. 저장한 프리셋은 목록의 "My presets" 아래에 나오고,
+**Folder**를 누르면 저장 폴더(`문서\Bass Ladder Synth\Presets`)가 열립니다. 파일(.blsp)을 복사해서 다른 PC로 옮길 수도 있습니다.
+
+### 패널 배치
+
+모델 D 패널 순서를 따릅니다: CONTROLLERS · SOURCE(오실레이터 자리) · MIXER · MODIFIERS · OUTPUT.
+MODIFIERS는 실제처럼 위에서부터 필터 / 필터 컨투어 / 라우드니스 컨투어 3줄이고, 왼쪽에 Keyboard Control 1·2와 Decay 스위치가 있습니다.
+어택·디케이 노브의 눈금은 모델 D 패널처럼 200ms · 600ms · 1s · 5s 표시가 노브의 2 · 4 · 6 · 8 위치에 오도록 맞췄습니다.
+
 ## 오프라인 테스트
 
 `BassSynth/tests/smoke_test.cpp` 가 합성 노트로 엔진을 검사합니다 (빌드 때 자동 실행).

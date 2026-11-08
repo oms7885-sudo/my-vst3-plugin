@@ -3,8 +3,8 @@
 
 namespace
 {
-    // map: 0 = linear, 1 = true logarithmic (equal ratio per turn, like the Model D time and pitch pots),
-    //      2 = skewed so `centre` sits at 12 o'clock
+    // map: 0 = linear, 1 = true logarithmic, 2 = skewed so `centre` sits at 12 o'clock,
+    //      3 = Model D contour time scale: printed 200 ms / 600 ms / 1 s / 5 s at 2 / 4 / 6 / 8 of the turn
     // fmt: 0 = number + unit, 1 = Model D cutoff (-5..+5 with Hz), 2 = time (ms / s)
     struct FloatDef { const char* id; const char* name; float min, max, def, centre; const char* label; int map; int fmt; };
 
@@ -37,12 +37,12 @@ namespace
         { "cutM",     "Cutoff Frequency",   -5.0f,  5.0f, -1.4f,   0.0f,   "",   0, 1 },
         { "emph",     "Emphasis",            0.0f, 10.0f,  2.8f,   0.0f,   "",   0, 0 },
         { "contour",  "Amount of Contour",   0.0f, 10.0f,  8.0f,   0.0f,   "",   0, 0 },
-        { "fA",       "Filter Attack Time",  1.0f, 10000.0f, 3.0f,   0.0f, "",   1, 2 },
-        { "fD",       "Filter Decay Time",   4.0f, 35000.0f, 320.0f, 0.0f, "",   1, 2 },
+        { "fA",       "Filter Attack Time",  1.0f, 10000.0f, 3.0f,   0.0f, "",   3, 2 },
+        { "fD",       "Filter Decay Time",   4.0f, 35000.0f, 320.0f, 0.0f, "",   3, 2 },
         { "fSus",     "Filter Sustain Level",0.0f, 10.0f,  1.0f,   0.0f,   "",   0, 0 },
         // loudness contour
-        { "aA",       "Loudness Attack Time", 1.0f, 10000.0f, 1.5f,  0.0f, "",   1, 2 },
-        { "aD",       "Loudness Decay Time",  4.0f, 35000.0f, 900.0f, 0.0f, "",  1, 2 },
+        { "aA",       "Loudness Attack Time", 1.0f, 10000.0f, 1.5f,  0.0f, "",   3, 2 },
+        { "aD",       "Loudness Decay Time",  4.0f, 35000.0f, 900.0f, 0.0f, "",  3, 2 },
         { "aSus",     "Loudness Sustain Level", 0.0f, 10.0f, 7.5f,  0.0f,  "",   0, 0 },
         { "dyn",      "Dynamics",            0.0f,  1.0f,  0.35f,  0.0f,   "",   0, 0 },
         // output
@@ -57,6 +57,25 @@ namespace
         { "kb2",     "Keyboard Control 2",  false },   // 2/3 key tracking
         { "decaySw", "Decay Switch",        false },   // on: notes fade over the Decay time after release
     };
+
+    // Model D contour time knob: value at turn t (0..1), log-interpolated between the printed marks
+    float timeFrom01 (float lo, float hi, float t)
+    {
+        const float pt[6] = { 0.0f, 0.2f, 0.4f, 0.6f, 0.8f, 1.0f };
+        const float ms[6] = { lo, 200.0f, 600.0f, 1000.0f, 5000.0f, hi };
+        t = juce::jlimit (0.0f, 1.0f, t);
+        int i = juce::jmin (4, (int) (t / 0.2f));
+        const float f = (t - pt[i]) / 0.2f;
+        return ms[i] * std::pow (ms[i + 1] / ms[i], f);
+    }
+    float timeTo01 (float lo, float hi, float v)
+    {
+        const float ms[6] = { lo, 200.0f, 600.0f, 1000.0f, 5000.0f, hi };
+        v = juce::jlimit (lo, hi, v);
+        int i = 0;
+        while (i < 4 && v > ms[i + 1]) ++i;
+        return 0.2f * ((float) i + std::log (v / ms[i]) / std::log (ms[i + 1] / ms[i]));
+    }
 
     // Model D scale helpers
     float cutoffHz (float knob) { return 10.0f * std::pow (2.0f, (knob + 5.0f) * 1.1f); }   // 11 octaves over -5..+5
@@ -99,6 +118,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
                 [] (float a, float b, float v) { return std::log (v / a) / std::log (b / a); });
         }
         else if (d.map == 2) range.setSkewForCentre (d.centre);
+        else if (d.map == 3)
+            range = NormalisableRange<float> (d.min, d.max,
+                [] (float a, float b, float t) { return timeFrom01 (a, b, t); },
+                [] (float a, float b, float v) { return timeTo01 (a, b, v); });
         const String unit (d.label);
         const int fmt = d.fmt;
         auto toText = [unit, fmt] (float v, int)
@@ -217,6 +240,43 @@ void BassSynthProcessor::setStateInformation (const void* data, int sizeInBytes)
     if (auto xml = getXmlFromBinary (data, sizeInBytes))
         if (xml->hasTagName (apvts.state.getType()))
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+}
+
+//==============================================================================
+// user presets: plain XML files of the parameter state in Documents/Bass Ladder Synth/Presets
+juce::File BassSynthProcessor::userPresetDir()
+{
+    return juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+               .getChildFile ("Bass Ladder Synth").getChildFile ("Presets");
+}
+
+juce::Array<juce::File> BassSynthProcessor::userPresets()
+{
+    auto files = userPresetDir().findChildFiles (juce::File::findFiles, false, "*.blsp");
+    std::sort (files.begin(), files.end(), [] (const juce::File& a, const juce::File& b)
+               { return a.getFileName().compareIgnoreCase (b.getFileName()) < 0; });
+    return files;
+}
+
+bool BassSynthProcessor::saveUserPreset (const juce::File& file)
+{
+    if (auto xml = apvts.copyState().createXml())
+    {
+        file.getParentDirectory().createDirectory();
+        return xml->writeTo (file);
+    }
+    return false;
+}
+
+bool BassSynthProcessor::loadUserPreset (const juce::File& file)
+{
+    if (auto xml = juce::XmlDocument::parse (file))
+        if (xml->hasTagName (apvts.state.getType()))
+        {
+            apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            return true;
+        }
+    return false;
 }
 
 juce::AudioProcessorEditor* BassSynthProcessor::createEditor()

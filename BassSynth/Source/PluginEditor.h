@@ -37,24 +37,31 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
         juce::Rectangle<int> labelArea;
     };
-    struct Section { juce::String title; int cols; std::vector<int> knobIndex; juce::Rectangle<int> area; };
+    struct Section
+    {
+        juce::String title; int cols = 1;
+        std::vector<int> knobIndex;                         // -1 = empty cell
+        std::vector<std::pair<int, juce::String>> subLabels; // heading above a row
+        std::vector<int> rowY;
+        juce::Rectangle<int> area;
+    };
 
     void addKnob (const juce::String& id, const juce::String& label, bool small);
+    void refreshPresetList (const juce::File& select = {});
+    void savePreset();
 
     BassSynthProcessor& proc;
     PanelLookAndFeel lnf;
 
     std::vector<Knob> knobs;
     std::vector<Section> sections;
-    std::vector<int> setupKnobs;
-
-    juce::ToggleButton compButton;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> compAttachment;
-    juce::Rectangle<int> compLabelArea;
-
     juce::ComboBox presetBox;
+    juce::TextButton saveButton, folderButton;
+    std::unique_ptr<juce::FileChooser> chooser;
+    juce::Array<juce::File> userPresetFiles;
+    static constexpr int userIdBase = 1000;
 
-    juce::Rectangle<int> panelArea, topArea, displayArea, setupArea;
+    juce::Rectangle<int> panelArea, stripArea, plateArea, badgeArea, displayArea, presetLabelArea;
     uint32_t lastTrig = 0;
     int trigFlash = 0;
     bool gateLed = false;

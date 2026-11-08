@@ -36,6 +36,12 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
+    // user presets (Documents/Bass Ladder Synth/Presets/*.blsp)
+    static juce::File userPresetDir();
+    static juce::Array<juce::File> userPresets();
+    bool saveUserPreset (const juce::File& file);
+    bool loadUserPreset (const juce::File& file);
+
     // read by the editor
     std::atomic<float> displayFreq { 0.0f };
     std::atomic<bool>  displayGate { false };
