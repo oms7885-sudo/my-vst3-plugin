@@ -133,12 +133,12 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
 
     addSection ("Shaper", 3, { { "tone", "Tone" }, { "shapeAmt", "Clip Drive" }, { "foldAmt", "Fold Depth" },
                                { "detune", "Detune" }, { "drift", "Drift" } });
-    addSection ("Mixer", 4, { { "sawLvl", "Saw" }, { "satLvl", "Clip" }, { "foldLvl", "Fold" }, { "subLvl", "Sub Oct" }, { "upLvl", "Oct Up" },
-                              { "cleanLvl", "DI" }, { "detLvl", "Detune Voices" }, { "drive", "Overload" } });
-    addSection ("Filter", 4, { { "cutoff", "Cutoff" }, { "res", "Emphasis" }, { "envAmt", "Contour Amount" }, { "keytrk", "Key Track" },
-                               { "fA", "Attack" }, { "fD", "Decay" }, { "fS", "Sustain" } });
-    addSection ("Loudness", 3, { { "aA", "Attack" }, { "aD", "Decay" }, { "aS", "Sustain" },
-                                 { "aR", "Release" }, { "dyn", "Dynamics" } });
+    addSection ("Mixer", 4, { { "sawM", "Saw" }, { "clipM", "Clip" }, { "foldM", "Fold" }, { "subM", "Sub Oct" }, { "upM", "Oct Up" },
+                              { "diM", "DI" }, { "detVM", "Detune Voices" }, { "drive", "Overload" } });
+    addSection ("Filter", 4, { { "cutM", "Cutoff" }, { "emph", "Emphasis" }, { "contour", "Amount of Contour" }, { "kb1", "Kbd Ctrl 1" },
+                               { "fA", "Attack" }, { "fD", "Decay" }, { "fSus", "Sustain" }, { "kb2", "Kbd Ctrl 2" } });
+    addSection ("Loudness", 3, { { "aA", "Attack" }, { "aD", "Decay" }, { "aSus", "Sustain" },
+                                 { "decaySw", "Decay" }, { "dyn", "Dynamics" } });
 
     for (const auto& [id, label] : std::initializer_list<std::pair<const char*, const char*>> {
              { "cTh", "Comp Thresh" }, { "cRat", "Comp Ratio" }, { "gate", "Gate" }, { "pickSens", "Pick Sens" },
@@ -173,6 +173,16 @@ void BassSynthEditor::addKnob (const juce::String& id, const juce::String& label
 {
     Knob k;
     k.id = id; k.label = label; k.small = small;
+    if (dynamic_cast<juce::AudioParameterBool*> (proc.apvts.getParameter (id)) != nullptr)
+    {
+        // Model D style rocker switch
+        k.button = std::make_unique<juce::ToggleButton>();
+        k.buttonAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, id, *k.button);
+        if (auto* prm = proc.apvts.getParameter (id)) k.button->setTooltip (prm->getName (64));
+        addAndMakeVisible (*k.button);
+        knobs.push_back (std::move (k));
+        return;
+    }
     k.slider = std::make_unique<juce::Slider> (juce::Slider::RotaryVerticalDrag, juce::Slider::TextBoxBelow);
     k.slider->setRotaryParameters (juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
     k.slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, small ? 72 : 78, 16);
@@ -216,7 +226,8 @@ void BassSynthEditor::resized()
             const int col = (int) j % s.cols, row = (int) j / s.cols;
             const juce::Rectangle<int> cell (gridX + col * cellW, gridY + row * cellH, cellW, cellH);
             k.labelArea = cell.withHeight (28);
-            k.slider->setBounds (cell.getX() + 6, cell.getY() + 28, cellW - 12, cellH - 34);
+            if (k.button != nullptr) k.button->setBounds (cell.getX() + 16, cell.getY() + 36, cellW - 32, 52);
+            else k.slider->setBounds (cell.getX() + 6, cell.getY() + 28, cellW - 12, cellH - 34);
         }
     }
 

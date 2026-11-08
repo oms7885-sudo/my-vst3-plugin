@@ -33,6 +33,8 @@ private:
         bool small = false;
         std::unique_ptr<juce::Slider> slider;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        std::unique_ptr<juce::ToggleButton> button;   // for on/off switches (Keyboard Control, Decay)
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
         juce::Rectangle<int> labelArea;
     };
     struct Section { juce::String title; int cols; std::vector<int> knobIndex; juce::Rectangle<int> area; };

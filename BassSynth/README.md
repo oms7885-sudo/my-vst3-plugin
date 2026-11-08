@@ -23,19 +23,33 @@
 
 ## 패널
 
+미니무그 모델 D에도 있는 노브와 스위치는 실제 기기의 범위와 눈금에 맞췄습니다. 모델 D 프리셋 치트시트의 숫자를 그대로 옮기면 됩니다.
+
+| 노브/스위치 | 범위 (모델 D 사양) |
+|---|---|
+| Cutoff | -5 ~ +5 눈금 = 10Hz ~ 20kHz (눈금 1칸 = 1.1옥타브) |
+| Emphasis | 0 ~ 10 (9 근처부터 자체 발진) |
+| Amount of Contour | 0 ~ 10 = 0 ~ 4옥타브 |
+| Attack | 1ms ~ 10s (로그 곡선) |
+| Decay | 4ms ~ 35s (로그 곡선) |
+| Sustain | 0 ~ 10 = 0 ~ 100% |
+| Kbd Ctrl 1 / 2 | 키 트래킹 1/3 / 2/3, 둘 다 켜면 1옥타브당 1옥타브 |
+| Decay 스위치 | 켜면 손을 뗀 뒤 디케이 시간만큼 소리가 남음, 끄면 바로 끝남 |
+| Mixer 볼륨 | 0 ~ 10 |
+
+모델 D에 없는 이 플러그인 전용 노브:
+
 | 섹션 | 노브 |
 |---|---|
 | SHAPER | Tone(변조 전 LPF), Clip Drive, Fold Depth, Detune, Drift |
 | MIXER | Saw, Clip, Fold, Sub Oct, Oct Up, DI(원래 파형), Detune Voices, Overload |
-| FILTER | Cutoff, Emphasis, Contour Amount, Key Track, Attack, Decay, Sustain |
-| LOUDNESS | Attack, Decay, Sustain, Release, Dynamics |
+| LOUDNESS | Dynamics |
 | SETUP | Comp 스위치, Comp Thresh/Ratio, Gate, Pick Sens, Tail Follow, Sub Detect, Sub Hyst |
 | IN / OUT | Input, Output, Dry DI |
 
 - 노브는 위아래로 드래그, 더블클릭하면 기본값.
 - Input은 DI 피크가 0 dBFS 근처에 오도록 맞추면 기본값이 잘 맞습니다.
-- 안 친 음이 트리거되면 Pick Sens를 올리고, 친 음을 놓치면 내리세요.
-- 옥타브 다운이 떨리면 Sub Detect를 낮추세요.
+- 실제 래더처럼 Emphasis를 올리면 저음이 줄어듭니다.
 
 프리셋: Model D Bass, Punch Sub, Squelch, Fuzz Octave
 

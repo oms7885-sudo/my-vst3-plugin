@@ -32,10 +32,11 @@ struct Params
     float sawLvl = 0.8f, satLvl = 0.4f, foldLvl = 0.0f, subLvl = 0.5f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.35f;
     float drive = 0.45f;
     // filter
-    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f, keytrk = 0.5f;
+    float cutoff = 155.6248f, res = 0.3f, envAmt = 3.2f, keytrk = 1.0f / 3.0f;   // Model D: -1.4, 2.8, 8, Kbd Ctrl 1
     float fA = 3.0f, fD = 320.0f, fS = 0.1f;          // ms, ms, 0..1
     // loudness
-    float aA = 1.5f, aD = 900.0f, aS = 0.75f, aR = 90.0f;
+    float aA = 1.5f, aD = 900.0f, aS = 0.75f, aR = 8.0f;
+    float fR = 8.0f;                   // filter contour release (ms)
     float dyn = 0.35f;
     // output
     float outGainDb = 0.0f;
@@ -103,7 +104,7 @@ public:
         wX = std::min (1.0, p.detune / 2.0) * p.detLvl;
         dg = 1.0 + p.drive * 6.0;
         kRes = 4.1 * p.res;
-        cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0);
+        cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0); cfR = k (p.fR / 3000.0);
         caA = k (p.aA / 3000.0); caD = k (p.aD / 3000.0); caR = k (p.aR / 3000.0);
         inGain = std::pow (10.0, p.inGainDb / 20.0);
         outGain = std::pow (10.0, p.outGainDb / 20.0);
@@ -248,7 +249,7 @@ public:
         // RC envelopes
         if (fs == 1) { fe += (1.3 - fe) * cfA; if (fe >= 1) { fe = 1; fs = 2; } }
         else if (fs == 2) fe += (p.fS - fe) * cfD;
-        else if (fs == 3) fe += (0 - fe) * cfD;
+        else if (fs == 3) fe += (0 - fe) * cfR;
         if (as == 1) { ae += (1.3 - ae) * caA; if (ae >= 1) { ae = 1; as = 2; } }
         else if (as == 2) ae += (p.aS - ae) * caD;
         else if (as == 3) ae += (0 - ae) * caR;
@@ -256,7 +257,9 @@ public:
         const double dynF = (1 - p.dyn) + p.dyn * std::min (1.0, eF * 2.2);
         const double tf = std::min (1.0, eF / (notePk * p.tail + 1e-6));
         tfS += (tf - tfS) * (tf > tfS ? tfA : tfR);
-        const double yv = y4 * (1 + p.res * 0.9) * ae * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        // no resonance makeup: like the real ladder, the low end drops as Emphasis goes up
+        // (a fixed +2 dB keeps the default level where it was)
+        const double yv = y4 * 1.27 * ae * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
@@ -335,7 +338,7 @@ private:
     int ehL = 0, ehL2 = 0, openN = 0;
     double c[5] {}, cd[5] {}, cs[5] {};
     double mk = 0, thr = 0, sG = 1, sN = 1, fG = 0, wX = 0, dg = 1, kRes = 0;
-    double cfA = 0, cfD = 0, caA = 0, caD = 0, caR = 0, inGain = 1, outGain = 1;
+    double cfA = 0, cfD = 0, cfR = 0, caA = 0, caD = 0, caR = 0, inGain = 1, outGain = 1;
 
     // state
     double z[8] {}, zd[8] {}, zs[8] {};
