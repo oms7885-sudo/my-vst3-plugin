@@ -131,7 +131,7 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
         sections.push_back (std::move (s));
     };
 
-    addSection ("Shaper", 3, { { "tone", "Tone" }, { "shapeAmt", "Clip Drive" }, { "foldAmt", "Fold Depth" },
+    addSection ("Shaper", 3, { { "lock", "Lock" }, { "tone", "Tone" }, { "shapeAmt", "Clip Drive" }, { "foldAmt", "Fold Depth" },
                                { "detune", "Detune" }, { "drift", "Drift" } });
     addSection ("Mixer", 4, { { "sawLvl", "Saw" }, { "satLvl", "Clip" }, { "foldLvl", "Fold" }, { "subLvl", "Sub Oct" }, { "upLvl", "Oct Up" },
                               { "cleanLvl", "DI" }, { "detLvl", "Detune Voices" }, { "drive", "Overload" } });

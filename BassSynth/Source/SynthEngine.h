@@ -26,6 +26,7 @@ struct Params
     float hyst = 0.15f;
     // shaper
     float tone = 250.0f;               // Hz, low-pass before shaping
+    float lock = 1.0f;                 // 1 = DI phase, 0 = free oscillator
     float shapeAmt = 0.7f, foldAmt = 0.4f;
     float detune = 7.0f, drift = 2.0f; // cents
     // mixer
@@ -55,7 +56,7 @@ public:
         tfA = k (0.003); tfR = k (0.01);
         ehL  = (int) std::lround (0.015 * sr);
         ehL2 = (int) std::lround (0.025 * sr);
-        pkR = std::exp (-1.0 / (3.0 * sr));
+        pkR = std::exp (-1.0 / (1.5 * sr));
         BL = std::max (1, (int) std::lround (0.001 * sr));
         openN = (int) std::lround (0.0015 * sr);
         hold = 0.05 * sr;
@@ -82,6 +83,7 @@ public:
         std::fill (std::begin (phb), std::end (phb), 0.0f);
         s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0; per = sr / 55.0; wnP = 0;
         hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0;
+        po = poP = 0; finc = dphS = 55.0 / sr; oSub = 1; odd = 0;
         dr = 0; drT = 0; seed = 777;
         y1 = y2 = y3 = y4 = 0;
         fe = ae = 0; fs = as = 0;
@@ -203,14 +205,41 @@ public:
         const double ph = std::atan2 (-hQ, hI) / TAU + 0.5;
         double dph = ph - phP; if (dph < -0.5) dph += 1; else if (dph > 0.5) dph -= 1;
         phP = ph;
-        const double dt = std::min (std::max (dph, 1e-4), 0.05);
-        const double saw = 2 * ph - 1 - polyblep (ph, dt);
+
+        // ---- Lock: how tightly the oscillator follows the DI (1 = the DI's own phase, 0 = free-running osc).
+        // Right after a pick it always locks tight, then relaxes to the knob value, so attack timing never moves.
+        const double tOn = (double) (i - lastOn) / sr;
+        const double Lk = 0.15 + 0.85 * p.lock * p.lock;   // knob 0 still keeps a light hold on the pitch
+        const double le = tOn < 0.012 ? 1.0 : Lk + (1 - Lk) * std::exp (-(tOn - 0.012) / 0.04);
+        // pitch for the free oscillator: ignore one-off jumps in the measured phase rate
+        if (gateOn && dph > 20.0 / sr && dph < 800.0 / sr)
+        {
+            const double dev = std::abs (dph / dphS - 1);
+            if (le > 0.98 || dev < 0.25) { dphS += (dph - dphS) * (le > 0.98 ? 1.0 : 0.005 + 0.3 * le); odd = 0; }
+            else if (++odd > 0.003 * sr) { dphS = dph; odd = 0; }
+        }
+        finc += (dphS - finc) * (le >= 0.999 ? 1.0 : std::min (1.0, 1.0 / (sr * (0.001 + 0.008 * (1 - le)))));
+        {
+            const double pred = po + finc;
+            double pe = ph - pred; pe -= std::round (pe);
+            po = pred + pe * (le >= 0.999 ? 1.0 : 0.0005 + 0.2 * le * le);
+            po -= std::floor (po);
+        }
+        if ((poP < 0.25 && po >= 0.25) || (po < poP && po >= 0.25)) oSub = -oSub;
+        poP = po;
+        if (le > 0.95) oSub = subv;   // keep the oscillator sub in step with the DI sub during the attack
+        const double odt = std::min (std::max (finc, 1e-4), 0.05);
+        const double saw = 2 * po - 1 - polyblep (po, odt);
+        const double oSq = ((po > 0.25 && po < 0.75) ? 1.0 : -1.0)
+                         + polyblep (std::fmod (po + 0.75, 1.0), odt) - polyblep (std::fmod (po + 0.25, 1.0), odt);
+        const double mixO = 1 - le;
         if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
-        const double sub = subv * std::abs (sat);       // octave down
+        const double sub = subv * std::abs (sat) * (1 - mixO) + oSub * mixO;   // octave down
         const double ra = std::abs (sat); upM += (ra - upM) * upA;
         const double up = (ra - upM) * 2.0;             // octave up
         const double cln = th (yn * 0.9);               // the DI waveform itself
-        double m = (p.satLvl * sat + p.foldLvl * fold + p.subLvl * sub + p.upLvl * up + p.cleanLvl * cln
+        const double satM = sat * (1 - mixO) + oSq * 0.95 * mixO;
+        double m = (p.satLvl * satM + p.foldLvl * fold + p.subLvl * sub + p.upLvl * up + p.cleanLvl * cln
                     + p.sawLvl * saw * std::min (1.0, agd * 40.0)) * 0.55;
 
         // detune voices: the modulated DI frequency-shifted up and down (no delay, so no flam)
@@ -235,9 +264,12 @@ public:
         const double g = 1.0 - std::exp (-TAU * fc / (2 * sr));
         for (int o = 0; o < 2; ++o)
         {
+            // stages update in sequence (each stage sees the one before it already moved), as in the prototype
             const double u = th (m - kRes * y4);
-            const double t1 = th (y1), t2 = th (y2), t3 = th (y3);
-            y1 += g * (u - t1); y2 += g * (t1 - t2); y3 += g * (t2 - t3); y4 += g * (t3 - th (y4));
+            y1 += g * (u - th (y1));
+            y2 += g * (th (y1) - th (y2));
+            y3 += g * (th (y2) - th (y3));
+            y4 += g * (th (y3) - th (y4));
         }
 
         // RC envelopes
@@ -334,6 +366,7 @@ private:
 
     // state
     double z[8] {}, zd[8] {}, zs[8] {};
+    double po = 0, poP = 0, finc = 0.001, dphS = 0.001; int oSub = 1, odd = 0;
     double hs1[32] {}, hs2[32] {}; double hD1 = 0, hD2 = 0, phP = 0, ktf = 110, thU = 0, thD = 0;
     float eh[4096] {};
     double hpY = 0, hpX = 0, cEnv = 0, agc = 0, agd = 0, eF = 0, eS = 0;

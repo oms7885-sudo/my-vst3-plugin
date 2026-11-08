@@ -25,7 +25,7 @@
 
 | 섹션 | 노브 |
 |---|---|
-| SHAPER | Tone(변조 전 LPF), Clip Drive, Fold Depth, Detune, Drift |
+| SHAPER | Lock(1=DI 위상 그대로, 0=자유 오실레이터에 가깝게), Tone(변조 전 LPF), Clip Drive, Fold Depth, Detune, Drift |
 | MIXER | Saw, Clip, Fold, Sub Oct, Oct Up, DI(원래 파형), Detune Voices, Overload |
 | FILTER | Cutoff, Emphasis, Contour Amount, Key Track, Attack, Decay, Sustain |
 | LOUDNESS | Attack, Decay, Sustain, Release, Dynamics |
@@ -37,7 +37,9 @@
 - 안 친 음이 트리거되면 Pick Sens를 올리고, 친 음을 놓치면 내리세요.
 - 옥타브 다운이 떨리면 Sub Detect를 낮추세요.
 
-프리셋: Model D Bass, Punch Sub, Squelch, Fuzz Octave
+프리셋: Model D Bass, Punch Sub, Squelch, Hybrid Synth, Fuzz Octave
+
+- Lock을 낮추면 톱니파·사각파·서브가 깨끗한 오실레이터 파형으로 바뀝니다. 피킹 직후 12ms는 항상 DI를 따라가서 어택 타이밍은 그대로입니다.
 
 ## 오프라인 테스트
 
