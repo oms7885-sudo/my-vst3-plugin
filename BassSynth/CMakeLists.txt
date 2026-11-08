@@ -39,6 +39,11 @@ target_sources(BassLadderSynth PRIVATE
 
 target_include_directories(BassLadderSynth PRIVATE Source)
 
+# Korean tooltip text lives in the source as UTF-8
+if(MSVC)
+    target_compile_options(BassLadderSynth PRIVATE /utf-8)
+endif()
+
 target_compile_definitions(BassLadderSynth PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0

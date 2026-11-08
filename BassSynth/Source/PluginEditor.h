@@ -13,6 +13,10 @@ public:
                            float startAngle, float endAngle, juce::Slider&) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
+    // Korean hover help: name line + wrapped description
+    juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
+                                           juce::Rectangle<int> parentArea) override;
+    void drawTooltip (juce::Graphics&, const juce::String& text, int width, int height) override;
 };
 
 class BassSynthEditor : public juce::AudioProcessorEditor, private juce::Timer
@@ -41,6 +45,7 @@ private:
 
     BassSynthProcessor& proc;
     PanelLookAndFeel lnf;
+    juce::TooltipWindow tooltipWindow { this, 1000 };   // descriptions appear after 1 s of hovering
 
     std::vector<Knob> knobs;
     std::vector<Section> sections;
