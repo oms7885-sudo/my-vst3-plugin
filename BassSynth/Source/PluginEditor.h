@@ -13,10 +13,6 @@ public:
                            float startAngle, float endAngle, juce::Slider&) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
-    // Korean tooltips: name line + wrapped description
-    juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
-                                           juce::Rectangle<int> parentArea) override;
-    void drawTooltip (juce::Graphics&, const juce::String& text, int width, int height) override;
 };
 
 class BassSynthEditor : public juce::AudioProcessorEditor, private juce::Timer
@@ -30,7 +26,6 @@ public:
 
 private:
     void timerCallback() override;
-    void mouseDown (const juce::MouseEvent&) override;
 
     struct Knob
     {
@@ -38,42 +33,30 @@ private:
         bool small = false;
         std::unique_ptr<juce::Slider> slider;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
-        std::unique_ptr<juce::ToggleButton> button;   // for on/off switches (Keyboard Control, Decay)
-        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
         juce::Rectangle<int> labelArea;
     };
-    struct Section
-    {
-        juce::String title; int cols = 1;
-        std::vector<int> knobIndex;                         // -1 = empty cell
-        std::vector<std::pair<int, juce::String>> subLabels; // heading above a row
-        std::vector<int> rowY;
-        juce::Rectangle<int> area;
-    };
+    struct Section { juce::String title; int cols; std::vector<int> knobIndex; juce::Rectangle<int> area; };
 
     void addKnob (const juce::String& id, const juce::String& label, bool small);
-    void refreshPresetList (const juce::File& select = {});
-    void savePreset();
 
     BassSynthProcessor& proc;
     PanelLookAndFeel lnf;
-    juce::TooltipWindow tooltipWindow { this, 1000 };   // descriptions appear after 1 s of hovering
 
     std::vector<Knob> knobs;
     std::vector<Section> sections;
-    juce::ComboBox presetBox;
-    juce::TextButton saveButton, folderButton;
-    std::unique_ptr<juce::FileChooser> chooser;
-    juce::Array<juce::File> userPresetFiles;
-    static constexpr int userIdBase = 1000;
+    std::vector<int> setupKnobs;
 
-    juce::Rectangle<int> panelArea, stripArea, plateArea, badgeArea, displayArea, presetLabelArea;
+    juce::ToggleButton compButton;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> compAttachment;
+    juce::Rectangle<int> compLabelArea;
+
+    juce::ComboBox presetBox;
+
+    juce::Rectangle<int> panelArea, topArea, displayArea, setupArea;
     uint32_t lastTrig = 0;
     int trigFlash = 0;
     bool gateLed = false;
     float freq = 0.0f;
-    float meterDb = -100.0f, holdDb = -100.0f; int holdFrames = 0; bool clipLed = false;
-    juce::Rectangle<int> clipArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BassSynthEditor)
 };

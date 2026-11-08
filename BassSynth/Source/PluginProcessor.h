@@ -36,18 +36,10 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    // user presets (Documents/Bass Ladder Synth/Presets/*.blsp)
-    static juce::File userPresetDir();
-    static juce::Array<juce::File> userPresets();
-    bool saveUserPreset (const juce::File& file);
-    bool loadUserPreset (const juce::File& file);
-
     // read by the editor
     std::atomic<float> displayFreq { 0.0f };
     std::atomic<bool>  displayGate { false };
     std::atomic<uint32_t> displayTrig { 0 };
-    std::atomic<float> inPeak { 0.0f };    // input level after the Input knob, max since the editor last read it
-    std::atomic<bool>  inClip { false };   // set when the input reached 0 dBFS
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();

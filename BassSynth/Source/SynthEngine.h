@@ -32,11 +32,10 @@ struct Params
     float sawLvl = 0.8f, satLvl = 0.4f, foldLvl = 0.0f, subLvl = 0.5f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.35f;
     float drive = 0.45f;
     // filter
-    float cutoff = 155.6248f, res = 0.3f, envAmt = 3.2f, keytrk = 1.0f / 3.0f;   // Model D: -1.4, 2.8, 8, Kbd Ctrl 1
+    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f, keytrk = 0.5f;
     float fA = 3.0f, fD = 320.0f, fS = 0.1f;          // ms, ms, 0..1
     // loudness
-    float aA = 1.5f, aD = 900.0f, aS = 0.75f, aR = 8.0f;
-    float fR = 8.0f;                   // filter contour release (ms)
+    float aA = 1.5f, aD = 900.0f, aS = 0.75f, aR = 90.0f;
     float dyn = 0.35f;
     // output
     float outGainDb = 0.0f;
@@ -56,10 +55,9 @@ public:
         tfA = k (0.003); tfR = k (0.01);
         ehL  = (int) std::lround (0.015 * sr);
         ehL2 = (int) std::lround (0.025 * sr);
-        pkR = std::exp (-1.0 / (3.0 * sr));
-        BL = std::max (1, (int) std::lround (0.001 * sr));
+        pkR = std::exp (-1.0 / (1.5 * sr));
         openN = (int) std::lround (0.0015 * sr);
-        hold = 0.05 * sr;
+        hold = 0.06 * sr;
         upA = k (0.008);
         ktA = k (0.03);
         lpCoef (250.0, cs);
@@ -77,14 +75,11 @@ public:
         std::fill (std::begin (hs1), std::end (hs1), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
         hpY = hpX = cEnv = agc = agd = eF = eS = 0;
-        gateOn = false; lastOn = -1e9; pk = notePk = 0; tfS = 1;
-        h0X = h0Y = 0; cbm = 0; bc = 0; bi = 0; PW = 13; pkP = notePkP = 0;
-        std::fill (std::begin (bm), std::end (bm), 0.0f);
-        std::fill (std::begin (phb), std::end (phb), 0.0f);
+        gateOn = false; lastOn = -1e9; pk = notePk = 0; openCnt = 0; tfS = 1;
         s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0; per = sr / 55.0; wnP = 0;
         hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0;
         dr = 0; drT = 0; seed = 777;
-        y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
+        y1 = y2 = y3 = y4 = 0;
         fe = ae = 0; fs = as = 0;
         dcX = dcY = 0;
         n = 0;
@@ -104,7 +99,7 @@ public:
         wX = std::min (1.0, p.detune / 2.0) * p.detLvl;
         dg = 1.0 + p.drive * 6.0;
         kRes = 4.1 * p.res;
-        cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0); cfR = k (p.fR / 3000.0);
+        cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0);
         caA = k (p.aA / 3000.0); caD = k (p.aD / 3000.0); caR = k (p.aR / 3000.0);
         inGain = std::pow (10.0, p.inGainDb / 20.0);
         outGain = std::pow (10.0, p.outGainDb / 20.0);
@@ -139,46 +134,26 @@ public:
         const double aw = std::abs (w); agd += (aw - agd) * (aw > agd ? agA : agR);
         const double wn = w / (agd + 1e-4);
 
-        // level detection
+        // level detection + pick gate
         const double ax = std::abs (hp);
         eF += (ax - eF) * (ax > eF ? fA_ : fR_);
         eS += (eF - eS) * (eF > eS ? sA_ : sR_);
-
-        // ---- note detector (on the uncompressed signal) ----
-        // peak of |x| over about one cycle of the current note; a note starts when that peak
-        // jumps above the lowest peak of the previous ~40 ms (catches short damped gaps at once)
-        const double hp0 = hpA * (h0Y + x0 - h0X); h0X = x0; h0Y = hp0;
-        {
-            const double a0 = std::abs (hp0);
-            if (a0 > cbm) cbm = a0;
-            if (++bc >= BL)
-            {
-                bc = 0;
-                PW = std::min (28, std::max (6, (int) std::ceil (1.15 * per / BL)));
-                bm[bi & 63] = (float) cbm; cbm = 0;
-                double P_ = 0;
-                for (int q = 0; q < PW; ++q) P_ = std::max (P_, (double) bm[(bi - q) & 63]);
-                phb[bi & 63] = (float) P_;
-                ++bi;
-            }
-        }
-        double Pn = cbm;
-        for (int q = 0; q < PW - 1; ++q) Pn = std::max (Pn, (double) bm[(bi - 1 - q) & 63]);
-        // look back only to after the last note's own attack has settled
-        const int back = std::min (40, (int) std::floor ((i - lastOn) / BL) - PW - 2);
-        double Mn = 1e9;
-        for (int q = 5; q <= back; ++q) Mn = std::min (Mn, (double) phb[(bi - q) & 63]);
-        pkP = Pn > pkP ? Pn : pkP * pkR;
-        if (gateOn && Pn > notePkP) notePkP = Pn;
         pk = eF > pk ? eF : pk * pkR;
         if (gateOn && eF > notePk) notePk = eF;
-
+        const double openT = std::max (thr, pk * 0.3), closeT = std::max (thr * 0.6, notePk * 0.16);
         bool onset = false;
-        if (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.15) && i - lastOn > hold) { onset = true; gateOn = true; }
-        else if (gateOn && Pn < std::max (thr, notePkP * 0.12)) { gateOn = false; fs = 3; as = 3; }
+        eh[i & EHM] = (float) eF;
+        const double rise = eF / (std::min (eh[(i - ehL) & EHM], eh[(i - ehL2) & EHM]) + 1e-6);
+        if (! gateOn && eF > openT && rise > 2.0)
+        {
+            if (++openCnt > openN) { gateOn = true; onset = true; openCnt = 0; }
+        }
+        else openCnt = 0;
+        if (gateOn && ! onset && eF < closeT) { gateOn = false; fs = 3; as = 3; }
+        else if (gateOn && ! onset && rise > p.pickSens && eF > std::max (thr * 2, pk * 0.3) && i - lastOn > hold) onset = true;
         if (onset)
         {
-            notePk = eF; notePkP = Pn; lastOn = (double) i; fs = 1; as = 1;
+            notePk = eF; lastOn = (double) i; fs = 1; as = 1;
         }
 
         // ---- DI modulation ----
@@ -233,23 +208,18 @@ public:
         double fc = p.cutoff * std::pow (2.0, p.envAmt * fe)
                   * std::pow (std::min (8.0, std::max (0.125, ktf / 110.0)), (double) p.keytrk);
         fc = std::min (fc, sr * 0.45);
-        // zero-delay-feedback ladder: the resonance feedback is solved within the same sample,
-        // so the peak stays as strong at 5 kHz as at 150 Hz, like the analog ladder; tanh at the input and each stage
-        const double gz = std::tan (PI * fc / (2 * sr)), Gz = gz / (1 + gz), G2 = Gz * Gz, G4 = G2 * G2;
+        const double g = 1.0 - std::exp (-TAU * fc / (2 * sr));
         for (int o = 0; o < 2; ++o)
         {
-            const double est = (G4 * m + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kRes * G4);
-            double a = th (m - kRes * est), v, yy;
-            v = (th (a) - l1) * Gz; yy = v + l1; l1 = yy + v; a = yy;
-            v = (th (a) - l2) * Gz; yy = v + l2; l2 = yy + v; a = yy;
-            v = (th (a) - l3) * Gz; yy = v + l3; l3 = yy + v; a = yy;
-            v = (th (a) - l4) * Gz; yy = v + l4; l4 = yy + v; y4 = yy;
+            const double u = th (m - kRes * y4);
+            const double t1 = th (y1), t2 = th (y2), t3 = th (y3);
+            y1 += g * (u - t1); y2 += g * (t1 - t2); y3 += g * (t2 - t3); y4 += g * (t3 - th (y4));
         }
 
         // RC envelopes
         if (fs == 1) { fe += (1.3 - fe) * cfA; if (fe >= 1) { fe = 1; fs = 2; } }
         else if (fs == 2) fe += (p.fS - fe) * cfD;
-        else if (fs == 3) fe += (0 - fe) * cfR;
+        else if (fs == 3) fe += (0 - fe) * cfD;
         if (as == 1) { ae += (1.3 - ae) * caA; if (ae >= 1) { ae = 1; as = 2; } }
         else if (as == 2) ae += (p.aS - ae) * caD;
         else if (as == 3) ae += (0 - ae) * caR;
@@ -257,9 +227,7 @@ public:
         const double dynF = (1 - p.dyn) + p.dyn * std::min (1.0, eF * 2.2);
         const double tf = std::min (1.0, eF / (notePk * p.tail + 1e-6));
         tfS += (tf - tfS) * (tf > tfS ? tfA : tfR);
-        // no resonance makeup: like the real ladder, the low end drops as Emphasis goes up
-        // (a fixed +2 dB keeps the default level where it was)
-        const double yv = y4 * 1.27 * ae * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        const double yv = y4 * (1 + p.res * 0.9) * ae * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
@@ -338,19 +306,17 @@ private:
     int ehL = 0, ehL2 = 0, openN = 0;
     double c[5] {}, cd[5] {}, cs[5] {};
     double mk = 0, thr = 0, sG = 1, sN = 1, fG = 0, wX = 0, dg = 1, kRes = 0;
-    double cfA = 0, cfD = 0, cfR = 0, caA = 0, caD = 0, caR = 0, inGain = 1, outGain = 1;
+    double cfA = 0, cfD = 0, caA = 0, caD = 0, caR = 0, inGain = 1, outGain = 1;
 
     // state
     double z[8] {}, zd[8] {}, zs[8] {};
     double hs1[32] {}, hs2[32] {}; double hD1 = 0, hD2 = 0, phP = 0, ktf = 110, thU = 0, thD = 0;
     float eh[4096] {};
     double hpY = 0, hpX = 0, cEnv = 0, agc = 0, agd = 0, eF = 0, eS = 0;
-    bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; double tfS = 1;
-    double h0X = 0, h0Y = 0, cbm = 0, pkP = 0, notePkP = 0; int bc = 0, BL = 44, PW = 13; int64_t bi = 0;
-    float bm[64] {}, phb[64] {};
+    bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; int openCnt = 0; double tfS = 1;
     int s = -1, subv = 1; int64_t lastEdge = -1; double zf = 0, upM = 0, per = 800, wnP = 0;
     double dr = 0; int drT = 0; uint32_t seed = 777;
-    double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
+    double y1 = 0, y2 = 0, y3 = 0, y4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
     double dcX = 0, dcY = 0;
     double lastFreq = 0;
