@@ -17,7 +17,6 @@ namespace
         { "subLP",    "Sub Detect LPF",     35.0f, 300.0f, 120.0f, 100.0f, "Hz" },
         { "hyst",     "Sub Hysteresis",      0.0f,  0.5f,  0.15f,  0.0f,   "" },
         // shaper
-        { "lock",     "Lock",                0.0f,  1.0f,  1.0f,   0.0f,   "" },
         { "tone",     "Tone",               60.0f, 2000.0f, 250.0f, 300.0f, "Hz" },
         { "shapeAmt", "Clip Drive",          0.0f,  1.0f,  0.7f,   0.0f,   "" },
         { "foldAmt",  "Fold Depth",          0.0f,  1.0f,  0.4f,   0.0f,   "" },
@@ -65,7 +64,6 @@ namespace
                                 { "envAmt", 2.2f }, { "fD", 180.0f }, { "fS", 0.0f }, { "drive", 0.3f } } },
             { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.72f }, { "envAmt", 4.6f }, { "fD", 420.0f }, { "fS", 0.05f },
                                 { "drive", 0.6f }, { "sawLvl", 0.9f }, { "subLvl", 0.3f } } },
-            { "Hybrid Synth", { { "lock", 0.15f } } },
             { "Fuzz Octave",  { { "sawLvl", 0.3f }, { "shapeAmt", 1.0f }, { "satLvl", 0.7f }, { "foldLvl", 0.6f }, { "foldAmt", 0.7f }, { "subLvl", 0.5f },
                                 { "upLvl", 0.4f }, { "cutoff", 700.0f }, { "envAmt", 2.0f }, { "res", 0.2f }, { "drive", 0.7f } } },
         };
@@ -112,7 +110,7 @@ bsyn::Params BassSynthProcessor::readParams() const
     p.comp = f ("comp") > 0.5f; p.cTh = f ("cTh"); p.cRat = f ("cRat");
     p.gateDb = f ("gate"); p.pickSens = f ("pickSens"); p.tail = f ("tail");
     p.subLP = f ("subLP"); p.hyst = f ("hyst");
-    p.lock = f ("lock"); p.tone = f ("tone"); p.shapeAmt = f ("shapeAmt"); p.foldAmt = f ("foldAmt");
+    p.tone = f ("tone"); p.shapeAmt = f ("shapeAmt"); p.foldAmt = f ("foldAmt");
     p.detune = f ("detune"); p.drift = f ("drift");
     p.sawLvl = f ("sawLvl"); p.satLvl = f ("satLvl"); p.foldLvl = f ("foldLvl"); p.subLvl = f ("subLvl"); p.upLvl = f ("upLvl");
     p.cleanLvl = f ("cleanLvl"); p.detLvl = f ("detLvl"); p.drive = f ("drive");
