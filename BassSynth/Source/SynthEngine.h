@@ -29,6 +29,12 @@ struct Params
     float shapeAmt = 0.7f, foldAmt = 0.4f;
     float detune = 7.0f, drift = 2.0f; // cents
     // mixer
+    // oscillator bank (Model D style). Range: 0 = 32', 1 = 16' (the note you play), 2 = 8', 3 = 4', 4 = 2'.
+    // Wave: 0 triangle, 1 triangle-saw (osc 3: reverse saw), 2 saw, 3 square, 4 wide pulse, 5 narrow pulse.
+    // sawLvl is the Osc 1 volume (kept under its old name so saved projects still load).
+    int   osc1Range = 1, osc1Wave = 2, osc2Range = 1, osc2Wave = 2, osc3Range = 0, osc3Wave = 2;
+    float osc2Semi = 0.0f, osc3Semi = 0.0f;   // Frequency offset in semitones (-7..+7)
+    float osc2Lvl = 0.0f, osc3Lvl = 0.0f;
     float sawLvl = 0.8f, satLvl = 0.4f, foldLvl = 0.0f, subLvl = 0.5f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.35f;
     float drive = 0.45f;
     // filter
@@ -55,9 +61,10 @@ public:
         tfA = k (0.003); tfR = k (0.01);
         ehL  = (int) std::lround (0.015 * sr);
         ehL2 = (int) std::lround (0.025 * sr);
-        pkR = std::exp (-1.0 / (1.5 * sr));
+        pkR = std::exp (-1.0 / (3.0 * sr));
+        BL = std::max (1, (int) std::lround (0.001 * sr));
         openN = (int) std::lround (0.0015 * sr);
-        hold = 0.06 * sr;
+        hold = 0.05 * sr; velA = 1 - std::exp (-1.0 / (0.003 * sr));
         upA = k (0.008);
         ktA = k (0.03);
         lpCoef (250.0, cs);
@@ -75,9 +82,12 @@ public:
         std::fill (std::begin (hs1), std::end (hs1), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
         hpY = hpX = cEnv = agc = agd = eF = eS = 0;
-        gateOn = false; lastOn = -1e9; pk = notePk = 0; openCnt = 0; tfS = 1;
+        gateOn = false; lastOn = -1e9; pk = notePk = 0; tfS = 1; onP = 0; vel = velS = 1;
+        h0X = h0Y = 0; cbm = 0; bc = 0; bi = 0; PW = 13; pkP = notePkP = 0;
+        std::fill (std::begin (bm), std::end (bm), 0.0f);
+        std::fill (std::begin (phb), std::end (phb), 0.0f);
         s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0; per = sr / 55.0; wnP = 0;
-        hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0;
+        hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0; cyc = 0; acc[0] = acc[1] = acc[2] = 0;
         dr = 0; drT = 0; seed = 777;
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0;
@@ -134,26 +144,52 @@ public:
         const double aw = std::abs (w); agd += (aw - agd) * (aw > agd ? agA : agR);
         const double wn = w / (agd + 1e-4);
 
-        // level detection + pick gate
+        // level detection
         const double ax = std::abs (hp);
         eF += (ax - eF) * (ax > eF ? fA_ : fR_);
         eS += (eF - eS) * (eF > eS ? sA_ : sR_);
+
+        // ---- note detector (on the uncompressed signal) ----
+        // peak of |x| over about one cycle of the current note; a note starts when that peak
+        // jumps above the lowest peak of the previous ~40 ms (catches short damped gaps at once)
+        const double hp0 = hpA * (h0Y + x0 - h0X); h0X = x0; h0Y = hp0;
+        {
+            const double a0 = std::abs (hp0);
+            if (a0 > cbm) cbm = a0;
+            if (++bc >= BL)
+            {
+                bc = 0;
+                PW = std::min (28, std::max (6, (int) std::ceil (1.15 * per / BL)));
+                bm[bi & 63] = (float) cbm; cbm = 0;
+                double P_ = 0;
+                for (int q = 0; q < PW; ++q) P_ = std::max (P_, (double) bm[(bi - q) & 63]);
+                phb[bi & 63] = (float) P_;
+                ++bi;
+            }
+        }
+        double Pn = cbm;
+        for (int q = 0; q < PW - 1; ++q) Pn = std::max (Pn, (double) bm[(bi - 1 - q) & 63]);
+        // look back only to after the last note's own attack has settled
+        const int back = std::min (40, (int) std::floor ((i - lastOn) / BL) - PW - 2);
+        double Mn = 1e9;
+        for (int q = 5; q <= back; ++q) Mn = std::min (Mn, (double) phb[(bi - q) & 63]);
+        const double refP = pkP;                       // level of the recent notes, before this one
+        pkP = Pn > pkP ? Pn : pkP * pkR;
+        if (gateOn && Pn > notePkP) notePkP = Pn;
         pk = eF > pk ? eF : pk * pkR;
         if (gateOn && eF > notePk) notePk = eF;
-        const double openT = std::max (thr, pk * 0.3), closeT = std::max (thr * 0.6, notePk * 0.16);
+
         bool onset = false;
-        eh[i & EHM] = (float) eF;
-        const double rise = eF / (std::min (eh[(i - ehL) & EHM], eh[(i - ehL2) & EHM]) + 1e-6);
-        if (! gateOn && eF > openT && rise > 2.0)
-        {
-            if (++openCnt > openN) { gateOn = true; onset = true; openCnt = 0; }
-        }
-        else openCnt = 0;
-        if (gateOn && ! onset && eF < closeT) { gateOn = false; fs = 3; as = 3; }
-        else if (gateOn && ! onset && rise > p.pickSens && eF > std::max (thr * 2, pk * 0.3) && i - lastOn > hold) onset = true;
+        // a pick often sounds a small click first and the full note 20-50 ms later: when the level
+        // jumps well above the click inside the hold time, restart the note right there (on the beat)
+        const bool upgrade = gateOn && i - lastOn <= hold && i - lastOn > 15 * BL
+                             && Pn > 2.5 * std::max (onP, (double) phb[(bi - 10) & 63]) && Pn > pkP * 0.3;
+        if (upgrade || (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.15) && i - lastOn > hold)) { onset = true; gateOn = true; }
+        else if (gateOn && Pn < std::max (thr, notePkP * 0.12)) { gateOn = false; fs = 3; as = 3; }
         if (onset)
         {
-            notePk = eF; lastOn = (double) i; fs = 1; as = 1;
+            notePk = eF; notePkP = Pn; lastOn = (double) i; fs = 1; as = 1; onP = Pn;
+            refOn = upgrade ? refOn : refP;
         }
 
         // ---- DI modulation ----
@@ -178,16 +214,22 @@ public:
         double hI, hQ; hilbert (uu, hs1, hD1, hI, hQ);
         const double ph = std::atan2 (-hQ, hI) / TAU + 0.5;
         double dph = ph - phP; if (dph < -0.5) dph += 1; else if (dph > 0.5) dph -= 1;
+        if (ph - phP < -0.5) ++cyc;     // one DI cycle completed (counts cycles for the 32' range)
         phP = ph;
         const double dt = std::min (std::max (dph, 1e-4), 0.05);
-        const double saw = 2 * ph - 1 - polyblep (ph, dt);
+
+        // ---- oscillator bank: every oscillator is drawn from the DI's own phase (no pitch tracking) ----
+        const double gAmp = std::min (1.0, agd * 40.0);
+        const double o1 = oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, ph, dt, 0.0, acc[0], onset));
+        const double o2 = p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, ph, dt, p.osc2Semi, acc[1], onset)) : 0.0;
+        const double o3 = p.osc3Lvl > 0 ? oscWave (p.osc3Wave, true,  oscPhase (p.osc3Range, ph, dt, p.osc3Semi, acc[2], onset)) : 0.0;
         if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
         const double sub = subv * std::abs (sat);       // octave down
         const double ra = std::abs (sat); upM += (ra - upM) * upA;
         const double up = (ra - upM) * 2.0;             // octave up
         const double cln = th (yn * 0.9);               // the DI waveform itself
         double m = (p.satLvl * sat + p.foldLvl * fold + p.subLvl * sub + p.upLvl * up + p.cleanLvl * cln
-                    + p.sawLvl * saw * std::min (1.0, agd * 40.0)) * 0.55;
+                    + (p.sawLvl * o1 + p.osc2Lvl * o2 + p.osc3Lvl * o3) * gAmp) * 0.55;
 
         // detune voices: the modulated DI frequency-shifted up and down (no delay, so no flam)
         if (wX > 0)
@@ -232,7 +274,12 @@ public:
         const double dynF = (1 - p.dyn) + p.dyn * std::min (1.0, eF * 2.2);
         const double tf = std::min (1.0, eF / (notePk * p.tail + 1e-6));
         tfS += (tf - tfS) * (tf > tfS ? tfA : tfR);
-        const double yv = y4 * (1 + p.res * 0.9) * ae * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        // a pick much softer than the recent notes (a click before the real pluck, a ghost note) plays
+        // softer; measured over the note's first 30 ms as its attack builds
+        if (gateOn && i - lastOn < 30 * BL)
+            vel = std::min (1.0, std::max (0.2, notePkP / (0.4 * refOn + 1e-9)));
+        velS += (vel - velS) * velA;
+        const double yv = y4 * (1 + p.res * 0.9) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
@@ -274,6 +321,44 @@ private:
         }
         return q;
     }
+    struct OscPh { double t, dt; };
+
+    // phase of one oscillator: range shifts the DI's phase by octaves; a Frequency offset runs a phase
+    // accumulator at the DI's rate times the interval, re-aligned to the DI on every pick
+    OscPh oscPhase (int range, double ph, double dt, float semi, double& accum, bool onset) const
+    {
+        const int o = std::clamp (range, 0, 4) - 1;               // -1 (32') .. +3 (2')
+        double t, d;
+        if (o < 0) { t = (ph + (double) (cyc & 1)) * 0.5; d = dt * 0.5; }
+        else       { const double mul = (double) (1 << o); t = ph * mul; t -= std::floor (t); d = dt * mul; }
+        if (std::abs (semi) < 1e-3) { accum = t; return { t, d }; }
+        const double ratio = std::pow (2.0, semi / 12.0);
+        if (onset) accum = t;
+        accum += d * ratio; accum -= std::floor (accum);
+        return { accum, std::min (d * ratio, 0.1) };
+    }
+
+    static double oscWave (int w, bool osc3, OscPh q)
+    {
+        const double t = q.t, dt = std::max (q.dt, 1e-5);
+        auto saw   = [&] { return 2 * t - 1 - polyblep (t, dt); };
+        auto tri   = [&] { return 1 - 4 * std::abs (t - 0.5); };
+        auto pulse = [&] (double pw)
+        {
+            double tp = t + (1 - pw); tp -= std::floor (tp);
+            return (t < pw ? 1.0 : -1.0) + polyblep (t, dt) - polyblep (tp, dt);
+        };
+        switch (w)
+        {
+            case 0:  return tri();
+            case 1:  return osc3 ? -saw() : 0.5 * (tri() + saw());
+            case 2:  return saw();
+            case 3:  return pulse (0.5);
+            case 4:  return pulse (0.3);
+            default: return pulse (0.15);
+        }
+    }
+
     static double polyblep (double t, double dt)
     {
         if (t < dt) { t /= dt; return t + t - t * t - 1; }
@@ -307,6 +392,7 @@ private:
 
     // coefficients
     double hpA = 0, cAt = 0, cRl = 0, agA = 0, agR = 0, fA_ = 0, fR_ = 0, sA_ = 0, sR_ = 0, tfA = 0, tfR = 0;
+    double velA = 0;
     double pkR = 0, hold = 0, upA = 0, ktA = 0, dcA = 0;
     int ehL = 0, ehL2 = 0, openN = 0;
     double c[5] {}, cd[5] {}, cs[5] {};
@@ -315,10 +401,14 @@ private:
 
     // state
     double z[8] {}, zd[8] {}, zs[8] {};
+    int64_t cyc = 0; double acc[3] {};
     double hs1[32] {}, hs2[32] {}; double hD1 = 0, hD2 = 0, phP = 0, ktf = 110, thU = 0, thD = 0;
     float eh[4096] {};
     double hpY = 0, hpX = 0, cEnv = 0, agc = 0, agd = 0, eF = 0, eS = 0;
-    bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; int openCnt = 0; double tfS = 1;
+    double onP = 0, vel = 1, velS = 1, refOn = 0;
+    bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; double tfS = 1;
+    double h0X = 0, h0Y = 0, cbm = 0, pkP = 0, notePkP = 0; int bc = 0, BL = 44, PW = 13; int64_t bi = 0;
+    float bm[64] {}, phb[64] {};
     int s = -1, subv = 1; int64_t lastEdge = -1; double zf = 0, upM = 0, per = 800, wnP = 0;
     double dr = 0; int drT = 0; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;

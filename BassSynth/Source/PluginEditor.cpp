@@ -22,8 +22,8 @@ namespace
         return juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain));
     }
 
-    constexpr int editorW = 1280, editorH = 548, cheekW = 28;
-    constexpr int cellW = 82, cellH = 122, smallCellW = 80;
+    constexpr int editorW = 1500, editorH = 548, cheekW = 28;
+    constexpr int cellW = 74, cellH = 122, smallCellW = 80;
 
     // hover help (Korean): "NAME\ndescription". Source is compiled as UTF-8 (/utf-8 on MSVC).
     juce::String tipFor (const juce::String& id)
@@ -43,7 +43,17 @@ namespace
             { "foldAmt", "FOLD DEPTH\n웨이브폴드가 파형을 접는 깊이입니다. 올릴수록 금속성 배음이 많아집니다." },
             { "detune", "DETUNE\n디튠 보이스가 원래 음정에서 벗어나는 정도입니다 (센트). 올릴수록 맥놀이가 빨라지고 소리가 두꺼워집니다." },
             { "drift", "DRIFT\n디튠 보이스의 음정이 천천히 랜덤하게 흔들리는 정도입니다. 아날로그 오실레이터 같은 움직임을 줍니다." },
-            { "sawLvl", "SAW\n톱니파 볼륨입니다. DI의 위상에서 바로 그려 줄 음정을 즉시 따라가며, 무그 베이스 소리의 중심입니다." },
+            { "osc1Range", "OSC 1 RANGE\n오실레이터 1의 옥타브입니다. 16'이 연주하는 음 그대로이고, 32'은 한 옥타브 아래, 8'·4'·2'은 한·두·세 옥타브 위입니다. 모든 오실레이터는 DI 파형의 위상에서 바로 만들어져 지연이 없습니다." },
+            { "osc2Range", "OSC 2 RANGE\n오실레이터 2의 옥타브입니다. 16'이 연주하는 음 그대로이고, 32'은 한 옥타브 아래입니다." },
+            { "osc3Range", "OSC 3 RANGE\n오실레이터 3의 옥타브입니다. 기본은 32'(한 옥타브 아래)이라 저음을 받쳐 줍니다." },
+            { "osc1Wave", "OSC 1 WAVEFORM\n파형을 고릅니다: 삼각파, 삼각-톱니, 톱니파, 사각파, 넓은 펄스, 좁은 펄스. 오른쪽으로 갈수록 소리가 얇고 날카로워집니다." },
+            { "osc2Wave", "OSC 2 WAVEFORM\n파형을 고릅니다: 삼각파, 삼각-톱니, 톱니파, 사각파, 넓은 펄스, 좁은 펄스." },
+            { "osc3Wave", "OSC 3 WAVEFORM\n파형을 고릅니다. 오실레이터 3은 원래 무그처럼 삼각-톱니 대신 역톱니파가 있습니다." },
+            { "osc2Semi", "OSC 2 FREQUENCY\n오실레이터 2의 음정을 반음 단위로 -7~+7까지 옮깁니다 (+7 = 5도 위). 조금만 돌리면 맥놀이로 두꺼워지고, 새로 피킹할 때마다 위상이 DI에 다시 맞춰집니다." },
+            { "osc3Semi", "OSC 3 FREQUENCY\n오실레이터 3의 음정을 반음 단위로 -7~+7까지 옮깁니다. 조금만 돌리면 맥놀이로 두꺼워집니다." },
+            { "sawLvl", "OSC 1\n오실레이터 1 볼륨입니다. DI의 위상에서 바로 그려 연주 음정을 즉시 따라가며, 무그 베이스 소리의 중심입니다." },
+            { "osc2Lvl", "OSC 2\n오실레이터 2 볼륨입니다. 0이면 꺼집니다." },
+            { "osc3Lvl", "OSC 3\n오실레이터 3 볼륨입니다. 0이면 꺼집니다." },
             { "satLvl", "CLIP\n클리핑 소리(사각파 쪽) 볼륨입니다." },
             { "foldLvl", "FOLD\n웨이브폴드 소리 볼륨입니다." },
             { "subLvl", "SUB OCT\n한 옥타브 아래 소리 볼륨입니다. 저음을 두껍게 합니다." },
@@ -212,7 +222,9 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
 
     addSection ("Shaper", 3, { { "tone", "Tone" }, { "shapeAmt", "Clip Drive" }, { "foldAmt", "Fold Depth" },
                                { "detune", "Detune" }, { "drift", "Drift" } });
-    addSection ("Mixer", 4, { { "sawLvl", "Saw" }, { "satLvl", "Clip" }, { "foldLvl", "Fold" }, { "subLvl", "Sub Oct" }, { "upLvl", "Oct Up" },
+    addSection ("Oscillators", 4, { { "osc1Range", "Osc 1 Range" }, { "osc1Wave", "Osc 1 Wave" }, { "osc2Range", "Osc 2 Range" }, { "osc2Wave", "Osc 2 Wave" },
+                                    { "osc2Semi", "Osc 2 Freq" }, { "osc3Range", "Osc 3 Range" }, { "osc3Wave", "Osc 3 Wave" }, { "osc3Semi", "Osc 3 Freq" } });
+    addSection ("Mixer", 5, { { "sawLvl", "Osc 1" }, { "osc2Lvl", "Osc 2" }, { "osc3Lvl", "Osc 3" }, { "satLvl", "Clip" }, { "foldLvl", "Fold" }, { "subLvl", "Sub Oct" }, { "upLvl", "Oct Up" },
                               { "cleanLvl", "DI" }, { "detLvl", "Detune Voices" }, { "drive", "Overload" } });
     addSection ("Filter", 4, { { "cutoff", "Cutoff" }, { "res", "Emphasis" }, { "envAmt", "Contour Amount" }, { "keytrk", "Key Track" },
                                { "fA", "Attack" }, { "fD", "Decay" }, { "fS", "Sustain" } });

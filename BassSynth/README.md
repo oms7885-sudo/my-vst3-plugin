@@ -26,7 +26,8 @@
 | 섹션 | 노브 |
 |---|---|
 | SHAPER | Tone(변조 전 LPF), Clip Drive, Fold Depth, Detune, Drift |
-| MIXER | Saw, Clip, Fold, Sub Oct, Oct Up, DI(원래 파형), Detune Voices, Overload |
+| OSCILLATORS | Osc 1·2·3 Range (32'~2'), Waveform (삼각, 삼각-톱니/역톱니, 톱니, 사각, 넓은·좁은 펄스), Osc 2·3 Frequency (±7반음) — 모두 DI 위상에서 생성 |
+| MIXER | Osc 1, Osc 2, Osc 3, Clip, Fold, Sub Oct, Oct Up, DI(원래 파형), Detune Voices, Overload |
 | FILTER | Cutoff, Emphasis, Contour Amount, Key Track, Attack, Decay, Sustain |
 | LOUDNESS | Attack, Decay, Sustain, Release, Dynamics |
 | SETUP | Comp 스위치, Comp Thresh/Ratio, Gate, Pick Sens, Tail Follow, Sub Detect, Sub Hyst |
