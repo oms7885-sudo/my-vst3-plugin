@@ -197,11 +197,16 @@ void BassSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     // the bass DI is mono: use channel 1, or the average of a stereo input
     auto* l = buffer.getWritePointer (0);
     const float* r = numIn > 1 ? buffer.getReadPointer (1) : nullptr;
+    const float inG = juce::Decibels::decibelsToGain (apvts.getRawParameterValue ("inGain")->load());
+    float pk = 0.0f;
     for (int i = 0; i < n; ++i)
     {
         const float x = r != nullptr ? 0.5f * (l[i] + r[i]) : l[i];
+        pk = juce::jmax (pk, std::abs (x * inG));
         l[i] = engine.process (x);
     }
+    if (pk > inPeak.load()) inPeak.store (pk);
+    if (pk >= 1.0f) inClip.store (true);
     for (int ch = 1; ch < numOut; ++ch)
         buffer.copyFrom (ch, 0, buffer, 0, 0, n);
 

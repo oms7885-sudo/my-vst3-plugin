@@ -46,6 +46,8 @@ public:
     std::atomic<float> displayFreq { 0.0f };
     std::atomic<bool>  displayGate { false };
     std::atomic<uint32_t> displayTrig { 0 };
+    std::atomic<float> inPeak { 0.0f };    // input level after the Input knob, max since the editor last read it
+    std::atomic<bool>  inClip { false };   // set when the input reached 0 dBFS
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();

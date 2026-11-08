@@ -13,6 +13,10 @@ public:
                            float startAngle, float endAngle, juce::Slider&) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
+    // Korean tooltips: name line + wrapped description
+    juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
+                                           juce::Rectangle<int> parentArea) override;
+    void drawTooltip (juce::Graphics&, const juce::String& text, int width, int height) override;
 };
 
 class BassSynthEditor : public juce::AudioProcessorEditor, private juce::Timer
@@ -26,6 +30,7 @@ public:
 
 private:
     void timerCallback() override;
+    void mouseDown (const juce::MouseEvent&) override;
 
     struct Knob
     {
@@ -52,6 +57,7 @@ private:
 
     BassSynthProcessor& proc;
     PanelLookAndFeel lnf;
+    juce::TooltipWindow tooltipWindow { this, 1000 };   // descriptions appear after 1 s of hovering
 
     std::vector<Knob> knobs;
     std::vector<Section> sections;
@@ -66,6 +72,8 @@ private:
     int trigFlash = 0;
     bool gateLed = false;
     float freq = 0.0f;
+    float meterDb = -100.0f, holdDb = -100.0f; int holdFrames = 0; bool clipLed = false;
+    juce::Rectangle<int> clipArea;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BassSynthEditor)
 };

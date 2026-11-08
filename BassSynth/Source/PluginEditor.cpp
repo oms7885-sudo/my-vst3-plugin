@@ -27,6 +27,67 @@ namespace
     constexpr int editorW = 1240, editorH = 580, cheekW = 26, railH = 20, panelH = 432, titleH = 42;
     constexpr int cellW = 80, cellH = 112, subGap = 16;
 
+    // hover help (Korean): "NAME\ndescription". Source is compiled as UTF-8 (/utf-8 on MSVC).
+    juce::String tipFor (const juce::String& id)
+    {
+        static const std::pair<const char*, const char*> tips[] = {
+        { "inGain", "INPUT\nDI 입력 크기를 맞춥니다. 아래 IN 미터를 보면서, 세게 쳤을 때 피크가 노란 구간(-12 ~ -3dB)에 오도록 맞추면 기본값이 잘 맞습니다. 너무 작으면 음 감지가 늦어지고, 빨간 구간까지 가면 작은 잡음도 음으로 잡힐 수 있습니다." },
+        { "comp", "COMP\n입력 컴프레서를 켜고 끕니다. 켜면 세게 친 음과 약하게 친 음의 크기 차이가 줄어 변조된 소리가 고르게 나옵니다. 음 감지는 컴프와 상관없이 원래 신호로 합니다." },
+        { "cTh", "COMP THRESH\n컴프가 소리를 누르기 시작하는 크기입니다. 낮출수록 더 많은 소리가 눌려 고르게 됩니다." },
+        { "cRat", "COMP RATIO\n컴프가 누르는 세기입니다. 높을수록 크고 작은 음의 차이가 더 줄어듭니다." },
+        { "gate", "GATE\n이보다 작은 소리는 무시합니다. 연주하지 않을 때 험이나 잡음이 소리 나면 올려 주세요." },
+        { "pickSens", "PICK SENS\n새 음으로 판단하는 문턱입니다. 소리가 직전보다 몇 배 커져야 새 음으로 볼지 정합니다. 치지 않은 음이나 잡음이 트리거되면 올리고, 친 음을 놓치면 내려 주세요." },
+        { "tail", "TAIL FOLLOW\n줄 소리가 잦아들 때 신스 소리도 함께 줄이는 정도입니다. 높을수록 음 끝이 빨리 사라지고, 0이면 이 기능이 꺼집니다." },
+        { "subLP", "SUB DETECT\n옥타브 다운이 음정을 읽을 때 쓰는 필터 주파수입니다. 연주하는 가장 높은 음보다 살짝 위로 두세요. 옥타브 다운이 떨리거나 튀면 내려 주세요." },
+        { "hyst", "SUB HYST\n옥타브 다운이 잡음에 흔들리지 않게 하는 여유 폭입니다. 올리면 안정적이지만, 너무 높으면 작은 소리에서 옥타브 다운이 끊깁니다." },
+        { "tone", "TONE\n클립, 폴드, 옥타브 업, DI 파형을 만들기 전에 DI의 고음을 깎는 필터입니다. 낮추면 둥글고 깔끔해지고, 높이면 거칠고 밝아집니다. 톱니파에는 영향을 주지 않습니다." },
+        { "shapeAmt", "CLIP DRIVE\nDI 파형을 깎는 세기입니다. 낮으면 부드러운 포화, 높으면 거의 사각파가 됩니다." },
+        { "foldAmt", "FOLD DEPTH\n웨이브폴드가 파형을 접는 깊이입니다. 올릴수록 금속성 배음이 많아집니다." },
+        { "detune", "DETUNE\n디튠 보이스가 원래 음정에서 벗어나는 정도입니다 (센트). 올릴수록 맥놀이가 빨라지고 소리가 두꺼워집니다." },
+        { "drift", "DRIFT\n디튠 보이스의 음정이 천천히 랜덤하게 흔들리는 정도입니다. 아날로그 오실레이터 같은 움직임을 줍니다." },
+        { "sawM", "SAW\n톱니파 볼륨입니다. DI의 위상에서 바로 그려 줄 음정을 즉시 따라가며, 무그 베이스 소리의 중심입니다." },
+        { "clipM", "CLIP\n클리핑 소리(사각파 쪽) 볼륨입니다." },
+        { "subM", "SUB OCT\n한 옥타브 아래 소리 볼륨입니다. 저음을 두껍게 합니다." },
+        { "foldM", "FOLD\n웨이브폴드 소리 볼륨입니다." },
+        { "upM", "OCT UP\n한 옥타브 위 소리 볼륨입니다." },
+        { "diM", "DI\n변조하지 않은 원래 DI 파형 볼륨입니다. 필터는 그대로 거칩니다." },
+        { "detVM", "DETUNE VOICES\n위아래로 디튠된 복사본 볼륨입니다. 0이면 디튠이 꺼집니다." },
+        { "drive", "OVERLOAD\n필터 앞에서 소리를 밀어 넣는 정도입니다. 무그 믹서를 세게 밀 때처럼 두껍고 거칠어집니다." },
+        { "kb1", "KBD CTRL 1\n키 트래킹 1/3입니다. 높은 음일수록 필터가 조금 더 열립니다." },
+        { "kb2", "KBD CTRL 2\n키 트래킹 2/3입니다. 1과 함께 켜면 1옥타브 올라갈 때 필터도 1옥타브 열립니다." },
+        { "cutM", "CUTOFF FREQUENCY\n필터가 열리는 기준 위치입니다. 모델 D처럼 -5~+5 눈금이며, 범위는 10Hz~20kHz입니다." },
+        { "emph", "EMPHASIS\n레조넌스입니다. 올리면 컷오프 근처가 강조되어 \"와우\" 소리가 나고, 실제 무그처럼 저음이 줄어듭니다. 9 근처부터는 필터가 스스로 발진합니다." },
+        { "contour", "AMOUNT OF CONTOUR\n필터 엔벨로프가 컷오프를 얼마나 더 여는지 정합니다. 0~10이 0~4옥타브입니다." },
+        { "fA", "ATTACK TIME (필터)\n피킹 후 필터가 최대로 열리기까지의 시간입니다. 길게 하면 소리가 \"와\" 하고 차오릅니다." },
+        { "fD", "DECAY TIME (필터)\n최대로 열린 필터가 Sustain 위치까지 닫히는 시간입니다. \"뿌왕\"의 길이를 정합니다." },
+        { "fSus", "SUSTAIN LEVEL (필터)\n음을 누르고 있는 동안 필터가 머무는 위치입니다. 0이면 끝까지 닫힙니다." },
+        { "decaySw", "DECAY\n켜면 손을 뗀 뒤에도 Decay 시간만큼 소리와 필터가 남습니다. 끄면 바로 (8ms) 끝납니다." },
+        { "aA", "ATTACK TIME (라우드니스)\n피킹 후 소리가 최대 크기까지 커지는 시간입니다. 베이스는 보통 최소로 둡니다." },
+        { "aD", "DECAY TIME (라우드니스)\n최대 크기에서 Sustain 크기까지 줄어드는 시간입니다." },
+        { "aSus", "SUSTAIN LEVEL (라우드니스)\n음이 유지되는 동안의 크기입니다." },
+        { "outGain", "VOLUME\n최종 출력 크기입니다 (dB)." },
+        { "dry", "DRY DI\n원래 DI 소리를 신스와 섞는 양입니다. 0이면 신스 소리만 납니다." },
+        { "dyn", "DYNAMICS\n피킹 세기가 신스 음량에 반영되는 정도입니다. 0이면 항상 같은 크기로 납니다." },
+        };
+        for (const auto& [k, t] : tips)
+            if (id == k) return juce::String (juce::CharPointer_UTF8 (t));
+        return {};
+    }
+
+    juce::TextLayout tipLayout (const juce::String& text, float maxW)
+    {
+        juce::AttributedString s;
+        s.setWordWrap (juce::AttributedString::byWord);
+        const juce::String malgun ("Malgun Gothic");
+        s.append (text.upToFirstOccurrenceOf ("\n", false, false) + "\n",
+                  juce::Font (juce::FontOptions (malgun, 13.0f, juce::Font::bold)), C::amber);
+        s.append (text.fromFirstOccurrenceOf ("\n", false, false),
+                  juce::Font (juce::FontOptions (malgun, 13.0f, juce::Font::plain)), C::silk);
+        juce::TextLayout tl;
+        tl.createLayout (s, maxW);
+        return tl;
+    }
+
     // numbers printed around a knob, as "position:text" pairs (position 0..1 of the knob's turn)
     juce::String legendFor (const juce::String& id)
     {
@@ -134,6 +195,25 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     g.fillRoundedRectangle (paddle, 2.0f);
 }
 
+juce::Rectangle<int> PanelLookAndFeel::getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
+                                                        juce::Rectangle<int> parentArea)
+{
+    const auto tl = tipLayout (tipText, 320.0f);
+    const int w = (int) std::ceil (tl.getWidth()) + 24, h = (int) std::ceil (tl.getHeight()) + 18;
+    return juce::Rectangle<int> (screenPos.x + 14, screenPos.y + 20, w, h).constrainedWithin (parentArea);
+}
+
+void PanelLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text, int width, int height)
+{
+    const auto r = juce::Rectangle<float> (0.0f, 0.0f, (float) width, (float) height);
+    g.setColour (C::screen);
+    g.fillRoundedRectangle (r, 4.0f);
+    g.setColour (juce::Colour (0xff5a4a2a));
+    g.drawRoundedRectangle (r.reduced (0.5f), 4.0f, 1.0f);
+    const auto tl = tipLayout (text, (float) width - 24.0f);
+    tl.draw (g, r.reduced (12.0f, 9.0f));
+}
+
 juce::Label* PanelLookAndFeel::createSliderTextBox (juce::Slider& s)
 {
     auto* l = LookAndFeel_V4::createSliderTextBox (s);
@@ -197,9 +277,10 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
 
     saveButton.setButtonText ("Save");
     saveButton.onClick = [this] { savePreset(); };
+    saveButton.setTooltip (juce::String (juce::CharPointer_UTF8 ("SAVE\n지금 설정을 내 프리셋으로 저장합니다.")));
     addAndMakeVisible (saveButton);
     folderButton.setButtonText ("Folder");
-    folderButton.setTooltip ("Open the folder where your presets are saved");
+    folderButton.setTooltip (juce::String (juce::CharPointer_UTF8 ("FOLDER\n내 프리셋이 저장된 폴더를 엽니다.")));
     folderButton.onClick = [this]
     {
         auto dir = BassSynthProcessor::userPresetDir();
@@ -259,7 +340,7 @@ void BassSynthEditor::addKnob (const juce::String& id, const juce::String& label
         // rocker switch
         k.button = std::make_unique<juce::ToggleButton>();
         k.buttonAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, id, *k.button);
-        if (auto* prm = proc.apvts.getParameter (id)) k.button->setTooltip (prm->getName (64));
+        k.button->setTooltip (tipFor (id));
         addAndMakeVisible (*k.button);
         knobs.push_back (std::move (k));
         return;
@@ -273,7 +354,7 @@ void BassSynthEditor::addKnob (const juce::String& id, const juce::String& label
     if (auto* prm = proc.apvts.getParameter (id))
     {
         k.slider->setDoubleClickReturnValue (true, (double) prm->convertFrom0to1 (prm->getDefaultValue()));
-        k.slider->setTooltip (prm->getName (64));
+        k.slider->setTooltip (tipFor (id));
     }
     addAndMakeVisible (*k.slider);
     knobs.push_back (std::move (k));
@@ -439,24 +520,58 @@ void BassSynthEditor::paint (juce::Graphics& g)
             g.setColour (on ? C::pilot : C::pilotOff);
             g.fillEllipse (c);
         };
-        auto row1 = d.removeFromTop (22);
-        led (row1.removeFromLeft (14), trigFlash > 0);
-        g.setColour (C::amber); g.setFont (panelFont (11.0f, true, 0.2f));
-        g.drawText ("TRIG", row1.removeFromLeft (60).withTrimmedLeft (8), juce::Justification::centredLeft);
-        led (row1.removeFromLeft (14), gateLed);
-        g.drawText ("GATE", row1.removeFromLeft (60).withTrimmedLeft (8), juce::Justification::centredLeft);
+        auto row1 = d.removeFromTop (18);
+        led (row1.removeFromLeft (12), trigFlash > 0);
+        g.setColour (C::amber); g.setFont (panelFont (10.5f, true, 0.2f));
+        g.drawText ("TRIG", row1.removeFromLeft (46).withTrimmedLeft (6), juce::Justification::centredLeft);
+        led (row1.removeFromLeft (12), gateLed);
+        g.drawText ("GATE", row1.removeFromLeft (52).withTrimmedLeft (6), juce::Justification::centredLeft);
         juce::String note = "--";
         if (freq > 0.0f)
         {
             static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
             const int midi = (int) std::lround (69.0 + 12.0 * std::log2 (freq / 440.0));
             note = juce::String (names[((midi % 12) + 12) % 12]) + juce::String (midi / 12 - 1)
-                 + "   " + juce::String (freq, 1) + " Hz";
+                 + "  " + juce::String (freq, 1) + " Hz";
         }
-        g.setFont (monoFont (15.0f));
-        g.drawText (note, d, juce::Justification::centredLeft);
+        g.setFont (monoFont (13.0f));
+        g.drawText (note, row1, juce::Justification::centredLeft);
+
+        // IN meter: -48..0 dB, green / yellow (-12..-3) / red (-3..0), 1 s peak hold, CLIP light
+        d.removeFromTop (6);
+        auto row2 = d.removeFromTop (16);
+        g.setColour (C::amber); g.setFont (panelFont (10.5f, true, 0.2f));
+        g.drawText ("IN", row2.removeFromLeft (22), juce::Justification::centredLeft);
+        clipArea = row2.removeFromRight (40);
+        led (clipArea.withWidth (12), clipLed);
+        g.setColour (clipLed ? C::pilot : C::silkDim);
+        g.drawText ("CLIP", clipArea.withTrimmedLeft (14), juce::Justification::centredLeft);
+        auto num = row2.removeFromRight (44);
+        g.setColour (C::amber); g.setFont (monoFont (11.0f));
+        g.drawText (holdDb > -60.0f ? juce::String (holdDb, 1) : juce::String ("-inf"), num, juce::Justification::centredRight);
+        auto bar = row2.reduced (2, 3).toFloat();
+        g.setColour (juce::Colour (0xff2a2418));
+        g.fillRect (bar);
+        auto xOf = [&bar] (float db) { return bar.getX() + bar.getWidth() * juce::jlimit (0.0f, 1.0f, (db + 48.0f) / 48.0f); };
+        const float lvl = xOf (meterDb);
+        struct Zone { float lo, hi; juce::Colour c; };
+        const Zone zones[] = { { -48.0f, -12.0f, juce::Colour (0xff6fbf5a) }, { -12.0f, -3.0f, juce::Colour (0xffe8c547) },
+                               { -3.0f, 0.0f, juce::Colour (0xffe2482e) } };
+        for (const auto& z : zones)
+        {
+            const float x0 = xOf (z.lo), x1 = juce::jmin (xOf (z.hi), lvl);
+            g.setColour (z.c.withAlpha (0.18f));
+            g.fillRect (juce::Rectangle<float> (x0, bar.getY(), xOf (z.hi) - x0, bar.getHeight()));
+            if (x1 > x0) { g.setColour (z.c); g.fillRect (juce::Rectangle<float> (x0, bar.getY(), x1 - x0, bar.getHeight())); }
+        }
+        if (holdDb > -48.0f) { g.setColour (C::silk); g.fillRect (juce::Rectangle<float> (xOf (holdDb) - 1.0f, bar.getY() - 1.0f, 2.0f, bar.getHeight() + 2.0f)); }
     }
 
+}
+
+void BassSynthEditor::mouseDown (const juce::MouseEvent& e)
+{
+    if (clipArea.contains (e.getPosition())) proc.inClip.store (false);   // click CLIP to reset it
 }
 
 void BassSynthEditor::timerCallback()
@@ -466,5 +581,11 @@ void BassSynthEditor::timerCallback()
     else if (trigFlash > 0) --trigFlash;
     gateLed = proc.displayGate.load();
     freq = proc.displayFreq.load();
+    // input meter: fast rise, smooth fall, peak number held for 1 s
+    const float pk = proc.inPeak.exchange (0.0f);
+    const float db = pk > 0.0f ? juce::Decibels::gainToDecibels (pk) : -100.0f;
+    meterDb = db > meterDb ? db : juce::jmax (db, meterDb - 1.5f);
+    if (db >= holdDb || --holdFrames <= 0) { holdDb = db; holdFrames = 30; }
+    clipLed = proc.inClip.load();
     repaint (displayArea);
 }
