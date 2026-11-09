@@ -1,4 +1,6 @@
+#define BASS_SYNTH_EDITOR_ARTWORK
 #include "PluginEditor.h"
+#undef BASS_SYNTH_EDITOR_ARTWORK
 #include <algorithm>
 #include <iterator>
 
@@ -153,231 +155,6 @@ namespace
         "AAwAAAAAAAIAAgABAAIAAQACAAgAAAANAAcABwAJAAcACQAAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAF"
         "AAUABAAEAAAAAAAAAAAABAALAAAAAwAAAAAAAAAJAAAAAAAAAAAAAAAAAAUAAAABAAAACgAsAC4AA0RGTFQAFGdyZWsAHmxhdG4AHgAE"
         "AAAAAP//AAAAAAAAAAAAAAABAAEACAACAAAAFAABAAAAJAACd2dodAEAAABpdGFsARwAAQACAAMAAQACAR0AAAAAAAEAAAAA";
-    const char ashWood[] =
-        "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"
-        "JSzE/wCsRQIW6lKk4eiW8vpUosjbFYIEj3QBSiwR5LSpJGkcHPFTk6lojyOhIgOvH48xTk6anyYiM33Bl/kPCrydSzHk5CQfPOKE/wCW"
-        "ypRbJVkjGZUeXbpRYixbVmLhw7oSupS2jdi2jYVmP8lGkQWeo2xJK2xnzNWoTqWwt7dIwlsEcDVqC5QsW0mbdrvTUqC5VVuysZtIPQUq"
-        "C5BNkwYCrduN0mrUFz61FmwFSlpuBwmlQly0DDSUyGEDupRcilTJJ7DQI5CmGkVIIGTZ54RQcrEcuyR0FBkhpKZATl71ByW2Sc46YqYu"
-        "pqyZ7IgcMqUWqWEgbP3pSW5NsiNgnrSi01JuZxRyn+aUtu1NvaSTwzPjUosNVGfbWJ9qlFpqyc5Lis9uOKUWSLS2klbYKuKlTSIguTNt"
-        "bIOTbfyq1BcqUMEABLZnimaYmhomgcmW+oAFKhbUt28ZstnlTCLcG7QzLKAPZNMNcLa0xSlOfWpEQXImzt4yScuBilQXKiytY7SSeRXN"
-        "KguXG1tgkhLeR9silQXIJsmcRgLPs6QwKVC3LYWDAwylWeySc6VCXLtTYRJA6yPGrUFyxUyylUoCBA31KhbkmUf4t254ZUhHoLRIybZ/"
-        "TVotnq4E+bR8hSi3/9k=";
-    const char ashPanel[] =
-        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAQDAwMDAgQDAwMEBAQFBgoGBgUFBgwICQcKDgwPDg4MDQ0PERYTDxAVEQ0NExoTFRcYGRkZ"
-        "DxIbHRsYHRYYGRj/2wBDAQQEBAYFBgsGBgsYEA0QGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY"
-        "GBj/wAARCABNAGEDAREAAhEBAxEB/8QAGQAAAwEBAQAAAAAAAAAAAAAAAAECAwQI/8QAKxABAAEDAwIGAQUBAQAAAAAAAREAAiESMVFB"
-        "YQMiMnGBkaFCUmLB0bHw/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAH/xAAWEQEBAQAAAAAAAAAAAAAAAAAAARH/2gAMAwEAAhEDEQA/APLO"
-        "lRgmN+agNMCkW+xvQRpG2evvmgYwQF3sVQmEZx70CDEESc1A8d5cxVAN54a27dUoEHlZycNQEzlzPxSBc4ntVCHyxDntQGv+T9UGhcT1"
-        "OKgd3iL0KDJ8rCD71Q7XEtA/1dPegUqfpTiYqQMHc+n+6oq24V1MQb0Est0kD3qCRJ225KA26UDt9KS5chs0CjvbVF2jtEHJQVBpn8lB"
-        "FwBnbtu0EhCsW546VBZbz/yqC0zmgYRJ/wCKBR5nO+Y3qCWIIM81Qoyk56lAW2p6d++9QPThnEcVQfN1Bemczjjp8VBVpbPqbe6b1QXh"
-        "Lcb0EeUtVVegdf8AKAt1MxpMbzQXaTtYfFA4dCkBQRpjeA5OtAJMouN3/KBGkJD4qCiEZsnidqocfuu27UC0W/us+mgmEVQPnagQ560Q"
-        "mVyzxmiwatwZ9/6oJEMb0GtitoB7vNBognmIjjJQRpJxn3oGWr8c9KCggiAHd6tBLm3TOF6UCLotUtLg2XagmfH4fqgd9rph3j4+KCLf"
-        "Kqrkog8pb6Y7lFJ06XZoJCGYY7VIL8O5th1Pw1R0aouW26Z5oIb/ADem0eqVAF2IwZ+6oLVhgmOk1BF+VVPiqJbcLGDqv9VBnNvf7qjs"
-        "b7TGry+1EY3XDPmoqNzfagI3bU7tAW6th/NA7ZO+clNGttrC3TDQIQm0k71Atukz3qhzlnLQRdnI/wC0GTaB0HmgnTf+1+6DsHC6s9Ij"
-        "FBndLMwvOzQRLp/oqChRBtuOzVFBcMrp4aCrZOIqDS0CVGXnrVBcXXChqToVBmkW6S26X8VRmKYR4zQO4xuwbtBmht+aCdNnNn21BrrI"
-        "ceWqE5JDBsTNBOLZU+eKB2Np3Pqg0GFkhfmgo0ruPcoGun0slAta8Mb9qQS3F04/M0Gd12IEoCYjU0CEeA4oKn+b9lAxi6QNvqoJZbon"
-        "M70Bdm5nPZqhMtwTQV6LdWU4oNbbnRLEPSKgXjDZZbeMyTDVGFudR3oNjww8BuVTgxNQZtzbcJH1QTLddM5qgPMNzvQGnuVNH//Z";
-    const char walnutWood[] =
-        "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"
-        "n4dI/9k=";
-    const char walnutPanel[] =
-        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAQDAwMDAgQDAwMEBAQFBgoGBgUFBgwICQcKDgwPDg4MDQ0PERYTDxAVEQ0NExoTFRcYGRkZ"
-        "DxIbHRsYHRYYGRj/2wBDAQQEBAYFBgsGBgsYEA0QGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY"
-        "GBj/wAARCABNAGEDAREAAhEBAxEB/8QAGQABAQEBAQEAAAAAAAAAAAAAAQIAAwQI/8QAMRABAAEDBAECAwcDBQAAAAAAAREAAiESMUFR"
-        "YSJxgZGhAxMyUmJysSNCklPB0eHw/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAEE/8QAFhEBAQEAAAAAAAAAAAAAAAAAAAER/9oADAMBAAIR"
-        "AxEAPwD5IttjaKzNDbWsBHYVFXbDZ69uPNVCgDjNFRvm1+FEbiDb+aiqtIlFH2oY2bSMQ7pzVRNz6XkoDKvFBN86EmTkoKtnTiQtN3mg"
-        "33j5oFJtnjxUVJlY25oHBmW58FWINS25bZ8UDaGWflRWxoiUTmoKL4IWV7oBTMQUEwpyvEVQ7vj60QYBQx33QFxc5ufrQToen5U1cdQb"
-        "sk+9EJbEgE1FTeXPpttXzVEE3RbotI5KI6E769XWKB0sTDnkZqLAO5AFUaJ2Nu+ahGLYZMEcUGA5+lUYxA5DaoNsXLFscn/t6qOf3f7v"
-        "8qD0lnpdVox3iooI1Dd6Q6qoL7rrjTJHW0VFQaSxBkd8VQzdE3Nke1QjSQ5qiYnInxqB/davgoKtbQ2372KDTJi22TqgjSzh1fm8UEsx"
-        "lxxVQQfntpg9M2lsQpxmaijUf3XONuao5xkk9PNvdAiQw/BKkGghu/Euw/zVB6ozdNQa0xAYOaCoMYljagB9Mmw0BltZXvBignELO/Hd"
-        "ICcJz31VQans+VUd/jdHm2oohl9QG8clQTK7LB1igbWJJn6tBn8Lp3nb/ugIn9L5aBW0XVdmMRxQEhLMzSBDE3b0G9RatrcT01Ryyqc0"
-        "QkaXny0Gn9J86DsL1PVAbjyzUURckNt570EuCRjz1QYdSWm3B3VgSAbS0HaaDOkm2XaFKg1qcMrtBQOxEfWgyaiScHHFBzhyKg8URroi"
-        "NZ7FUOm3/Vf8WmCtT+ICf2TUUi6YceaEbSRqYl2O/wDiqObAoh8KgxgXjZqxFWs2hM/GKgXbafjEUUW2yO8dTVD/AB4oJhhkkjmgkuS2"
-        "Yg2Cg04xdnk6og+dMHUWG7jbeorWxm5tM8lVGuYtZEfeSioAbNiXmc0FasJY7YMVBMQ7o1RgubgHnigRcsE++1EUHpUmPeip0qJcK8C7"
-        "UBC407bQ0ROrxDzn/agnUdv0or0226iJjGPFBkmwuQn2oJy/ZOdmM1EOkBy4xRZBeFv2TdlzEDFIgty+mLZOCignCIUSL0wuZYmaauAt"
-        "/pt3OM0Di2xeOp3oqHfOZPlVRzSMnFEc/vLurflUH//Z";
-    const char ivoryWood[] =
-        "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"
-        "RDD9ppwf/9k=";
-    const char ivoryPanel[] =
-        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAQDAwMDAgQDAwMEBAQFBgoGBgUFBgwICQcKDgwPDg4MDQ0PERYTDxAVEQ0NExoTFRcYGRkZ"
-        "DxIbHRsYHRYYGRj/2wBDAQQEBAYFBgsGBgsYEA0QGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY"
-        "GBj/wAARCABNAGEDAREAAhEBAxEB/8QAGQABAQEBAQEAAAAAAAAAAAAAAQACAwQI/8QAJxAAAgIBAgUEAwEAAAAAAAAAAAERITECQVFh"
-        "cYGREiJC8KHB0fH/xAAXAQEBAQEAAAAAAAAAAAAAAAAAAQQF/8QAFhEBAQEAAAAAAAAAAAAAAAAAAAER/9oADAMBAAIRAxEAPwD7PXY5"
-        "rcnqyBlALfADDw5lkA91JRJW6INJAOzqwCYQGk7golSwBdmFE5CM3MRRA3FvyBTxVhVbnIRLkAKk6AW2sIKlj+hD2AlWxQ3xgClgYuyB"
-        "U8EhBOlVgGm06A1FuQCFDAK4gNPEjRVYE5EoF5XMo2luAwvsgYSl8uYClEzBANde5QqEuPcC2ICM0AccACywFUm8lFNUQKTZRrSqbmAN"
-        "1z8gclRFWpoqMS3KTCnTqYRutlJAbOWBlc8hV8ghvFFFtgBVJ7ga2AJ6eAM2iKy54eREZTzjqyjWl1MkDtUqACV1LA4JoZTlPIFE2UMQ"
-        "gRfGN+hFWFyKivhqAz6s8OJBN1AGI/wK1FugiUpyUKVWQWbS6gFS2UdNoUASU7gURzAoyQEaeYGJsCytihS5kVSptUVFKuE+oFKtEFM8"
-        "yiSmYXYB2A2vwBVbAYmcQBehfWBwfkgoy4AUq/YFKmgobaf6KhTbVT2Arh2wC7kBTlUNG9MrNgbSzIEoAa+oDz7PrBIDZWAp+0Knv4Ki"
-        "SpgKiGAJ+5wouABW2TBr021JYOmgDUe1sCxf4ApA/9k=";
 
     // UI photo cutouts from the supplied Model D reference.
     const char blueOn[] =
@@ -1142,6 +919,68 @@ namespace
         "QdEx6100TmPXtMk90Lpm1H+dhha/c59EKfjH6M6WXHT7y3XMM1FwytVKbLBLdS5xQf1CQMY/9QuI66mD46we5eukrp7R8LmTEZp27O0U"
         "fCJgFUElBs05Pmtlc6dwHiAhSDy37ncHAfztevFvd9ixQKjyX9xIMr8r6SBtenrUeGGKhGzQQolXbbfcbbD+TjdFzqbsxUbP/9k=";
 
+    // Unobstructed faceplate material sampled from each mockup.
+    const char ashPanel[] =
+        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUl"
+        "FhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+        "JCT/wAARCAA0AGwDAREAAhEBAxEB/8QAGAABAQEBAQAAAAAAAAAAAAAAAQACAwf/xAAlEAACAQQCAgICAwAAAAAAAAAAARECITFBUXES"
+        "kYHB0eEiYfD/xAAVAQEBAAAAAAAAAAAAAAAAAAAAAf/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/APC4s1E/QFDcKGAv"
+        "1ACt7AVKWvwAPgDMW4AXjIBVEPAGaW3MJ2AaLvZA1YzYDKUyBQBpFGu3IG6VC4YE01hR9gFTlREdkGEm7rC5KKb3Af4uwGWrS4toAxgB"
+        "TfjYgGnUr4AaaYA14p6AF1JRS1ewGk3DUgV3PIBU3iZAw8PYFK0Ap+gKprUwBd4IKGgNY2UZldgNOHNMkGZ4ko0moAUoX+uAytJAYdtA"
+        "EytAStMgMN+scACUqy9kBfkBTRQuqJ2AUKegOiSgDkm3MtgaVTdpYFPIE27zb+iDLwUVO5AU4/aApyBavcCidMgLYS/YC3bRQ0u1tAPl"
+        "PIHNUu+fgB50APFgJLMw+yBKJ2QBIC3FpkATmbSAzxgBW4AKovm3BAUwleSjS7AlSvQE7qWARn5APwBRuQLM9wQE2komoQFSgNL7INUv"
+        "x8nCbT2UZd3fYGeX8ASpTmSD/9k=";
+    const char ashPanelAlt[] =
+        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUl"
+        "FhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+        "JCT/wAARCABNAGEDAREAAhEBAxEB/8QAGQAAAwEBAQAAAAAAAAAAAAAAAAECAwQH/8QAKBAAAgIBAwQCAgIDAAAAAAAAAAERITECQWES"
+        "UYGRcaEDwWLwIjLx/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAH/xAAVEQEBAAAAAAAAAAAAAAAAAAAAEf/aAAwDAQACEQMRAD8A8QicXGe4"
+        "BEKVC+CBRKncoE+H4AVMAXYAr2ALq6XGNwBKr9AEzkBd9wBOogBdXL9AWne4A9bYEYypAenAD32AVxt7AEBWlpty45ATzUL5AlP6AeAB"
+        "YdvmCBeiikn2jkBwo/aATVASlvCsCku4BpVgNKAFFgJxsvIC3j2A9Ke2fsAjOwB5YFRN/QFJLu18rIC1JTIE0lLl8AClzHT7ArSpxpXg"
+        "BxVRAE9MZjwANTvjLAFCwvADUPafnAB8sA6V30gTDVuABOwFuATlT7AScUBeltqvPIFtSrUR2AmFNWAJfQD/AL8gDtRtICTqUk19ATP5"
+        "OQHqTiHmPAE6f8ZfcApLHlAFRswJSi9gK0OIc+gNZhtpz8gS9V4S5AOqox+wGm7i4AnVlgS9NcLdgTK/rA3epLegM253AnPgAjMACnZg"
+        "PTQFpOG3hgKYpVyQH7KHNucgS7wwM2q2nuAunV2YHQnTu+AI1XM2/sCZcfoBqtmuGBSTVugGpQFpRM55ANSeqYUxsgJiFCTlgZpxlMB6"
+        "lWaWQJaQE9On+IGnUrqgE7VKlsAq03ABpaXKAtOAKUPdMAbjGAF1eQE3P/QJb2AXyAJp8IBz/J+0A1TmiBO3H2ULVbc2AnkCv9VIF6W+"
+        "naOwB+RdOlak8qYAy07gadCX422212Ahtp7AKW2AK1IB0ko//9k=";
+    const char walnutPanel[] =
+        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUl"
+        "FhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+        "JCT/wAARCAA0AGwDAREAAhEBAxEB/8QAGAABAQEBAQAAAAAAAAAAAAAAAQACAwj/xAAlEAACAgICAgEEAwAAAAAAAAAAAREhAjFBYVFx"
+        "oRIigZHR8PH/xAAWAQEBAQAAAAAAAAAAAAAAAAAAAQP/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwDz4zFqsV0BtKfQ"
+        "Eqm5QA/YFPaAp8AM+AJxfQGXE8oCbAKAuAJYtgMVADitqgFNw4CjX8IIMrToDGNN0BtTQGlzPwBSFFWEZen4AyyhX9RAz5aXQGorbAYS"
+        "n4CgIovTgAyTe2ALGJsB0okBQFNUBPxPsDOTugMsqFdEUwlsDS8gKAIAVSAm6cv8AE1AGWBW02lSAVpgV2l/gA99AZYCu+dAZ+roDolX"
+        "bA1W3IFN8QAJqG7YBOwB6fgA+AF+AJV2BTYA/QA2ApuKS9gYIOmJROY6Ak6e/wBAU1pgMIA4AGANgWLoBkqM75AN6AVQDBFKActgWClP"
+        "oCYElIEwM5uADgonRBrHkqB7AEvuYCtSQKxT2Ff/2Q==";
+    const char walnutPanelAlt[] =
+        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUl"
+        "FhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+        "JCT/wAARCABNAGEDAREAAhEBAxEB/8QAGAABAQEBAQAAAAAAAAAAAAAAAAECAwf/xAAsEAACAgEDBAECBQUAAAAAAAAAAREhMRJBUQJh"
+        "cZGBIqEyUrHR4UJywfDx/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAED/8QAFhEBAQEAAAAAAAAAAAAAAAAAAAER/9oADAMBAAIRAxEAPwDw"
+        "VIxamFSUBWlfT9X/AECtJLFgYzgC7QsfqBUsw2n4AfhUbdgI3QEtt7AZ6p0tTKCNdMx2XO4DW+4FeAqZbjAClcthE1Nq2pAqX+oKVETE"
+        "AVdUZdkDmCiQ3y32AZAYTaxyBGm7b+4RnS+/oK6JN4kIqUTAVnqTdJSBlXWnpUcBGlzqkKumpj5kCLiKARP8gVKLx4AJICL2kQXl0u6K"
+        "MaPPsDsumnKVcgRRMuvADrb6lFRwBlRDStMBLy9MANgJE3PsgvlN+AL0tIoTVJSgMw9nPIEeLdbBEhfmQHaUl/IVNXLdY3AzF9t1yATz"
+        "D9kCFE5e37lC4tkE6VVKkBqO3wA2komU5bIM1Ezn7lE2YQl8oqunz1R3RAu7S7ATO7ggdLiVJRXhxmcEEj4YBtKZfjsAmJuSgsXkBaUp"
+        "teAMXLW4RVj/ACA+EBtSFMzyAh8dSAy67AE5r0gChUkBaUqfRATXlvEFDFQAalVNfYDMPE0AcY1IBpX536CNS8rP9skUTcRgoaVE1L2A"
+        "y4m0vgBieBBU5S/cCv38gRKnx5Av6AZu5UoCJ12ATVO+Ah7GDSeWFXp3cL4CDdWmn5oKzCa7vcC6tul4pUBN82BEm3CYGk3kCpU2BmNn"
+        "fbgBDdRjuBNXaOQM6lyB2SmpgBnpTcAT+l+ghpgKdX09Ld5CIs1CCpewGtMN3JA0/S3uA/Cm9uAMvN7ooy1uEY1vt6IP/9k=";
+    const char ivoryPanel[] =
+        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUl"
+        "FhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+        "JCT/wAARCAA0AGwDAREAAhEBAxEB/8QAGgAAAwEBAQEAAAAAAAAAAAAAAAECBAUDCP/EACMQAAIBBAEEAwEAAAAAAAAAAAABEQIhMUFR"
+        "ImFxgQMSobH/xAAWAQEBAQAAAAAAAAAAAAAAAAAAAQT/xAAVEQEBAAAAAAAAAAAAAAAAAAAAAf/aAAwDAQACEQMRAD8A+iWY2lEsKUyE"
+        "KACAH9QJqQENEWARR+BDQByIIqpcAZa6JqdgOq8FRDnyQLYDKGlyAnCwwJ9kUoAGrBU/0IEgCFsIl7CvGqJeAN89yoUEUNeChQQEgF9B"
+        "E77gIKG7AT7AOQACKnkDPU+p5A6QQROCqHu5IFlAGmAlsBNATsAzuAFFgAIlhXnW7MDPW+pgdRWCDkAeyqRAAAEuwExcAAYCaAiqwHlW"
+        "wM1TuwOtgqFNiKJ5AWAAA8MBSBLQDAJAQE1KzCM9dk9gZandhXYkBZYAEKZAHwFGghMBTkAYUBCwwCrDAy/K8gZaskH/2Q==";
+    const char ivoryPanelAlt[] =
+        "/9j/4AAQSkZJRgABAQAAAAAAAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUl"
+        "FhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"
+        "JCT/wAARCABNAGEDAREAAhEBAxEB/8QAGAABAQEBAQAAAAAAAAAAAAAAAAECAwj/xAAjEAEBAAEEAgICAwAAAAAAAAAAAREhMUGBUZEC"
+        "YRJxofDx/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAEE/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8A9FTpjaS0EgFoM1FK"
+        "qJJrsitSCL5BAWVRYB7FTIiIHG4GfIpv5EAIKZwBBFAmihqBmgyKsA2ghNqirjdUTGgIirv5EBSiEVVk5EXEBmTIqyIJYqLMQAE6BPKK"
+        "TegsUMiE1Br4gvsGNkUtVGc25wKvxtBf0iHYqAcgaqgCzYF4AyCIrNBIosQX2IiigZ3RTCi4A4A4EPYJn0ipnTAIovSIKLEU3ERRvjgC"
+        "TPIGAMAmJ9gzyKbgsgHQhn6AyBnsCa8AoLP4BfIGNwPxgrkB5BZP9QMwEtwoucwQ7oICy5BqafYrUghAXT+wHHjtFAM6KALJpQJsIkut"
+        "ARVwqN/EFxpkDbUDIP/Z";
+
     juce::Image decodeImage (const char* data)
     {
         juce::MemoryOutputStream bytes;
@@ -1150,15 +989,17 @@ namespace
         return juce::ImageFileFormat::loadFrom (bytes.getData(), bytes.getDataSize());
     }
 
-    struct Finishes { juce::Image wood, panel; };
+    struct Finishes { juce::Image header, lowerWood, leftWood, rightWood, panel, panelAlt; };
 
     const Finishes& finishes (int theme)
     {
-        // Wood and powder coat are sampled from the three approved mockups.
         static const Finishes surfaces[] {
-            { decodeImage (ashWood), decodeImage (ashPanel) },
-            { decodeImage (walnutWood), decodeImage (walnutPanel) },
-            { decodeImage (ivoryWood), decodeImage (ivoryPanel) }
+            { decodeImage (panelArtwork::ashHeader), decodeImage (panelArtwork::ashLowerWood), decodeImage (panelArtwork::ashLeftWood),
+              decodeImage (panelArtwork::ashRightWood), decodeImage (ashPanel), decodeImage (ashPanelAlt) },
+            { decodeImage (panelArtwork::walnutHeader), decodeImage (panelArtwork::walnutLowerWood), decodeImage (panelArtwork::walnutLeftWood),
+              decodeImage (panelArtwork::walnutRightWood), decodeImage (walnutPanel), decodeImage (walnutPanelAlt) },
+            { decodeImage (panelArtwork::ivoryHeader), decodeImage (panelArtwork::ivoryLowerWood), decodeImage (panelArtwork::ivoryLeftWood),
+              decodeImage (panelArtwork::ivoryRightWood), decodeImage (ivoryPanel), decodeImage (ivoryPanelAlt) }
         };
         return surfaces[theme];
     }
@@ -1323,7 +1164,7 @@ namespace
         return slot == std::end (mainControls) ? nullptr : slot;
     }
 
-    void drawWood (juce::Graphics& g, juce::Rectangle<int> bounds, const juce::Image& wood, bool vertical)
+    void drawLowerWood (juce::Graphics& g, juce::Rectangle<int> bounds, const juce::Image& wood)
     {
         if (! g.clipRegionIntersects (bounds))
             return;
@@ -1332,46 +1173,105 @@ namespace
         juce::Graphics::ScopedSaveState saved (g);
         g.reduceClipRegion (bounds);
         g.setColour (juce::Colours::white);
-        if (vertical)
+        const float row = (float) wood.getHeight();
+        for (int i = 0; (float) i * row < r.getHeight(); ++i)
         {
-            g.addTransform (juce::AffineTransform (0.0f, -1.0f, r.getRight(), 1.0f, 0.0f, r.getY()));
-            g.drawImage (wood, juce::Rectangle<float> (r.getHeight(), r.getWidth()));
-        }
-        else
-        {
-            const float row = juce::jmin (r.getHeight(), 76.0f);
-            for (int i = 0; (float) i * row < r.getHeight(); ++i)
-            {
-                const float y = r.getY() + (float) i * row;
-                if (i % 2 == 0)
-                    g.drawImage (wood, { r.getX(), y, r.getWidth(), row });
-                else
-                    g.drawImageTransformed (wood, juce::AffineTransform::scale (r.getWidth() / (float) wood.getWidth(),
-                                                                                -row / (float) wood.getHeight())
-                                                        .translated (r.getX(), y + row));
-            }
+            const float y = r.getY() + (float) i * row;
+            if (i % 2 == 0)
+                g.drawImage (wood, { r.getX(), y, r.getWidth(), row });
+            else
+                g.drawImageTransformed (wood, juce::AffineTransform::scale (r.getWidth() / (float) wood.getWidth(), -1.0f)
+                                                    .translated (r.getX(), y + row));
         }
     }
 
-    juce::Image makePanelSurface (const juce::Image& sample)
+    juce::Image makePanelSurface (const Finishes& finish)
     {
-        const int w = sample.getWidth(), h = sample.getHeight();
+        const int w = finish.panel.getWidth(), h = finish.panel.getHeight();
         juce::Image tile (juce::Image::RGB, w * 2, h * 2, true);
         juce::Graphics g (tile);
+        const auto& sample = finish.panel;
         g.drawImageAt (sample, 0, 0);
         g.drawImageTransformed (sample, juce::AffineTransform::scale (-1.0f, 1.0f).translated ((float) (w * 2), 0.0f));
         g.drawImageTransformed (sample, juce::AffineTransform::scale (1.0f, -1.0f).translated (0.0f, (float) (h * 2)));
         g.drawImageTransformed (sample, juce::AffineTransform::scale (-1.0f, -1.0f)
                                            .translated ((float) (w * 2), (float) (h * 2)));
+
+        const auto alt = finish.panelAlt.rescaled (w * 2, h * 2);
+        juce::Image::BitmapData pixels (tile, juce::Image::BitmapData::readWrite);
+        const juce::Image::BitmapData detail (alt, juce::Image::BitmapData::readOnly);
+        for (int y = 0; y < pixels.height; ++y)
+            for (int x = 0; x < pixels.width; ++x)
+            {
+                const float wx = (float) juce::jmin (x, pixels.width - 1 - x) / (float) w;
+                const float wy = (float) juce::jmin (y, pixels.height - 1 - y) / (float) h;
+                const float blend = wx * wy * 0.73f;
+                pixels.setPixelColour (x, y, pixels.getPixelColour (x, y).interpolatedWith (
+                    detail.getPixelColour (x, y), blend));
+            }
         return tile;
     }
 
     void drawSurface (juce::Graphics& g, juce::Rectangle<int> bounds, int theme)
     {
-        static const juce::Image tiles[] { makePanelSurface (finishes (0).panel), makePanelSurface (finishes (1).panel),
-                                           makePanelSurface (finishes (2).panel) };
+        static const juce::Image tiles[] { makePanelSurface (finishes (0)), makePanelSurface (finishes (1)),
+                                           makePanelSurface (finishes (2)) };
         g.setTiledImageFill (tiles[theme], bounds.getX(), bounds.getY(), 1.0f);
         g.fillRect (bounds);
+    }
+
+    struct DialMark { float position; juce::String label; };
+
+    juce::String dialNumber (double value)
+    {
+        if (std::abs (value) >= 1000.0)
+            return juce::String (value / 1000.0, std::fmod (value, 1000.0) == 0.0 ? 0 : 1) + "k";
+        return juce::String (value, std::fmod (value, 1.0) == 0.0 ? 0 : 1);
+    }
+
+    std::vector<DialMark> dialMarks (juce::Slider& dial, const bsyn::spec::Param* spec, bool compact)
+    {
+        const auto id = dial.getComponentID();
+        if (id == "modMix")
+            return { { 0.0f, "A" }, { 1.0f, "B" } };
+
+        const auto min = dial.getMinimum(), max = dial.getMaximum();
+        const auto unit = spec != nullptr ? juce::String (spec->unit) : juce::String();
+        if (min == 0.0 && max == 1.0)
+        {
+            if (compact)
+                return { { 0.0f, "0" }, { 0.5f, "5" }, { 1.0f, "10" } };
+            return { { 0.0f, "0" }, { 0.2f, "2" }, { 0.4f, "4" }, { 0.6f, "6" }, { 0.8f, "8" }, { 1.0f, "10" } };
+        }
+
+        std::vector<double> candidates;
+        if (unit == "Hz")
+            candidates = { 60, 100, 200, 500, 1000, 2000 };
+        else if (unit == "ms")
+            candidates = { 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000 };
+        else if (unit == "st")
+            candidates = { -6, -3, 0, 3, 6 };
+        else if (unit == "dB")
+            candidates = { -60, -48, -36, -24, -12, 0, 6 };
+        else if (max > min)
+        {
+            const auto step = (max - min) / (compact ? 2.0 : 3.0);
+            for (int i = 1; i < (compact ? 2 : 3); ++i)
+                candidates.push_back (min + i * step);
+        }
+
+        std::vector<DialMark> marks { { 0.0f, dialNumber (min) } };
+        const float spacing = compact ? 0.25f : 0.135f;
+        for (const auto value : candidates)
+        {
+            if (value <= min || value >= max)
+                continue;
+            const auto pos = (float) dial.valueToProportionOfLength (value);
+            if (pos - marks.back().position >= spacing && 1.0f - pos >= spacing)
+                marks.push_back ({ pos, dialNumber (value) });
+        }
+        marks.push_back ({ 1.0f, dialNumber (max) });
+        return marks;
     }
 
     void drawWaveform (juce::Graphics& g, juce::Point<float> origin, const juce::String& waveform)
@@ -1666,32 +1566,53 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
 
     const auto* spec = bsyn::spec::find (s.getComponentID().toRawUTF8());
     const bool stepped = spec != nullptr && spec->kind == bsyn::spec::Kind::Choice;
-    const int steps = stepped ? juce::jmax (1, (int) (spec->max - spec->min)) : 10;
     const auto choices = stepped && spec->choices != nullptr ? juce::StringArray::fromTokens (spec->choices, "|", "")
                                                             : juce::StringArray {};
     const bool rangeKnob = s.getComponentID().endsWith ("Range");
     const bool waveKnob = s.getComponentID().endsWith ("Wave");
+    const bool compact = w < 80;
+    const auto& photo = knobPhoto (theme, compact, rangeKnob || waveKnob, s.getComponentID().endsWith ("Freq"));
+    const float diameter = juce::jmin (photo.diameter, radius * 1.52f);
+    const float skirt = diameter * 0.5f;
+    const auto angleAt = [startAngle, endAngle] (float p) { return startAngle + p * (endAngle - startAngle); };
+
     g.setColour (colour (finish.ink));
-    for (int i = 0; i <= steps; ++i)
+    g.setFont (panelFont (compact ? 8.5f : 10.5f));
+    if ((rangeKnob || waveKnob) && choices.size() > 1)
     {
-        const float a = startAngle + (float) i / (float) steps * (endAngle - startAngle);
-        const bool major = stepped || i % 5 == 0;
-        if (rangeKnob && i < choices.size())
+        for (int i = 0; i < choices.size(); ++i)
         {
-            const auto at = point (a, radius - 4.0f);
-            g.setFont (panelFont (10.0f));
-            g.drawText (choices[i], juce::Rectangle<float> (at.x - 8.0f, at.y - 6.0f, 16.0f, 12.0f),
-                        juce::Justification::centred);
+            const auto a = angleAt ((float) i / (float) (choices.size() - 1));
+            const auto at = point (a, radius + 1.0f);
+            if (rangeKnob)
+                g.drawText (choices[i], juce::Rectangle<float> (at.x - 8.0f, at.y - 6.0f, 16.0f, 12.0f),
+                            juce::Justification::centred);
+            else
+                drawWaveform (g, at, choices[i]);
         }
-        else if (waveKnob && i < choices.size())
-            drawWaveform (g, point (a, radius - 1.0f), choices[i]);
-        else
-            g.drawLine ({ point (a, radius * (major ? 0.86f : 0.90f)), point (a, radius * 0.99f) },
-                        major ? 1.4f : 0.8f);
+    }
+    else
+    {
+        const auto marks = dialMarks (s, spec, compact);
+        for (int i = 0; i <= 10; ++i)
+        {
+            const float p = (float) i / 10.0f;
+            if (std::any_of (marks.begin(), marks.end(), [p] (const auto& mark) { return std::abs (p - mark.position) < 0.032f; }))
+                continue;
+            const auto a = angleAt (p);
+            g.drawLine ({ point (a, skirt + 3.0f), point (a, skirt + 5.0f) }, 0.85f);
+        }
+
+        for (const auto& mark : marks)
+        {
+            const auto a = angleAt (mark.position);
+            const auto at = point (a, radius + (compact ? 0.0f : 1.0f));
+            g.drawLine ({ point (a, skirt + 2.0f), point (a, skirt + (compact ? 4.0f : 6.0f)) }, 1.0f);
+            g.drawFittedText (mark.label, juce::Rectangle<float> (at.x - 10.0f, at.y - 5.5f, 20.0f, 11.0f)
+                                             .getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
+        }
     }
 
-    const auto& photo = knobPhoto (theme, w < 80, rangeKnob || waveKnob, s.getComponentID().endsWith ("Freq"));
-    const float diameter = juce::jmin (photo.diameter, radius * 1.52f);
     const juce::Rectangle<float> body (cx - diameter * 0.5f, cy - diameter * 0.5f, diameter, diameter);
     const auto shadow = body.translated (1.0f, 2.3f);
     g.setColour (juce::Colours::black.withAlpha (0.20f));
@@ -1852,7 +1773,15 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
         k.slider = std::make_unique<juce::Slider> (juce::Slider::RotaryVerticalDrag, juce::Slider::TextBoxBelow);
         k.slider->setComponentID (d.id);
         k.slider->setTitle (utf8 (d.name));
-        k.slider->setRotaryParameters (juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
+        const auto pi = juce::MathConstants<float>::pi;
+        if (d.kind == bsyn::spec::Kind::Choice && (k.id.endsWith ("Range") || k.id.endsWith ("Wave")))
+        {
+            const bool withoutLo = k.id.endsWith ("Range") && d.choices != nullptr
+                                && ! juce::String (d.choices).startsWith ("LO|");
+            k.slider->setRotaryParameters (pi * (withoutLo ? 1.7f : 1.5f), pi * 2.5f, true);
+        }
+        else
+            k.slider->setRotaryParameters (pi * 1.25f, pi * 2.75f, true);
         k.slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, small ? 74 : 84, 15);
         k.slider->setMouseDragSensitivity (small ? 160 : 200);
         // hold Ctrl (Cmd on Mac) while dragging for fine adjustment (detuning Frequency by cents)
@@ -1891,8 +1820,8 @@ void BassSynthEditor::resized()
     overloadArea = { 786, 97, 100, 44 };
     setupArea = { 47, 550, 1060, getHeight() - 570 };
     badgeArea = { 1140, 565, 202, 78 };
-    presetBox.setBounds (96, 19, 215, 27);
-    themeBox.setBounds (1112, 19, 225, 27);
+    presetBox.setBounds (96, 10, 215, 25);
+    themeBox.setBounds (1112, 10, 225, 25);
 
     const auto place = [] (Control& k, int x, int y, bool compact)
     {
@@ -1941,11 +1870,13 @@ void BassSynthEditor::paint (juce::Graphics& g)
     const auto ink = colour (finish.ink);
     const auto rule = colour (finish.rule);
     const auto& textures = finishes (lnf.theme);
-    drawWood (g, { cheekW, 0, getWidth() - 2 * cheekW, panelArea.getY() }, textures.wood, false);
-    drawWood (g, { cheekW, panelArea.getBottom(), getWidth() - 2 * cheekW,
-                   getHeight() - panelArea.getBottom() }, textures.wood, false);
-    drawWood (g, getLocalBounds().withWidth (cheekW), textures.wood, true);
-    drawWood (g, getLocalBounds().withTrimmedLeft (getWidth() - cheekW), textures.wood, true);
+    auto rail = getLocalBounds();
+    const auto left = rail.removeFromLeft (cheekW), right = rail.removeFromRight (cheekW);
+    g.setColour (juce::Colours::white);
+    g.drawImage (textures.leftWood, left.toFloat());
+    g.drawImage (textures.rightWood, right.toFloat());
+    g.drawImage (textures.header, rail.removeFromTop (panelArea.getY()).toFloat());
+    drawLowerWood (g, rail.withY (panelArea.getBottom()).withBottom (getHeight()), textures.lowerWood);
 
     drawSurface (g, panelArea, lnf.theme);
     drawMainBezel (g, panelArea);
@@ -1955,14 +1886,11 @@ void BassSynthEditor::paint (juce::Graphics& g)
         g.drawVerticalLine (x, (float) panelArea.getY() + 5.0f, (float) panelArea.getBottom() - 9.0f);
     g.drawHorizontalLine (envelopeDivider, (float) modifierDivider, (float) outputDivider);
 
-    for (const float x : { 47.0f, 700.0f, 1351.0f })
-        drawScrew (g, x, 45.0f);
-
     const auto topInk = lnf.theme == 1 ? juce::Colour (0xfff4e1c3) : juce::Colour (0xff322c26);
     g.setColour (topInk);
     g.setFont (panelFont (11.0f));
-    g.drawText ("PRESET", juce::Rectangle<int> { 44, 19, 49, 27 }, juce::Justification::centredLeft);
-    g.drawText ("THEME", juce::Rectangle<int> { 1059, 19, 49, 27 }, juce::Justification::centredLeft);
+    g.drawText ("PRESET", juce::Rectangle<int> { 44, 10, 49, 25 }, juce::Justification::centredLeft);
+    g.drawText ("THEME", juce::Rectangle<int> { 1059, 10, 49, 25 }, juce::Justification::centredLeft);
 
     struct Caption { const char* text; juce::Rectangle<int> area; };
     const Caption captions[] {
