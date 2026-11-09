@@ -1,8 +1,10 @@
 # Bass Ladder Synth (VST3)
 
 베이스 DI를 넣으면 무그(모델 D)풍 베이스 신스 소리로 바꿔 주는 큐베이스용 이펙트 플러그인입니다.
-피치 트래킹을 쓰지 않고 DI 파형 자체를 깎고(클리핑), 접고(웨이브폴드), 옥타브를 바꿔서 음색을 만들기 때문에
-지연과 트래킹 실수가 없습니다. 톱니파는 DI 파형의 순간 위상(힐베르트 변환)에서 바로 그려서 줄의 음정을 즉시 따라갑니다.
+피치 트래킹을 쓰지 않고, 세 오실레이터를 DI 파형의 순간 위상(힐베르트 변환)에서 바로 그리기 때문에
+지연과 트래킹 실수가 없습니다. 패널 구성과 동작은 Model D를 따릅니다.
+
+UI 작업 분담과 파라미터 표는 [docs/UI_HANDOFF.md](docs/UI_HANDOFF.md)를 보세요.
 
 ## 다운로드
 
@@ -19,28 +21,25 @@
 
 ## 신호 흐름
 
-입력 컴프 → 피킹 게이트 → 톤 LPF → DI 변조(위상 기반 톱니파 · 클리핑 · 웨이브폴드 · 옥타브 다운/업 · 주파수 시프트 디튠) → 믹서 포화(Overload) → 비선형 래더 필터 → RC 엔벨로프
+입력 컴프 → 음 감지(피킹) → 오실레이터 3개(DI 위상) + External(DI) + 노이즈 → 믹서(레벨이 높을수록 오버로드) → 비선형 래더 필터(필터 모듈레이션: Osc 3 / 노이즈) → RC 컨투어
 
 ## 패널
 
-| 섹션 | 노브 |
+| 섹션 | 컨트롤 |
 |---|---|
-| SHAPER | Tone(DI 입력 LPF), Detune, Drift |
-| OSCILLATORS | Osc 1·2·3 Range (32'~2'), Waveform (삼각, 삼각-톱니/역톱니, 톱니, 사각, 넓은·좁은 펄스), Osc 2·3 Frequency (가운데는 센트 단위 디튠, 끝은 ±7반음; 0이 아니면 자유 회전) — 모두 DI 위상에서 생성. 기본 Osc 3 = 32' 사각파(서브) |
-| MIXER | Osc 1, Osc 2, Osc 3, External(DI 원음), Noise, Detune Voices, Overload |
-| FILTER | Cutoff, Emphasis, Contour Amount, Key Track, Attack, Decay, Sustain |
-| LOUDNESS | Attack, Decay, Sustain, Release, Dynamics |
-| SETUP | Comp 스위치, Comp Thresh/Ratio, Gate, Pick Sens, Tail Follow, Sub Detect, Sub Hyst |
-| IN / OUT | Input, Output, Dry DI |
+| CONTROLLERS | Mod Amount(모드 휠 역할), Modulation Mix(Osc 3 ↔ 노이즈), Filter Mod 스위치 |
+| OSCILLATORS | Osc 1·2·3 Range, Waveform, Osc 2·3 Frequency(±9반음), Osc 3 Control 스위치(끄면 고정 음 / LO에서 LFO) |
+| MIXER | Osc 1·2·3, External(DI), Noise 볼륨과 각각의 On 스위치, 노이즈 화이트/핑크 |
+| FILTER | Cutoff, Emphasis, Amount of Contour, Keyboard Control 1·2 스위치, Attack, Decay, Sustain |
+| LOUDNESS | Attack, Decay, Sustain, Decay 스위치(무그식 릴리즈), Dynamics |
+| SETUP | Comp, Comp Thresh/Ratio, Gate, Pick Sens, Tail Follow, Ext Tone, Vintage, Input, Output, Dry DI |
 
-- 노브는 위아래로 드래그, 더블클릭하면 기본값.
-- Input은 DI 피크가 0 dBFS 근처에 오도록 맞추면 기본값이 잘 맞습니다.
+- 노브는 위아래로 드래그, Ctrl을 누르고 드래그하면 미세 조정, 더블클릭하면 기본값.
 - 안 친 음이 트리거되면 Pick Sens를 올리고, 친 음을 놓치면 내리세요.
-- 옥타브 다운이 떨리면 Sub Detect를 낮추세요.
 
-프리셋: Model D Bass, Punch Sub, Squelch, Fuzz Octave
+프리셋: Model D Bass, Punch Sub, Squelch, Fat Detune, Wobble, Growl, Heart Bass
 
 ## 오프라인 테스트
 
-`BassSynth/tests/smoke_test.cpp` 가 합성 노트로 엔진을 검사합니다 (빌드 때 자동 실행).
-`render_test in.f32 out.f32 sr inDb outDb drift` 로 녹음 파일을 렌더링해 볼 수 있습니다.
+`BassSynth/tests/smoke_test.cpp` 가 합성 노트로 엔진을, `tests/spec_test.cpp` 가 파라미터 표를 검사합니다 (빌드 때 자동 실행).
+`render_test in.f32 out.f32 sr inDb outDb vintage` 로 녹음 파일을 렌더링해 볼 수 있습니다.

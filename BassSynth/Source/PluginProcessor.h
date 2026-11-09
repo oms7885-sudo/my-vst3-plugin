@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <atomic>
 #include "SynthEngine.h"
+#include "Parameters.h"
 
 class BassSynthProcessor : public juce::AudioProcessor
 {
@@ -36,10 +37,13 @@ public:
 
     juce::AudioProcessorValueTreeState apvts;
 
-    // read by the editor
-    std::atomic<float> displayFreq { 0.0f };
-    std::atomic<bool>  displayGate { false };
-    std::atomic<uint32_t> displayTrig { 0 };
+    // ---- read by the editor (written once per audio block) ----
+    std::atomic<float> displayFreq { 0.0f };         // Hz of the note being played, 0 = none
+    std::atomic<bool>  displayGate { false };        // a note is sounding
+    std::atomic<uint32_t> displayTrig { 0 };         // counts note starts: a change = new pick (flash a LED)
+    std::atomic<float> displayInput { 0.0f };        // input peak after Input Gain, 1.0 = full scale (overload lamp)
+    std::atomic<float> displayFilterEnv { 0.0f };    // filter contour 0..1
+    std::atomic<float> displayAmpEnv { 0.0f };       // loudness contour 0..1
 
 private:
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();

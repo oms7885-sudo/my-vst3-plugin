@@ -4,6 +4,8 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PluginProcessor.h"
 
+// Baseline panel: built entirely from Parameters.h (sections, labels, Korean tooltips), so every
+// engine parameter shows up even before a designed UI replaces this file. See docs/UI_HANDOFF.md.
 // Vintage synth front panel: walnut end cheeks, black silkscreened panel, skirted knobs.
 class PanelLookAndFeel : public juce::LookAndFeel_V4
 {
@@ -31,29 +33,30 @@ public:
 private:
     void timerCallback() override;
 
-    struct Knob
+    // one panel control: a knob (Float / Choice) or a switch (Bool)
+    struct Control
     {
         juce::String id, label;
         bool small = false;
         std::unique_ptr<juce::Slider> slider;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sliderAttachment;
+        std::unique_ptr<juce::ToggleButton> button;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
         juce::Rectangle<int> labelArea;
     };
     struct Section { juce::String title; int cols; std::vector<int> knobIndex; juce::Rectangle<int> area; };
 
-    void addKnob (const juce::String& id, const juce::String& label, bool small);
+    void addControl (const bsyn::spec::Param& d, bool small);
 
     BassSynthProcessor& proc;
     PanelLookAndFeel lnf;
     juce::TooltipWindow tooltipWindow { this, 1000 };   // descriptions appear after 1 s of hovering
 
-    std::vector<Knob> knobs;
+    std::vector<Control> controls;
     std::vector<Section> sections;
     std::vector<int> setupKnobs;
 
-    juce::ToggleButton compButton;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> compAttachment;
-    juce::Rectangle<int> compLabelArea;
+    int ioGroupIndex = -1;
 
     juce::ComboBox presetBox;
 
@@ -62,6 +65,7 @@ private:
     int trigFlash = 0;
     bool gateLed = false;
     float freq = 0.0f;
+    int overloadHold = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BassSynthEditor)
 };

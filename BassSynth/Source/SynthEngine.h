@@ -1,6 +1,6 @@
-// Bass DI -> Moog-style bass synth engine (DI modulation version).
-// No pitch tracking: the DI waveform itself is clipped, folded and octave-shifted,
-// then runs through a nonlinear ladder filter and RC envelopes triggered by picks.
+// Bass DI -> Moog Model D style bass synth engine.
+// No pitch tracking: three oscillators are drawn straight from the DI's own phase, mixed like the
+// Model D mixer, then run through a nonlinear ladder filter and RC contours triggered by picks.
 // Header-only, no JUCE dependency, so it can be tested offline (see tests/).
 // This is a sample-by-sample port of the browser prototype ("Bass Ladder").
 #pragma once
@@ -15,36 +15,45 @@ namespace bsyn
 
 struct Params
 {
-    // input / setup
+    // ---- setup (plugin only: turning a bass DI into "keys") ----
     float inGainDb = 5.0f;
     bool  comp = true;
     float cTh = -30.0f, cRat = 8.0f;   // dB, ratio
     float gateDb = -45.0f;
     float pickSens = 2.0f;
     float tail = 0.4f;                 // 0 = off
-    float subLP = 120.0f;              // Hz, octave-down detector
-    float hyst = 0.15f;
-    // shaper
-    float tone = 250.0f;               // Hz, low-pass before shaping
-    float shapeAmt = 0.7f, foldAmt = 0.4f;
-    float detune = 7.0f, drift = 2.0f; // cents
-    // mixer
-    // oscillator bank (Model D style). Range: 0 = 32', 1 = 16' (the note you play), 2 = 8', 3 = 4', 4 = 2'.
+    float subLP = 120.0f, hyst = 0.15f; // internal: period detector for the note detector (not on the panel)
+    float tone = 250.0f;               // Hz, low-pass on the External (DI) signal
+    float vintage = 0.3f;              // 0 = stable reissue .. 1 = old unit: osc 2/3 drift on their own
+
+    // ---- oscillators ----
+    // Range: -1 = LO (osc 3 only), 0 = 32', 1 = 16' (the note you play), 2 = 8', 3 = 4', 4 = 2'.
     // Wave: 0 triangle, 1 triangle-saw (osc 3: reverse saw), 2 saw, 3 square, 4 wide pulse, 5 narrow pulse.
-    // sawLvl is the Osc 1 volume (kept under its old name so saved projects still load).
     int   osc1Range = 1, osc1Wave = 2, osc2Range = 1, osc2Wave = 2, osc3Range = 0, osc3Wave = 3;
-    float osc2Semi = 0.0f, osc3Semi = 0.0f;   // Frequency offset in semitones (-7..+7); osc runs free when non-zero
-    float osc2Lvl = 0.0f, osc3Lvl = 0.5f, noiseLvl = 0.0f;
-    // satLvl/foldLvl/subLvl/upLvl: the old DI-shaping sources, no longer on the panel (kept at 0)
-    float sawLvl = 0.8f, satLvl = 0.0f, foldLvl = 0.0f, subLvl = 0.0f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.35f;
-    float drive = 0.45f;
-    // filter
-    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f, keytrk = 0.5f;
-    float fA = 3.0f, fD = 320.0f, fS = 0.1f;          // ms, ms, 0..1
-    // loudness
-    float aA = 1.5f, aD = 900.0f, aS = 0.75f, aR = 90.0f;
+    float osc2Freq = 0.0f, osc3Freq = 0.0f;   // semitones, -9..+9 (Model D: up to a major sixth either way)
+    bool  osc3Ctl = true;                     // Osc 3 Control: on = follows the DI, off = fixed pitch (drone / LFO)
+
+    // ---- mixer (Model D: a volume and an on/off switch per source) ----
+    float osc1Lvl = 0.8f, osc2Lvl = 0.0f, osc3Lvl = 0.5f, extLvl = 0.0f, noiseLvl = 0.0f;
+    bool  osc1On = true, osc2On = true, osc3On = true, extOn = false, noiseOn = false;
+    bool  noisePink = false;
+
+    // ---- modulation (filter only) ----
+    float modMix = 0.0f;               // 0 = osc 3 .. 1 = noise
+    float modAmt = 0.0f;               // the mod wheel
+    bool  filterMod = false;
+
+    // ---- filter ----
+    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f;
+    bool  keyTrk1 = false, keyTrk2 = true;    // 1/3 + 2/3 keyboard control
+    float fA = 3.0f, fD = 320.0f, fS = 0.1f;  // ms, ms, 0..1
+
+    // ---- loudness ----
+    float aA = 1.5f, aD = 900.0f, aS = 0.75f;
+    bool  decaySw = false;             // off: the sound stops when the note ends; on: it dies away over Decay
     float dyn = 0.35f;
-    // output
+
+    // ---- output ----
     float outGainDb = 0.0f;
     float dry = 0.0f;
 };
@@ -58,6 +67,7 @@ public:
         hpA = std::exp (-TAU * 30.0 / sr);
         cAt = k (0.002); cRl = k (0.15);
         agA = k (0.002); agR = k (0.08);
+        relFast = k (0.004 / 3.0);
         fA_ = k (0.001); fR_ = k (0.03); sA_ = k (0.04); sR_ = k (0.2);
         tfA = k (0.003); tfR = k (0.01);
         ehL  = (int) std::lround (0.015 * sr);
@@ -66,7 +76,7 @@ public:
         BL = std::max (1, (int) std::lround (0.001 * sr));
         openN = (int) std::lround (0.0015 * sr);
         hold = 0.05 * sr; fastGap = 0.07 * sr; velA = 1 - std::exp (-1.0 / (0.003 * sr));
-        upA = k (0.008);
+        inPkR = std::exp (-1.0 / (0.3 * sr)); drA = k (0.8);
         ktA = k (0.03);
         lpCoef (250.0, cs);
         dcA = std::exp (-TAU * 15.0 / sr);
@@ -81,15 +91,15 @@ public:
         std::fill (std::begin (eh), std::end (eh), 0.0f);
         std::fill (std::begin (zs), std::end (zs), 0.0);
         std::fill (std::begin (hs1), std::end (hs1), 0.0);
-        std::fill (std::begin (hs2), std::end (hs2), 0.0);
-        hpY = hpX = cEnv = agc = agd = eF = eS = 0;
+                hpY = hpX = cEnv = agc = agd = eF = eS = 0;
         gateOn = false; lastOn = -1e9; pk = notePk = 0; tfS = 1; onP = 0; vel = velS = 1; runMax = 0; decayed = false;
         h0X = h0Y = 0; cbm = 0; bc = 0; bi = 0; PW = 13; pkP = notePkP = 0;
         std::fill (std::begin (bm), std::end (bm), 0.0f);
         std::fill (std::begin (phb), std::end (phb), 0.0f);
-        s = -1; subv = 1; lastEdge = -1; zf = 0; upM = 0; per = sr / 55.0; wnP = 0;
-        hD1 = hD2 = 0; phP = 0; ktf = 110; thU = thD = 0; cyc = 0; acc[0] = acc[1] = acc[2] = 0;
-        dr = 0; drT = 0; seed = 777;
+        s = -1; lastEdge = -1; zf = 0; per = sr / 55.0; wnP = 0;
+        hD1 = 0; phP = 0; ktf = 110; cyc = 0; acc[0] = acc[1] = acc[2] = 0; o3free = 0;
+        std::fill (std::begin (pk3), std::end (pk3), 0.0); inPk = 0;
+        seed = 777; drT = 0; dw[0] = dw[1] = dwT[0] = dwT[1] = 0;
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0;
         dcX = dcY = 0;
@@ -105,13 +115,10 @@ public:
         P = p;
         mk = -p.cTh * (1.0 - 1.0 / p.cRat) * 0.5;
         thr = std::pow (10.0, p.gateDb / 20.0);
-        sG = 1.0 + p.shapeAmt * 14.0; sN = 1.0 / th (sG * 0.8);
-        fG = PI * (0.6 + p.foldAmt * 3.0);
-        wX = std::min (1.0, p.detune / 2.0) * p.detLvl;
-        dg = 1.0 + p.drive * 6.0;
         kRes = 4.1 * p.res;
         cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0);
-        caA = k (p.aA / 3000.0); caD = k (p.aD / 3000.0); caR = k (p.aR / 3000.0);
+        caA = k (p.aA / 3000.0); caD = k (p.aD / 3000.0);
+        keyAmt = (p.keyTrk1 ? 1.0 / 3.0 : 0.0) + (p.keyTrk2 ? 2.0 / 3.0 : 0.0);
         inGain = std::pow (10.0, p.inGainDb / 20.0);
         outGain = std::pow (10.0, p.outGainDb / 20.0);
     }
@@ -121,6 +128,7 @@ public:
         const Params& p = P;
         const int64_t i = n++;
         const double x0 = input * inGain;
+        { const double ai = std::abs (x0); inPk = ai > inPk ? ai : inPk * inPkR; }
 
         // input compressor (soft knee, feed-forward)
         double x = x0;
@@ -201,12 +209,10 @@ public:
             refOn = upgrade ? refOn : refP;
         }
 
-        // ---- DI modulation ----
-        const double sat  = th (yn * sG) * sN;          // clipping: soft -> near square
-        const double fold = std::sin (yn * fG);         // wavefolder
+        // ---- period of the DI (used by the note detector's window) ----
         if (s < 0 && wn > p.hyst && (lastEdge < 0 || (double) (i - lastEdge) > 0.4 * per))
         {
-            s = 1; subv = -subv;
+            s = 1;
             if (lastEdge >= 0)
             {
                 const double d = (double) (i - lastEdge);
@@ -227,38 +233,59 @@ public:
         phP = ph;
         const double dt = std::min (std::max (dph, 1e-4), 0.05);
 
-        // ---- oscillator bank: every oscillator is drawn from the DI's own phase (no pitch tracking) ----
-        const double gAmp = std::min (1.0, agd * 40.0);
-        const double o1 = oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, ph, dt, 0.0, acc[0]));
-        const double o2 = p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, ph, dt, p.osc2Semi, acc[1])) : 0.0;
-        const double o3 = p.osc3Lvl > 0 ? oscWave (p.osc3Wave, true,  oscPhase (p.osc3Range, ph, dt, p.osc3Semi, acc[2])) : 0.0;
-        if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
-        const double sub = subv * std::abs (sat);       // octave down
-        const double ra = std::abs (sat); upM += (ra - upM) * upA;
-        const double up = (ra - upM) * 2.0;             // octave up
-        const double cln = th (yn * 0.9);               // the DI waveform itself
-        const double nz = p.noiseLvl > 0 ? rnd() * 0.6 : 0.0;   // white noise (Model D mixer)
-        double m = (p.satLvl * sat + p.foldLvl * fold + p.subLvl * sub + p.upLvl * up + p.cleanLvl * cln
-                    + (p.sawLvl * o1 + p.osc2Lvl * o2 + p.osc3Lvl * o3 + p.noiseLvl * nz) * gAmp) * 0.55;
-
-        // detune voices: the modulated DI frequency-shifted up and down (no delay, so no flam)
-        if (wX > 0)
+        // ---- vintage drift: osc 2 and 3 each wander by a few cents on their own ----
+        if (--drT <= 0)
         {
-            if (--drT <= 0) { drT = 2048; dr += (rnd() - dr) * 0.15; }
-            double mI, mQ; hilbert (m, hs2, hD2, mI, mQ);
-            const double fUp = ktf * (std::pow (2.0, (p.detune + p.drift * dr) / 1200.0) - 1);
-            const double fDn = ktf * (1 - std::pow (2.0, -(p.detune - p.drift * dr) / 1200.0));
-            thU += TAU * fUp / sr; if (thU > TAU) thU -= TAU;
-            thD += TAU * fDn / sr; if (thD > TAU) thD -= TAU;
-            const double vU = mI * std::cos (thU) - mQ * std::sin (thU);
-            const double vD = mI * std::cos (thD) + mQ * std::sin (thD);
-            m = (mI + wX * 0.8 * (vU + vD)) / (1 + wX * 0.9);
+            drT = 2048;
+            for (int q = 0; q < 2; ++q) { dwT[q] += (rnd() * 0.7 - dwT[q]) * 0.08; }
         }
-        m = th (m * dg) / std::sqrt (dg) * 1.6;
+        for (int q = 0; q < 2; ++q) dw[q] += (dwT[q] - dw[q]) * drA;
+        const double cents2 = p.vintage * (4.0 * dw[0] + 1.2), cents3 = p.vintage * (4.0 * dw[1] - 0.9);
+
+        // ---- oscillator bank: drawn from the DI's own phase (no pitch tracking) ----
+        const double gAmp = std::min (1.0, agd * 40.0);
+        const double o1 = p.osc1On && p.osc1Lvl > 0 ? oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, ph, dt, 0.0, acc[0])) : 0.0;
+        const double o2 = p.osc2On && p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, ph, dt, p.osc2Freq + cents2 / 100.0, acc[1])) : 0.0;
+        const bool need3 = (p.osc3On && p.osc3Lvl > 0) || (p.filterMod && p.modAmt > 0 && p.modMix < 1);
+        double o3 = 0;
+        if (need3)
+        {
+            if (p.osc3Ctl)
+                o3 = oscWave (p.osc3Wave, true, oscPhase (p.osc3Range, ph, dt, p.osc3Freq + cents3 / 100.0, acc[2]));
+            else
+            {
+                // Osc 3 Control off: a fixed pitch set by Range, Frequency sweeps about 6 octaves
+                const int r = std::clamp (p.osc3Range, -1, 4);
+                const double base = r < 0 ? 2.0 : 32.703 * std::pow (2.0, (double) r);   // LO = 2 Hz, 32' = C1
+                const double f3 = base * std::pow (2.0, p.osc3Freq / 9.0 * 3.0 + cents3 / 1200.0);
+                const double d3 = f3 / sr;
+                o3free += d3; o3free -= std::floor (o3free);
+                o3 = oscWave (p.osc3Wave, true, { o3free, d3 });
+            }
+        }
+        if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
+        const double ext = th (yn * 0.9);               // External: the DI itself
+        // noise source: white, or pink (Kellet's economy filter)
+        const double wht = rnd();
+        pk3[0] = 0.99765 * pk3[0] + wht * 0.0990460;
+        pk3[1] = 0.96300 * pk3[1] + wht * 0.2965164;
+        pk3[2] = 0.57000 * pk3[2] + wht * 1.0526913;
+        const double pnk = (pk3[0] + pk3[1] + pk3[2] + wht * 0.1848) * 0.22;
+        const double nzS = p.noisePink ? pnk : wht * 0.6;
+
+        double m = ((p.osc1On ? p.osc1Lvl * o1 : 0.0) + (p.osc2On ? p.osc2Lvl * o2 : 0.0)
+                    + (p.osc3On ? p.osc3Lvl * o3 : 0.0) + (p.noiseOn ? p.noiseLvl * nzS : 0.0)) * gAmp
+                   + (p.extOn ? p.extLvl * ext : 0.0);
+        // the mixer feeds the ladder hot, like the Model D: more mixer level = more overload
+        m = th (m * 0.55 * mixDrive) / std::sqrt (mixDrive) * 1.6;
+
+        // filter modulation: osc 3 and noise, mixed, scaled by the "wheel"
+        const double modSrc = (1.0 - p.modMix) * o3 + p.modMix * pnk * 2.5;
+        const double fMod = p.filterMod ? std::pow (2.0, p.modAmt * 3.0 * modSrc) : 1.0;
 
         // nonlinear 4-pole ladder, 2x oversampled
-        double fc = p.cutoff * std::pow (2.0, p.envAmt * fe)
-                  * std::pow (std::min (8.0, std::max (0.125, ktf / 110.0)), (double) p.keytrk);
+        double fc = p.cutoff * std::pow (2.0, p.envAmt * fe) * fMod
+                  * std::pow (std::min (8.0, std::max (0.125, ktf / 110.0)), keyAmt);
         fc = std::min (fc, sr * 0.45);
         // zero-delay-feedback ladder: the resonance feedback is solved within the same sample,
         // so the peak stays as strong at 5 kHz as at 150 Hz, like the analog ladder; tanh at the input and each stage
@@ -276,10 +303,10 @@ public:
         // RC envelopes
         if (fs == 1) { fe += (1.3 - fe) * cfA; if (fe >= 1) { fe = 1; fs = 2; } }
         else if (fs == 2) fe += (p.fS - fe) * cfD;
-        else if (fs == 3) fe += (0 - fe) * cfD;
+        else if (fs == 3) fe += (0 - fe) * (p.decaySw ? cfD : relFast);
         if (as == 1) { ae += (1.3 - ae) * caA; if (ae >= 1) { ae = 1; as = 2; } }
         else if (as == 2) ae += (p.aS - ae) * caD;
-        else if (as == 3) ae += (0 - ae) * caR;
+        else if (as == 3) ae += (0 - ae) * (p.decaySw ? caD : relFast);
 
         const double dynF = (1 - p.dyn) + p.dyn * std::min (1.0, eF * 2.2);
         const double tf = std::min (1.0, eF / (notePk * p.tail + 1e-6));
@@ -299,6 +326,9 @@ public:
 
     // for the editor display
     double currentFreq() const { return lastFreq; }
+    double inputPeak() const   { return inPk; }          // input level after Input Gain (1.0 = full scale)
+    double filterContour() const { return fe; }
+    double loudnessContour() const { return ae; }
     bool   gateIsOpen() const  { return gateOn; }
     uint32_t triggers() const  { return trigCount; }
 
@@ -333,14 +363,15 @@ private:
     }
     struct OscPh { double t, dt; };
 
-    // phase of one oscillator: range shifts the DI's phase by octaves; a Frequency offset runs a phase
-    // accumulator at the DI's rate times the interval and runs free (like a real Moog), so the beating
-    // lands somewhere different on every note
+    // phase of one oscillator: range shifts the DI's phase by octaves (counting DI cycles for the low
+    // ranges); a Frequency offset or vintage drift runs a phase accumulator at the DI's rate times the
+    // interval and runs free (like a real Moog), so the beating lands somewhere different on every note
     OscPh oscPhase (int range, double ph, double dt, float semi, double& accum) const
     {
-        const int o = std::clamp (range, 0, 4) - 1;               // -1 (32') .. +3 (2')
+        const int r = std::clamp (range, -1, 4);
+        const int o = r < 0 ? -3 : r - 1;                         // LO = 3 octaves below 16', 32' = -1 .. 2' = +3
         double t, d;
-        if (o < 0) { t = (ph + (double) (cyc & 1)) * 0.5; d = dt * 0.5; }
+        if (o < 0) { const int64_t kd = (int64_t) 1 << -o; t = (ph + (double) (cyc % kd)) / (double) kd; d = dt / (double) kd; }
         else       { const double mul = (double) (1 << o); t = ph * mul; t -= std::floor (t); d = dt * mul; }
         if (std::abs (semi) < 1e-3) { accum = t; return { t, d }; }
         const double ratio = std::pow (2.0, semi / 12.0);
@@ -403,24 +434,25 @@ private:
     // coefficients
     double hpA = 0, cAt = 0, cRl = 0, agA = 0, agR = 0, fA_ = 0, fR_ = 0, sA_ = 0, sR_ = 0, tfA = 0, tfR = 0;
     double velA = 0;
-    double pkR = 0, hold = 0, upA = 0, ktA = 0, dcA = 0;
+    double pkR = 0, hold = 0, ktA = 0, dcA = 0;
     int ehL = 0, ehL2 = 0, openN = 0;
     double c[5] {}, cd[5] {}, cs[5] {};
-    double mk = 0, thr = 0, sG = 1, sN = 1, fG = 0, wX = 0, dg = 1, kRes = 0;
-    double cfA = 0, cfD = 0, caA = 0, caD = 0, caR = 0, inGain = 1, outGain = 1;
+    double mk = 0, thr = 0, kRes = 0, keyAmt = 2.0 / 3.0, relFast = 0, inPkR = 0, drA = 0;
+    static constexpr double mixDrive = 3.7;
+    double cfA = 0, cfD = 0, caA = 0, caD = 0, inGain = 1, outGain = 1;
 
     // state
     double z[8] {}, zd[8] {}, zs[8] {};
     int64_t cyc = 0; double acc[3] {};
-    double hs1[32] {}, hs2[32] {}; double hD1 = 0, hD2 = 0, phP = 0, ktf = 110, thU = 0, thD = 0;
+    double hs1[32] {}; double hD1 = 0, phP = 0, ktf = 110, o3free = 0, pk3[3] {}, inPk = 0;
     float eh[4096] {};
     double hpY = 0, hpX = 0, cEnv = 0, agc = 0, agd = 0, eF = 0, eS = 0;
     double onP = 0, vel = 1, velS = 1, refOn = 0, runMax = 0, fastGap = 3087; bool decayed = false;
     bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; double tfS = 1;
     double h0X = 0, h0Y = 0, cbm = 0, pkP = 0, notePkP = 0; int bc = 0, BL = 44, PW = 13; int64_t bi = 0;
     float bm[64] {}, phb[64] {};
-    int s = -1, subv = 1; int64_t lastEdge = -1; double zf = 0, upM = 0, per = 800, wnP = 0;
-    double dr = 0; int drT = 0; uint32_t seed = 777;
+    int s = -1; int64_t lastEdge = -1; double zf = 0, per = 800, wnP = 0;
+    int drT = 0; double dw[2] {}, dwT[2] {}; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
     double dcX = 0, dcY = 0;

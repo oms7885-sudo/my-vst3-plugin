@@ -63,5 +63,7 @@ target_link_libraries(BassLadderSynth
 # Offline engine test (no JUCE needed)
 add_executable(smoke_test tests/smoke_test.cpp)
 add_executable(render_test tests/render_test.cpp)
+add_executable(spec_test tests/spec_test.cpp)
 enable_testing()
 add_test(NAME engine_smoke COMMAND smoke_test)
+add_test(NAME parameter_table COMMAND spec_test)

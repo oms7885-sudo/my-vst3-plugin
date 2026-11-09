@@ -22,58 +22,27 @@ namespace
         return juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain));
     }
 
-    constexpr int editorW = 1500, editorH = 548, cheekW = 28;
+    constexpr int editorW = 1400, cheekW = 28;
     constexpr int cellW = 78, cellH = 122, smallCellW = 80;
 
-    // hover help (Korean): "NAME\ndescription". Source is compiled as UTF-8 (/utf-8 on MSVC).
+    // hover help (Korean) comes from Parameters.h: "TITLE\ndescription"
     juce::String tipFor (const juce::String& id)
     {
-        static const std::pair<const char*, const char*> tips[] = {
-            { "inGain", "INPUT\nDI 입력 크기를 맞춥니다. 큐베이스 트랙 미터에서 세게 쳤을 때 피크가 -6dB 근처에 오도록 인터페이스 게인을 맞추면, 이 노브는 기본값(+5dB)으로 두셔도 잘 맞습니다. 음 감지가 늦으면 올리고, 작은 잡음이 음으로 잡히면 내려 주세요." },
-            { "comp", "COMP\n입력 컴프레서를 켜고 끕니다. 켜면 세게 친 음과 약하게 친 음의 크기 차이가 줄어 변조된 소리가 고르게 나옵니다." },
-            { "cTh", "COMP THRESH\n컴프가 소리를 누르기 시작하는 크기입니다. 낮출수록 더 많은 소리가 눌려 고르게 됩니다." },
-            { "cRat", "COMP RATIO\n컴프가 누르는 세기입니다. 높을수록 크고 작은 음의 차이가 더 줄어듭니다." },
-            { "gate", "GATE\n이보다 작은 소리는 무시합니다. 연주하지 않을 때 험이나 잡음이 소리 나면 올려 주세요." },
-            { "pickSens", "PICK SENS\n새 음으로 판단하는 문턱입니다. 소리가 직전보다 몇 배 커져야 새 음으로 볼지 정합니다. 치지 않은 음이나 잡음이 트리거되면 올리고, 친 음을 놓치면 내려 주세요." },
-            { "tail", "TAIL FOLLOW\n줄 소리가 잦아들 때 신스 소리도 함께 줄이는 정도입니다. 높을수록 음 끝이 빨리 사라지고, 0이면 이 기능이 꺼집니다." },
-            { "subLP", "SUB DETECT\n옥타브 다운이 음정을 읽을 때 쓰는 필터 주파수입니다. 연주하는 가장 높은 음보다 살짝 위로 두세요. 옥타브 다운이 떨리거나 튀면 내려 주세요." },
-            { "hyst", "SUB HYST\n옥타브 다운이 잡음에 흔들리지 않게 하는 여유 폭입니다. 올리면 안정적이지만, 너무 높으면 작은 소리에서 옥타브 다운이 끊깁니다." },
-            { "tone", "TONE\n클립, 폴드, 옥타브 업, DI 파형을 만들기 전에 DI의 고음을 깎는 필터입니다. 낮추면 둥글고 깔끔해지고, 높이면 거칠고 밝아집니다. 톱니파에는 영향을 주지 않습니다." },
-            { "detune", "DETUNE\n디튠 보이스가 원래 음정에서 벗어나는 정도입니다 (센트). 올릴수록 맥놀이가 빨라지고 소리가 두꺼워집니다." },
-            { "drift", "DRIFT\n디튠 보이스의 음정이 천천히 랜덤하게 흔들리는 정도입니다. 아날로그 오실레이터 같은 움직임을 줍니다." },
-            { "osc1Range", "OSC 1 RANGE\n오실레이터 1의 옥타브입니다. 16'이 연주하는 음 그대로이고, 32'은 한 옥타브 아래, 8'·4'·2'은 한·두·세 옥타브 위입니다. 모든 오실레이터는 DI 파형의 위상에서 바로 만들어져 지연이 없습니다." },
-            { "osc2Range", "OSC 2 RANGE\n오실레이터 2의 옥타브입니다. 16'이 연주하는 음 그대로이고, 32'은 한 옥타브 아래입니다." },
-            { "osc3Range", "OSC 3 RANGE\n오실레이터 3의 옥타브입니다. 기본은 32'(한 옥타브 아래)으로, 무그에서 서브 베이스를 만드는 방식 그대로 저음을 받쳐 줍니다." },
-            { "osc1Wave", "OSC 1 WAVEFORM\n파형을 고릅니다: 삼각파, 삼각-톱니, 톱니파, 사각파, 넓은 펄스, 좁은 펄스. 오른쪽으로 갈수록 소리가 얇고 날카로워집니다." },
-            { "osc2Wave", "OSC 2 WAVEFORM\n파형을 고릅니다: 삼각파, 삼각-톱니, 톱니파, 사각파, 넓은 펄스, 좁은 펄스." },
-            { "osc3Wave", "OSC 3 WAVEFORM\n파형을 고릅니다. 기본은 사각파로, 서브로 가장 흔히 쓰는 파형입니다. 더 깊고 깨끗한 서브는 삼각파입니다. 오실레이터 3은 원래 무그처럼 삼각-톱니 대신 역톱니파가 있습니다." },
-            { "osc2Semi", "OSC 2 FREQUENCY\n오실레이터 2의 음정을 옮깁니다. 가운데 근처는 아주 미세하게(센트 단위) 움직여서 디튠용이고, 끝으로 갈수록 반음 단위로 -7~+7(+7 = 5도 위)까지 갑니다. 0이 아니면 이 오실레이터는 실제 무그처럼 자유롭게 돌아서, 맥놀이가 음마다 다른 곳에서 납니다. 더블클릭하면 0으로 돌아갑니다." },
-            { "osc3Semi", "OSC 3 FREQUENCY\n오실레이터 3의 음정을 옮깁니다. 가운데 근처는 센트 단위 디튠, 끝으로 갈수록 반음 단위(-7~+7)입니다. 0이 아니면 자유롭게 돌아서 음마다 맥놀이 위치가 달라집니다." },
-            { "sawLvl", "OSC 1\n오실레이터 1 볼륨입니다. DI의 위상에서 바로 그려 연주 음정을 즉시 따라가며, 무그 베이스 소리의 중심입니다." },
-            { "osc2Lvl", "OSC 2\n오실레이터 2 볼륨입니다. 0이면 꺼집니다." },
-            { "osc3Lvl", "OSC 3\n오실레이터 3 볼륨입니다. 0이면 꺼집니다." },
-            { "cleanLvl", "EXTERNAL\n변조하지 않은 원래 DI 소리 볼륨입니다. 무그의 External Input처럼 필터와 앰프를 그대로 거칩니다. 올리면 손맛(피킹 소리)이 섞입니다." },
-            { "noiseLvl", "NOISE\n화이트 노이즈 볼륨입니다. 어택에 조금 섞으면 바람 소리 같은 숨결이 더해집니다. 노이즈도 필터와 앰프를 거칩니다." },
-            { "detLvl", "DETUNE VOICES\n위아래로 디튠된 복사본 볼륨입니다. 0이면 디튠이 꺼집니다." },
-            { "drive", "OVERLOAD\n필터 앞에서 소리를 밀어 넣는 정도입니다. 무그 믹서를 세게 밀 때처럼 두껍고 거칠어집니다." },
-            { "cutoff", "CUTOFF\n필터가 열리는 기준 주파수입니다 (50Hz~5kHz). 낮을수록 어둡고 두꺼운 소리가 납니다." },
-            { "res", "EMPHASIS\n레조넌스입니다 (0~1). 올리면 컷오프 근처가 강조되어 \"와우\" 소리가 납니다. 1에 가까우면 필터가 스스로 발진할 수 있습니다." },
-            { "envAmt", "CONTOUR AMOUNT\n필터 엔벨로프가 컷오프를 얼마나 더 여는지 정합니다 (0~6옥타브). 올릴수록 피킹할 때 \"뿌왕\" 하는 폭이 커집니다." },
-            { "keytrk", "KEY TRACK\n높은 음일수록 필터를 더 여는 정도입니다. 1이면 1옥타브 올라갈 때 필터도 1옥타브 열립니다." },
-            { "fA", "ATTACK (필터)\n피킹 후 필터가 최대로 열리기까지의 시간입니다. 길게 하면 소리가 \"와\" 하고 차오릅니다." },
-            { "fD", "DECAY (필터)\n최대로 열린 필터가 Sustain 위치까지 닫히는 시간입니다. \"뿌왕\"의 길이를 정합니다. 음이 끝난 뒤 필터가 닫히는 시간도 이 값을 따릅니다." },
-            { "fS", "SUSTAIN (필터)\n음이 유지되는 동안 필터가 머무는 위치입니다. 0이면 끝까지 닫힙니다." },
-            { "aA", "ATTACK (라우드니스)\n피킹 후 소리가 최대 크기까지 커지는 시간입니다. 베이스는 보통 최소로 둡니다." },
-            { "aD", "DECAY (라우드니스)\n최대 크기에서 Sustain 크기까지 줄어드는 시간입니다." },
-            { "aS", "SUSTAIN (라우드니스)\n음이 유지되는 동안의 크기입니다." },
-            { "aR", "RELEASE\n음이 끝난 뒤 소리가 사라지는 시간입니다." },
-            { "dyn", "DYNAMICS\n피킹 세기가 신스 음량에 반영되는 정도입니다. 0이면 항상 같은 크기로 납니다." },
-            { "outGain", "OUTPUT\n최종 출력 크기입니다 (dB)." },
-            { "dry", "DRY DI\n원래 DI 소리를 신스와 섞는 양입니다. 0이면 신스 소리만 납니다." },
-        };
-        for (const auto& [k, t] : tips)
-            if (id == k) return juce::String (juce::CharPointer_UTF8 (t));
+        if (const auto* d = bsyn::spec::find (id.toRawUTF8()))
+            return juce::String (juce::CharPointer_UTF8 (d->tip));
         return {};
+    }
+
+    juce::String utf8 (const char* t) { return juce::String (juce::CharPointer_UTF8 (t)); }
+
+    // columns per panel section (rows follow from the number of controls)
+    int columnsFor (const juce::String& section)
+    {
+        if (section == "Controllers") return 2;
+        if (section == "Oscillators") return 3;
+        if (section == "Mixer")       return 4;
+        if (section == "Filter")      return 4;
+        return 3;
     }
 
     juce::TextLayout tipLayout (const juce::String& text, float maxW)
@@ -204,39 +173,29 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
 {
     setLookAndFeel (&lnf);
 
-    auto addSection = [this] (const juce::String& title, int cols, std::initializer_list<std::pair<const char*, const char*>> items)
+    // every control comes from the parameter table, grouped by section in table order
+    for (const auto* secName : bsyn::spec::sections)
     {
-        Section s { title, cols, {}, {} };
-        for (const auto& [id, label] : items)
+        const juce::String sec (secName);
+        if (sec == "Setup")
         {
-            addKnob (id, label, false);
-            s.knobIndex.push_back ((int) knobs.size() - 1);
+            for (const auto& d : bsyn::spec::params)
+                if (sec == d.section)
+                {
+                    addControl (d, true);
+                    setupKnobs.push_back ((int) controls.size() - 1);
+                }
+            continue;
         }
+        Section s { sec, columnsFor (sec), {}, {} };
+        for (const auto& d : bsyn::spec::params)
+            if (sec == d.section)
+            {
+                addControl (d, false);
+                s.knobIndex.push_back ((int) controls.size() - 1);
+            }
         sections.push_back (std::move (s));
-    };
-
-    addSection ("Shaper", 3, { { "tone", "Tone" }, { "detune", "Detune" }, { "drift", "Drift" } });
-    addSection ("Oscillators", 4, { { "osc1Range", "Osc 1 Range" }, { "osc1Wave", "Osc 1 Wave" }, { "osc2Range", "Osc 2 Range" }, { "osc2Wave", "Osc 2 Wave" },
-                                    { "osc2Semi", "Osc 2 Freq" }, { "osc3Range", "Osc 3 Range" }, { "osc3Wave", "Osc 3 Wave" }, { "osc3Semi", "Osc 3 Freq" } });
-    addSection ("Mixer", 4, { { "sawLvl", "Osc 1" }, { "osc2Lvl", "Osc 2" }, { "osc3Lvl", "Osc 3" }, { "cleanLvl", "External" },
-                              { "noiseLvl", "Noise" }, { "detLvl", "Detune Voices" }, { "drive", "Overload" } });
-    addSection ("Filter", 4, { { "cutoff", "Cutoff" }, { "res", "Emphasis" }, { "envAmt", "Contour Amount" }, { "keytrk", "Key Track" },
-                               { "fA", "Attack" }, { "fD", "Decay" }, { "fS", "Sustain" } });
-    addSection ("Loudness", 3, { { "aA", "Attack" }, { "aD", "Decay" }, { "aS", "Sustain" },
-                                 { "aR", "Release" }, { "dyn", "Dynamics" } });
-
-    for (const auto& [id, label] : std::initializer_list<std::pair<const char*, const char*>> {
-             { "cTh", "Comp Thresh" }, { "cRat", "Comp Ratio" }, { "gate", "Gate" }, { "pickSens", "Pick Sens" },
-             { "tail", "Tail Follow" }, { "subLP", "Sub Detect" }, { "hyst", "Sub Hyst" },
-             { "inGain", "Input" }, { "outGain", "Output" }, { "dry", "Dry DI" } })
-    {
-        addKnob (id, label, true);
-        setupKnobs.push_back ((int) knobs.size() - 1);
     }
-
-    compButton.setTooltip (tipFor ("comp"));
-    addAndMakeVisible (compButton);
-    compAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, "comp", compButton);
 
     for (int i = 0; i < proc.getNumPrograms(); ++i)
         presetBox.addItem (proc.getProgramName (i), i + 1);
@@ -244,7 +203,9 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
     presetBox.onChange = [this] { proc.setCurrentProgram (presetBox.getSelectedId() - 1); };
     addAndMakeVisible (presetBox);
 
-    setSize (editorW, editorH);
+    int maxRows = 1;
+    for (auto& sct : sections) maxRows = juce::jmax (maxRows, ((int) sct.knobIndex.size() + sct.cols - 1) / sct.cols);
+    setSize (editorW, 100 + cellH * maxRows + 44 + 128);   // top strip + module rows + setup strip
     startTimerHz (30);
 }
 
@@ -254,22 +215,32 @@ BassSynthEditor::~BassSynthEditor()
     setLookAndFeel (nullptr);
 }
 
-void BassSynthEditor::addKnob (const juce::String& id, const juce::String& label, bool small)
+void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
 {
-    Knob k;
-    k.id = id; k.label = label; k.small = small;
-    k.slider = std::make_unique<juce::Slider> (juce::Slider::RotaryVerticalDrag, juce::Slider::TextBoxBelow);
-    k.slider->setRotaryParameters (juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
-    k.slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, small ? 72 : 78, 16);
-    k.slider->setMouseDragSensitivity (small ? 160 : 200);
-    k.attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.apvts, id, *k.slider);
-    if (auto* prm = proc.apvts.getParameter (id))
+    Control k;
+    k.id = d.id; k.label = utf8 (d.label); k.small = small;
+    if (d.kind == bsyn::spec::Kind::Bool)
     {
-        k.slider->setDoubleClickReturnValue (true, (double) prm->convertFrom0to1 (prm->getDefaultValue()));
-        k.slider->setTooltip (tipFor (id));
+        k.button = std::make_unique<juce::ToggleButton>();
+        k.button->setTooltip (tipFor (d.id));
+        k.buttonAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, d.id, *k.button);
+        addAndMakeVisible (*k.button);
     }
-    addAndMakeVisible (*k.slider);
-    knobs.push_back (std::move (k));
+    else
+    {
+        k.slider = std::make_unique<juce::Slider> (juce::Slider::RotaryVerticalDrag, juce::Slider::TextBoxBelow);
+        k.slider->setRotaryParameters (juce::MathConstants<float>::pi * 1.25f, juce::MathConstants<float>::pi * 2.75f, true);
+        k.slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, small ? 72 : 78, 16);
+        k.slider->setMouseDragSensitivity (small ? 160 : 200);
+        // hold Ctrl (Cmd on Mac) while dragging for fine adjustment (detuning Frequency by cents)
+        k.slider->setVelocityModeParameters (0.4, 1, 0.02, true, juce::ModifierKeys::ctrlAltCommandModifiers);
+        k.sliderAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (proc.apvts, d.id, *k.slider);
+        if (auto* prm = proc.apvts.getParameter (d.id))
+            k.slider->setDoubleClickReturnValue (true, (double) prm->convertFrom0to1 (prm->getDefaultValue()));
+        k.slider->setTooltip (tipFor (d.id));
+        addAndMakeVisible (*k.slider);
+    }
+    controls.push_back (std::move (k));
 }
 
 void BassSynthEditor::resized()
@@ -282,7 +253,9 @@ void BassSynthEditor::resized()
     presetBox.setBounds (topArea.getX() + 24 + 70, topArea.getY() + 62, 220, 24);
 
     // module row
-    auto mods = area.removeFromTop (cellH * 2 + 44).reduced (10, 0);
+    int maxRows = 1;
+    for (auto& s : sections) maxRows = juce::jmax (maxRows, ((int) s.knobIndex.size() + s.cols - 1) / s.cols);
+    auto mods = area.removeFromTop (cellH * maxRows + 44).reduced (10, 0);
     int totalCols = 0;
     for (auto& s : sections) totalCols += s.cols;
     const int spare = mods.getWidth() - totalCols * cellW;
@@ -297,11 +270,12 @@ void BassSynthEditor::resized()
         const int gridY = s.area.getY() + 36;
         for (size_t j = 0; j < s.knobIndex.size(); ++j)
         {
-            auto& k = knobs[(size_t) s.knobIndex[j]];
+            auto& k = controls[(size_t) s.knobIndex[j]];
             const int col = (int) j % s.cols, row = (int) j / s.cols;
             const juce::Rectangle<int> cell (gridX + col * cellW, gridY + row * cellH, cellW, cellH);
             k.labelArea = cell.withHeight (28);
-            k.slider->setBounds (cell.getX() + 6, cell.getY() + 28, cellW - 12, cellH - 34);
+            if (k.slider) k.slider->setBounds (cell.getX() + 6, cell.getY() + 28, cellW - 12, cellH - 34);
+            else          k.button->setBounds (cell.getX() + 14, cell.getY() + 34, cellW - 28, 56);
         }
     }
 
@@ -309,16 +283,14 @@ void BassSynthEditor::resized()
     setupArea = area.reduced (16, 0);
     const int sy = setupArea.getY() + 24;
     int sx = setupArea.getX();
-    compLabelArea = { sx, sy, smallCellW, 26 };
-    compButton.setBounds (sx + 15, sy + 30, smallCellW - 30, 48);
-    sx += smallCellW;
     for (size_t j = 0; j < setupKnobs.size(); ++j)
     {
-        if (j == 7) sx += 40; // gap before the in/out group
-        auto& k = knobs[(size_t) setupKnobs[j]];
+        auto& k = controls[(size_t) setupKnobs[j]];
+        if (k.id == "inGain") { ioGroupIndex = (int) j; sx += 40; }   // gap before the in/out group
         const juce::Rectangle<int> cell (sx, sy, smallCellW, 100);
         k.labelArea = cell.withHeight (26);
-        k.slider->setBounds (cell.getX() + 6, cell.getY() + 26, smallCellW - 12, 74);
+        if (k.slider) k.slider->setBounds (cell.getX() + 6, cell.getY() + 26, smallCellW - 12, 74);
+        else          k.button->setBounds (cell.getX() + 15, cell.getY() + 30, smallCellW - 30, 48);
         sx += smallCellW;
     }
 }
@@ -377,6 +349,8 @@ void BassSynthEditor::paint (juce::Graphics& g)
         g.drawText ("TRIG", row1.removeFromLeft (60).withTrimmedLeft (8), juce::Justification::centredLeft);
         led (row1.removeFromLeft (14), gateLed);
         g.drawText ("GATE", row1.removeFromLeft (60).withTrimmedLeft (8), juce::Justification::centredLeft);
+        led (row1.removeFromLeft (14), overloadHold > 0);
+        g.drawText ("OVERLOAD", row1.removeFromLeft (90).withTrimmedLeft (8), juce::Justification::centredLeft);
         juce::String note = "--";
         if (freq > 0.0f)
         {
@@ -414,14 +388,13 @@ void BassSynthEditor::paint (juce::Graphics& g)
         }
     }
 
-    // knob labels
-    for (const auto& k : knobs)
+    // control labels
+    for (const auto& k : controls)
     {
         g.setColour (C::silk);
         g.setFont (panelFont (k.small ? 10.0f : 10.5f, true, 0.1f));
         g.drawFittedText (k.label.toUpperCase(), k.labelArea, juce::Justification::centredBottom, 2);
     }
-    g.drawFittedText ("COMP", compLabelArea, juce::Justification::centredBottom, 1);
 
     // setup strip
     g.setColour (juce::Colour (0xff2a2825));
@@ -429,9 +402,9 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.setColour (C::silkDim);
     g.setFont (panelFont (10.5f, true, 0.3f));
     g.drawText ("SETUP", setupArea.getX(), setupArea.getY() + 4, 200, 16, juce::Justification::left);
-    if (setupKnobs.size() > 7)
+    if (ioGroupIndex >= 0)
     {
-        const auto& first = knobs[(size_t) setupKnobs[7]];
+        const auto& first = controls[(size_t) setupKnobs[(size_t) ioGroupIndex]];
         g.drawText ("IN / OUT", first.labelArea.getX(), setupArea.getY() + 4, 200, 16, juce::Justification::left);
     }
 }
@@ -443,5 +416,6 @@ void BassSynthEditor::timerCallback()
     else if (trigFlash > 0) --trigFlash;
     gateLed = proc.displayGate.load();
     freq = proc.displayFreq.load();
+    if (proc.displayInput.load() > 0.9f) overloadHold = 8; else if (overloadHold > 0) --overloadHold;
     repaint (displayArea);
 }

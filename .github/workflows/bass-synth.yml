@@ -2,8 +2,11 @@ name: Build Bass Ladder Synth (Windows VST3)
 
 on:
   push:
-    branches: [ bass-synth ]
+    branches: [ bass-synth, 'ui/**' ]
     paths: [ 'BassSynth/**', '.github/workflows/bass-synth.yml' ]
+  pull_request:
+    branches: [ bass-synth ]
+    paths: [ 'BassSynth/**' ]
   workflow_dispatch:
 
 jobs:
