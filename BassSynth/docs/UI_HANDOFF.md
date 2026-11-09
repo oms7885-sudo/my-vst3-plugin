@@ -10,6 +10,21 @@ Two people/tools work on this plugin in the same repository:
 Keep to your own files so changes never collide. If the UI needs something from the engine
 (a new meter, a new value), ask for it instead of editing engine files.
 
+## Two rules for the UI (so later engine updates need no UI work)
+
+1. **Start every UI task from the latest `bass-synth`.** Before starting, update your `ui/...` branch
+   from `bass-synth` (create a fresh branch from it, or merge `bass-synth` into yours). A UI branch
+   cut from an old commit would silently drop engine updates when merged.
+2. **Draw every parameter in the table, even ones the design has no place for.** Any row of
+   `bsyn::spec::params` that the designed panel does not place by id must still appear
+   automatically, in an "extra" area, using its `kind`, `label` and `tip`: a knob for `Float` and
+   `Choice`, a switch for `Bool`. Then when the engine adds a parameter, it shows up in the next build
+   without any UI change; giving it a proper place in the design can wait. Likewise, a placed id
+   that no longer exists in the table must simply be skipped, never crash.
+
+The UI must never hard-code ranges, defaults or option lists: read them from the table or the host
+parameter, so engine-side changes to them need no UI change either.
+
 ## Branches and builds
 
 - Engine work lands on `bass-synth`.
