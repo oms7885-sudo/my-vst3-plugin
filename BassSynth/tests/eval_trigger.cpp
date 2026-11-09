@@ -146,7 +146,8 @@ int main (int argc, char** argv)
           if (f) { std::fprintf (f, "# sr %.0f block %d\n", sr, BL);
                    for (auto& e : gt) std::fprintf (f, "%.5f %.5f %d %s %s\n", e.on, e.off, e.pitch, e.ps.c_str(), e.es.c_str()); std::fclose (f); } }
 
-        // match: each annotated start takes the nearest unused trigger from 15 ms before to 60 ms after
+        // match: each annotated start takes the nearest unused trigger from 45 ms before to 60 ms after
+        // (the annotations mark where the tone starts; the finger or pick touches the string up to ~40 ms earlier)
         Stat s; std::vector<char> used (trig.size(), 0);
         for (size_t k = 0; k < gt.size(); ++k)
         {
@@ -156,7 +157,7 @@ int main (int argc, char** argv)
             for (size_t j = 0; j < trig.size(); ++j)
             {
                 const double d = (double) trig[j] - on;
-                if (used[j] || d < -0.015 * sr || d > 0.06 * sr) continue;
+                if (used[j] || d < -0.045 * sr || d > 0.06 * sr) continue;
                 if (std::abs (d) < bd) { bd = std::abs (d); best = (int) j; }
             }
             Stat& grp = ioi < 150.0 ? fast : slow;

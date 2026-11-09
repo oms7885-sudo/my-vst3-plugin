@@ -162,8 +162,8 @@ public:
         eS += (eF - eS) * (eF > eS ? sA_ : sR_);
 
         // ---- note detector (on the uncompressed signal) ----
-        // peak of |x| over about one cycle of the current note; a note starts when that peak
-        // jumps above the lowest peak of the previous ~40 ms (catches short damped gaps at once)
+        // peak of |x| over the last 28 ms; a note starts when that peak jumps above the lowest peak of
+        // the previous ~40 ms. Settings checked against 17 annotated real bass lines (tests/eval_trigger.cpp)
         const double hp0 = hpA * (h0Y + x0 - h0X); h0X = x0; h0Y = hp0;
         {
             const double a0 = std::abs (hp0);
@@ -171,7 +171,10 @@ public:
             if (++bc >= BL)
             {
                 bc = 0;
-                PW = std::min (28, std::max (6, (int) std::ceil (1.15 * per / BL)));
+                // the window always spans the longest period a bass plays (28 ms). Sizing it from the
+                // measured period failed on real recordings: the period detector often locks to the 2nd
+                // harmonic, the window then covers half a cycle, and the level seems to jump on every cycle
+                PW = 28;
                 bm[bi & 63] = (float) cbm; cbm = 0;
                 double P_ = 0;
                 for (int q = 0; q < PW; ++q) P_ = std::max (P_, (double) bm[(bi - q) & 63]);
@@ -203,8 +206,8 @@ public:
         // the previous note has clearly died away, it is at least 70 ms old, and the new level is
         // close to that note's own peak (so damping noise and small bounces don't count)
         const bool fastPick = decayed && i - lastOn > fastGap && Pn > (1 + (p.pickSens - 1) * 0.5) * Mn
-                              && Pn > 0.6 * notePkP && Pn > std::max (thr * 1.5, pkP * 0.15);
-        if (upgrade || fastPick || (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.15) && i - lastOn > hold)) { onset = true; gateOn = true; }
+                              && Pn > 0.6 * notePkP && Pn > std::max (thr * 1.5, pkP * 0.25);
+        if (upgrade || fastPick || (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.25) && i - lastOn > hold)) { onset = true; gateOn = true; }
         else if (gateOn && Pn < std::max (thr, notePkP * 0.12)) { gateOn = false; fs = 3; as = 3; }
         if (onset)
         {
