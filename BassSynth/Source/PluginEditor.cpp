@@ -1049,6 +1049,9 @@ namespace
 
     constexpr int controllerDivider = 248, oscillatorDivider = 594, modifierDivider = 924, outputDivider = 1258;
     constexpr int envelopeDivider = 320;
+    constexpr int oscillatorRangeX = 344, oscillatorFrequencyX = 444, oscillatorWaveformX = 544;
+    constexpr int controllerLeftX = 99, controllerRightX = 201, controllerRowY = 265;
+    constexpr int oscillatorRow (int index) { return 90 + 119 * index; }
 
     bool bridgesDivider (const juce::String& id)
     {
@@ -1062,14 +1065,17 @@ namespace
 
     struct Placement { const char* id; int x, y; };
     constexpr Placement mainControls[] {
-        { "modAmt", 87, 151 }, { "modMix", 180, 151 }, { "filterMod", modifierDivider, 115 },
-        { "osc1Range", 344, 91 }, { "osc1Wave", 544, 91 },
-        { "osc2Range", 344, 209 }, { "osc2Freq", 444, 209 }, { "osc2Wave", 544, 209 },
-        { "osc3Range", 344, 348 }, { "osc3Freq", 444, 348 }, { "osc3Wave", 544, 348 },
-        { "osc3Ctl", 274, 382 },
-        { "osc1Lvl", 649, 91 }, { "osc1On", 730, 119 },
-        { "osc2Lvl", 649, 215 }, { "osc2On", 730, 243 },
-        { "osc3Lvl", 649, 339 }, { "osc3On", 730, 367 },
+        { "modAmt", controllerLeftX, controllerRowY }, { "modMix", controllerRightX, controllerRowY },
+        { "filterMod", modifierDivider, 115 },
+        { "osc1Range", oscillatorRangeX, oscillatorRow (0) }, { "osc1Wave", oscillatorWaveformX, oscillatorRow (0) },
+        { "osc2Range", oscillatorRangeX, oscillatorRow (1) }, { "osc2Freq", oscillatorFrequencyX, oscillatorRow (1) },
+        { "osc2Wave", oscillatorWaveformX, oscillatorRow (1) },
+        { "osc3Range", oscillatorRangeX, oscillatorRow (2) }, { "osc3Freq", oscillatorFrequencyX, oscillatorRow (2) },
+        { "osc3Wave", oscillatorWaveformX, oscillatorRow (2) },
+        { "osc3Ctl", 274, oscillatorRow (2) + 10 },
+        { "osc1Lvl", 649, oscillatorRow (0) }, { "osc1On", 730, oscillatorRow (0) + 31 },
+        { "osc2Lvl", 649, oscillatorRow (1) }, { "osc2On", 730, oscillatorRow (1) + 31 },
+        { "osc3Lvl", 649, oscillatorRow (2) }, { "osc3On", 730, oscillatorRow (2) + 31 },
         { "extLvl", 805, 151 }, { "extOn", 730, 181 },
         { "noiseLvl", 805, 275 }, { "noiseOn", 730, 305 }, { "noisePink", 873, 391 },
         { "cutoff", 1000, 91 }, { "res", 1104, 91 }, { "envAmt", 1206, 91 },
@@ -1520,6 +1526,15 @@ void PanelLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text,
     tl.draw (g, r.reduced (12.0f, 9.0f));
 }
 
+juce::Slider::SliderLayout PanelLookAndFeel::getSliderLayout (juce::Slider& slider)
+{
+    auto layout = juce::LookAndFeel_V4::getSliderLayout (slider);
+    const auto id = slider.getComponentID();
+    if (id.startsWith ("osc") && (id.endsWith ("Range") || id.endsWith ("Freq") || id.endsWith ("Wave")))
+        layout.textBoxBounds.translate (0, -12);
+    return layout;
+}
+
 juce::Label* PanelLookAndFeel::createSliderTextBox (juce::Slider& s)
 {
     auto* l = LookAndFeel_V4::createSliderTextBox (s);
@@ -1582,6 +1597,7 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
     Control k;
     k.id = d.id; k.label = utf8 (d.label); k.small = small;
     if (k.id == "noisePink") k.label = "White / Pink";
+    if (k.id == "osc3Ctl") k.label = "Osc. 3\nControl";
     if (d.kind == bsyn::spec::Kind::Bool)
     {
         k.button = std::make_unique<juce::ToggleButton>();
@@ -1631,7 +1647,7 @@ void BassSynthEditor::applyTheme (int selected)
 void BassSynthEditor::resized()
 {
     panelArea = { cheekW, 64, getWidth() - 2 * cheekW, 465 };
-    displayArea = { 47, 334, 174, 130 };
+    displayArea = { (controllerLeftX + controllerRightX - 174) / 2, 104, 174, 130 };
     overloadArea = { 786, 97, 100, 44 };
     setupArea = { 47, 550, 1060, getHeight() - 570 };
     badgeArea = { 1140, 565, 202, 78 };
@@ -1656,7 +1672,7 @@ void BassSynthEditor::resized()
         else if (mixerOnSwitch (k.id))
             k.labelArea = { x - 24, y + 38, 48, 15 };
         else if (k.id == "osc3Ctl")
-            k.labelArea = { x - 23, y - 12, 46, 28 };
+            k.labelArea = { x - 24, y - 13, 48, 29 };
 
         if (k.id == "osc3Ctl" || k.id == "noisePink")
             k.button->setBounds (x - 13, y + 17, 26, 45);
@@ -1720,10 +1736,10 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.setFont (panelFont (28.0f));
     for (const auto& caption : captions)
         g.drawFittedText (caption.text, caption.area.reduced (4, 0), juce::Justification::centred, 1);
-    const int oscillatorTitleY[] { 66, 187, 326 };
     g.setFont (panelFont (17.0f));
-    for (int i = 0; i < (int) std::size (oscillatorTitleY); ++i)
-        g.drawText ("OSCILLATOR " + juce::String (i + 1), juce::Rectangle<int> { 263, oscillatorTitleY[i], 318, 20 },
+    for (int i = 0; i < 3; ++i)
+        g.drawText ("OSCILLATOR " + juce::String (i + 1),
+                    juce::Rectangle<int> { oscillatorFrequencyX - 100, oscillatorRow (i) - 16, 200, 19 },
                     juce::Justification::centred);
 
     {
@@ -1779,15 +1795,16 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.fillRoundedRectangle (displayArea.toFloat(), 4.0f);
     g.setColour (rule);
     g.drawRoundedRectangle (displayArea.toFloat(), 4.0f, 1.0f);
-    led (64, 352, trigFlash > 0);
-    led (140, 352, gateLed);
+    const int displayX = displayArea.getX(), displayY = displayArea.getY();
+    led (displayX + 17, displayY + 18, trigFlash > 0);
+    led (displayX + 93, displayY + 18, gateLed);
     led (overloadArea.getCentreX(), overloadArea.getY() + 11, overloadHold > 0);
     g.setFont (panelFont (9.0f));
     g.setColour (ink);
     g.drawText ("OVERLOAD", overloadArea.withTrimmedTop (19).withHeight (15), juce::Justification::centred);
     g.setColour (C::silk);
-    g.drawText ("TRIG", juce::Rectangle<int> { 75, 344, 40, 16 }, juce::Justification::centredLeft);
-    g.drawText ("GATE", juce::Rectangle<int> { 151, 344, 50, 16 }, juce::Justification::centredLeft);
+    g.drawText ("TRIG", juce::Rectangle<int> { displayX + 28, displayY + 10, 40, 16 }, juce::Justification::centredLeft);
+    g.drawText ("GATE", juce::Rectangle<int> { displayX + 104, displayY + 10, 50, 16 }, juce::Justification::centredLeft);
 
     juce::String note = "--";
     if (freq > 0.0f)
@@ -1799,20 +1816,20 @@ void BassSynthEditor::paint (juce::Graphics& g)
     }
     g.setColour (C::amber);
     g.setFont (monoFont (16.0f));
-    g.drawText (note, juce::Rectangle<int> { 58, 369, 146, 26 }, juce::Justification::centred);
+    g.drawText (note, juce::Rectangle<int> { displayX + 11, displayY + 35, 146, 26 }, juce::Justification::centred);
     const auto meter = [&] (const char* label, int y, float value)
     {
         g.setFont (panelFont (8.5f));
         g.setColour (C::silk);
-        g.drawText (label, juce::Rectangle<int> { 57, y, 40, 13 }, juce::Justification::centredLeft);
+        g.drawText (label, juce::Rectangle<int> { displayX + 10, displayY + y, 40, 13 }, juce::Justification::centredLeft);
         g.setColour (juce::Colour (0xff4a3b25));
-        g.fillRect (99, y + 5, 101, 3);
+        g.fillRect (displayX + 52, displayY + y + 5, 101, 3);
         g.setColour (C::amber);
-        g.fillRect (99, y + 5, juce::roundToInt (101.0f * juce::jlimit (0.0f, 1.0f, value)), 3);
+        g.fillRect (displayX + 52, displayY + y + 5, juce::roundToInt (101.0f * juce::jlimit (0.0f, 1.0f, value)), 3);
     };
-    meter ("INPUT", 399, input);
-    meter ("FILTER", 418, filterEnv);
-    meter ("AMP", 437, ampEnv);
+    meter ("INPUT", 65, input);
+    meter ("FILTER", 84, filterEnv);
+    meter ("AMP", 103, ampEnv);
 }
 
 void BassSynthEditor::timerCallback()
