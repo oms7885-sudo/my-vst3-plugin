@@ -5,7 +5,8 @@ namespace
 {
     struct FloatDef { const char* id; const char* name; float min, max, def, centre; const char* label; };
 
-    // centre > 0 = logarithmic-feel knob with that value at 12 o'clock
+    // centre > 0 = logarithmic-feel knob with that value at 12 o'clock;
+    // centre < 0 = fine-around-zero knob (cubic): the middle third covers about +-26 cents, the ends whole semitones
     const FloatDef floatDefs[] = {
         // setup
         { "inGain",   "Input Gain",        -24.0f, 24.0f,  5.0f,   0.0f,   "dB" },
@@ -18,22 +19,17 @@ namespace
         { "hyst",     "Sub Hysteresis",      0.0f,  0.5f,  0.15f,  0.0f,   "" },
         // shaper
         { "tone",     "Tone",               60.0f, 2000.0f, 250.0f, 300.0f, "Hz" },
-        { "shapeAmt", "Clip Drive",          0.0f,  1.0f,  0.7f,   0.0f,   "" },
-        { "foldAmt",  "Fold Depth",          0.0f,  1.0f,  0.4f,   0.0f,   "" },
         { "detune",   "Detune",              0.0f, 25.0f,  7.0f,   0.0f,   "ct" },
         { "drift",    "Drift",               0.0f, 10.0f,  2.0f,   0.0f,   "ct" },
         // mixer
         // oscillators (levels; range and waveform are choice parameters below)
         { "sawLvl",   "Osc 1 Level",         0.0f,  1.0f,  0.8f,   0.0f,   "" },
         { "osc2Lvl",  "Osc 2 Level",         0.0f,  1.0f,  0.0f,   0.0f,   "" },
-        { "osc3Lvl",  "Osc 3 Level",         0.0f,  1.0f,  0.0f,   0.0f,   "" },
-        { "osc2Semi", "Osc 2 Frequency",    -7.0f,  7.0f,  0.0f,   0.0f,   "st" },
-        { "osc3Semi", "Osc 3 Frequency",    -7.0f,  7.0f,  0.0f,   0.0f,   "st" },
-        { "satLvl",   "Clip Level",          0.0f,  1.0f,  0.4f,   0.0f,   "" },
-        { "foldLvl",  "Fold Level",          0.0f,  1.0f,  0.0f,   0.0f,   "" },
-        { "subLvl",   "Sub Octave",          0.0f,  1.0f,  0.5f,   0.0f,   "" },
-        { "upLvl",    "Octave Up",           0.0f,  1.0f,  0.0f,   0.0f,   "" },
-        { "cleanLvl", "DI Waveform",         0.0f,  1.0f,  0.0f,   0.0f,   "" },
+        { "osc3Lvl",  "Osc 3 Level",         0.0f,  1.0f,  0.5f,   0.0f,   "" },
+        { "osc2Semi", "Osc 2 Frequency",    -7.0f,  7.0f,  0.0f,  -1.0f,   "st" },
+        { "osc3Semi", "Osc 3 Frequency",    -7.0f,  7.0f,  0.0f,  -1.0f,   "st" },
+        { "cleanLvl", "External (DI)",       0.0f,  1.0f,  0.0f,   0.0f,   "" },
+        { "noiseLvl", "Noise",               0.0f,  1.0f,  0.0f,   0.0f,   "" },
         { "detLvl",   "Detune Voices",       0.0f,  1.0f,  0.35f,  0.0f,   "" },
         { "drive",    "Overload",            0.0f,  1.0f,  0.45f,  0.0f,   "" },
         // filter
@@ -60,7 +56,7 @@ namespace
     const ChoiceDef choiceDefs[] = {
         { "osc1Range", "Osc 1 Range", 1, false }, { "osc1Wave", "Osc 1 Waveform", 2, false },
         { "osc2Range", "Osc 2 Range", 1, false }, { "osc2Wave", "Osc 2 Waveform", 2, false },
-        { "osc3Range", "Osc 3 Range", 0, true  }, { "osc3Wave", "Osc 3 Waveform", 2, true  },
+        { "osc3Range", "Osc 3 Range", 0, true  }, { "osc3Wave", "Osc 3 Waveform", 3, true  },
     };
     juce::StringArray choicesFor (const ChoiceDef& d)
     {
@@ -78,14 +74,14 @@ namespace
     {
         static const std::vector<Preset> p = {
             { "Model D Bass", {} },
-            { "Punch Sub",    { { "satLvl", 0.4f }, { "subLvl", 1.0f }, { "foldLvl", 0.0f }, { "sawLvl", 0.4f }, { "cutoff", 120.0f }, { "res", 0.15f },
+            { "Punch Sub",    { { "sawLvl", 0.4f }, { "osc3Lvl", 1.0f }, { "osc3Wave", 3.0f }, { "cutoff", 120.0f }, { "res", 0.15f },
                                 { "envAmt", 2.2f }, { "fD", 180.0f }, { "fS", 0.0f }, { "drive", 0.3f } } },
             { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.72f }, { "envAmt", 4.6f }, { "fD", 420.0f }, { "fS", 0.05f },
-                                { "drive", 0.6f }, { "sawLvl", 0.9f }, { "subLvl", 0.3f } } },
-            { "Fuzz Octave",  { { "sawLvl", 0.3f }, { "shapeAmt", 1.0f }, { "satLvl", 0.7f }, { "foldLvl", 0.6f }, { "foldAmt", 0.7f }, { "subLvl", 0.5f },
-                                { "upLvl", 0.4f }, { "cutoff", 700.0f }, { "envAmt", 2.0f }, { "res", 0.2f }, { "drive", 0.7f } } },
+                                { "drive", 0.6f }, { "sawLvl", 0.9f }, { "osc3Lvl", 0.3f } } },
+            { "Fat Detune",   { { "sawLvl", 0.7f }, { "osc2Lvl", 0.7f }, { "osc2Semi", 0.06f }, { "osc3Lvl", 0.6f }, { "osc3Semi", -0.05f },
+                                { "detLvl", 0.0f }, { "cutoff", 260.0f }, { "envAmt", 2.4f }, { "res", 0.2f }, { "drive", 0.6f } } },
             // fitted to the target stem (Change - "Change of Heart") from change_rec.wav
-            { "Heart Bass",   { { "cutoff", 377.0f }, { "res", 0.0469f }, { "envAmt", 0.67f }, { "keytrk", 0.0141f }, { "fA", 2.49f }, { "fD", 38.5f }, { "fS", 0.478f }, { "aA", 2.65f }, { "aD", 200.0f }, { "aS", 0.529f }, { "aR", 499.0f }, { "sawLvl", 0.517f }, { "satLvl", 0.151f }, { "subLvl", 0.863f }, { "foldLvl", 0.873f }, { "upLvl", 0.0874f }, { "detLvl", 0.172f }, { "detune", 10.9f }, { "drive", 0.378f }, { "tone", 527.0f }, { "shapeAmt", 0.849f }, { "dyn", 0.0114f }, { "osc1Range", 0.0f }, { "osc1Wave", 3.0f }, { "osc2Range", 1.0f }, { "osc2Wave", 2.0f }, { "osc2Lvl", 0.395f }, { "osc3Range", 0.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.0562f }, { "osc3Semi", 0.0245f } } },
+            { "Heart Bass",   { { "cutoff", 337.5351f }, { "res", 0.0194f }, { "envAmt", 0.93f }, { "keytrk", 0.311f }, { "fA", 0.682f }, { "fD", 49.4479f }, { "fS", 0.3158f }, { "aA", 1.3196f }, { "aD", 422.6434f }, { "aS", 0.5517f }, { "aR", 455.9858f }, { "sawLvl", 0.4285f }, { "detLvl", 0.222f }, { "detune", 10.7943f }, { "drive", 0.4611f }, { "tone", 335.9893f }, { "dyn", 0.2615f }, { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc2Range", 2.0f }, { "osc2Wave", 2.0f }, { "osc2Lvl", 0.4288f }, { "osc3Range", 0.0f }, { "osc3Wave", 4.0f }, { "osc3Lvl", 0.3034f }, { "osc3Semi", 0.002f }, { "osc2Semi", -0.0903f } } },
         };
         return p;
     }
@@ -108,6 +104,28 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
         NormalisableRange<float> range (d.min, d.max);
         if (d.centre > 0.0f) range.setSkewForCentre (d.centre);
         const String unit (d.label);
+        if (d.centre < 0.0f)
+        {
+            const float mx = d.max;
+            NormalisableRange<float> fine (d.min, d.max,
+                [mx] (float, float, float x) { const float s = 2.0f * x - 1.0f; return mx * s * s * s; },
+                [mx] (float, float, float v) { return 0.5f * (std::cbrt (v / mx) + 1.0f); });
+            auto fineText = [] (float v, int)
+            {
+                if (std::abs (v) < 1.0f)
+                    return (v >= 0.0f ? "+" : "") + String (roundToInt (v * 100.0f)) + " ct";
+                return (v >= 0.0f ? "+" : "") + String (v, 2) + " st";
+            };
+            auto fineValue = [] (const String& t)
+            {
+                const float v = t.retainCharacters ("+-.0123456789").getFloatValue();
+                return t.containsIgnoreCase ("ct") ? v / 100.0f : v;
+            };
+            p.push_back (std::make_unique<AudioParameterFloat> (ParameterID { d.id, 1 }, d.name, fine, d.def,
+                             AudioParameterFloatAttributes().withStringFromValueFunction (fineText)
+                                                            .withValueFromStringFunction (fineValue)));
+            continue;
+        }
         auto toText = [unit] (float v, int)
         {
             const float a = std::abs (v);
@@ -132,14 +150,14 @@ bsyn::Params BassSynthProcessor::readParams() const
     p.comp = f ("comp") > 0.5f; p.cTh = f ("cTh"); p.cRat = f ("cRat");
     p.gateDb = f ("gate"); p.pickSens = f ("pickSens"); p.tail = f ("tail");
     p.subLP = f ("subLP"); p.hyst = f ("hyst");
-    p.tone = f ("tone"); p.shapeAmt = f ("shapeAmt"); p.foldAmt = f ("foldAmt");
+    p.tone = f ("tone");
     p.detune = f ("detune"); p.drift = f ("drift");
     p.sawLvl = f ("sawLvl"); p.osc2Lvl = f ("osc2Lvl"); p.osc3Lvl = f ("osc3Lvl");
     p.osc2Semi = f ("osc2Semi"); p.osc3Semi = f ("osc3Semi");
     p.osc1Range = (int) f ("osc1Range"); p.osc1Wave = (int) f ("osc1Wave");
     p.osc2Range = (int) f ("osc2Range"); p.osc2Wave = (int) f ("osc2Wave");
-    p.osc3Range = (int) f ("osc3Range"); p.osc3Wave = (int) f ("osc3Wave"); p.satLvl = f ("satLvl"); p.foldLvl = f ("foldLvl"); p.subLvl = f ("subLvl"); p.upLvl = f ("upLvl");
-    p.cleanLvl = f ("cleanLvl"); p.detLvl = f ("detLvl"); p.drive = f ("drive");
+    p.osc3Range = (int) f ("osc3Range"); p.osc3Wave = (int) f ("osc3Wave"); 
+    p.cleanLvl = f ("cleanLvl"); p.noiseLvl = f ("noiseLvl"); p.detLvl = f ("detLvl"); p.drive = f ("drive");
     p.cutoff = f ("cutoff"); p.res = f ("res"); p.envAmt = f ("envAmt"); p.keytrk = f ("keytrk");
     p.fA = f ("fA"); p.fD = f ("fD"); p.fS = f ("fS");
     p.aA = f ("aA"); p.aD = f ("aD"); p.aS = f ("aS"); p.aR = f ("aR"); p.dyn = f ("dyn");

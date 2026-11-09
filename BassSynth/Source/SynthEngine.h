@@ -32,10 +32,11 @@ struct Params
     // oscillator bank (Model D style). Range: 0 = 32', 1 = 16' (the note you play), 2 = 8', 3 = 4', 4 = 2'.
     // Wave: 0 triangle, 1 triangle-saw (osc 3: reverse saw), 2 saw, 3 square, 4 wide pulse, 5 narrow pulse.
     // sawLvl is the Osc 1 volume (kept under its old name so saved projects still load).
-    int   osc1Range = 1, osc1Wave = 2, osc2Range = 1, osc2Wave = 2, osc3Range = 0, osc3Wave = 2;
-    float osc2Semi = 0.0f, osc3Semi = 0.0f;   // Frequency offset in semitones (-7..+7)
-    float osc2Lvl = 0.0f, osc3Lvl = 0.0f;
-    float sawLvl = 0.8f, satLvl = 0.4f, foldLvl = 0.0f, subLvl = 0.5f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.35f;
+    int   osc1Range = 1, osc1Wave = 2, osc2Range = 1, osc2Wave = 2, osc3Range = 0, osc3Wave = 3;
+    float osc2Semi = 0.0f, osc3Semi = 0.0f;   // Frequency offset in semitones (-7..+7); osc runs free when non-zero
+    float osc2Lvl = 0.0f, osc3Lvl = 0.5f, noiseLvl = 0.0f;
+    // satLvl/foldLvl/subLvl/upLvl: the old DI-shaping sources, no longer on the panel (kept at 0)
+    float sawLvl = 0.8f, satLvl = 0.0f, foldLvl = 0.0f, subLvl = 0.0f, upLvl = 0.0f, cleanLvl = 0.0f, detLvl = 0.35f;
     float drive = 0.45f;
     // filter
     float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f, keytrk = 0.5f;
@@ -64,7 +65,7 @@ public:
         pkR = std::exp (-1.0 / (3.0 * sr));
         BL = std::max (1, (int) std::lround (0.001 * sr));
         openN = (int) std::lround (0.0015 * sr);
-        hold = 0.05 * sr; velA = 1 - std::exp (-1.0 / (0.003 * sr));
+        hold = 0.05 * sr; fastGap = 0.07 * sr; velA = 1 - std::exp (-1.0 / (0.003 * sr));
         upA = k (0.008);
         ktA = k (0.03);
         lpCoef (250.0, cs);
@@ -82,7 +83,7 @@ public:
         std::fill (std::begin (hs1), std::end (hs1), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
         hpY = hpX = cEnv = agc = agd = eF = eS = 0;
-        gateOn = false; lastOn = -1e9; pk = notePk = 0; tfS = 1; onP = 0; vel = velS = 1;
+        gateOn = false; lastOn = -1e9; pk = notePk = 0; tfS = 1; onP = 0; vel = velS = 1; runMax = 0; decayed = false;
         h0X = h0Y = 0; cbm = 0; bc = 0; bi = 0; PW = 13; pkP = notePkP = 0;
         std::fill (std::begin (bm), std::end (bm), 0.0f);
         std::fill (std::begin (phb), std::end (phb), 0.0f);
@@ -165,6 +166,8 @@ public:
                 for (int q = 0; q < PW; ++q) P_ = std::max (P_, (double) bm[(bi - q) & 63]);
                 phb[bi & 63] = (float) P_;
                 ++bi;
+                // has the current note clearly died away since its peak?
+                if (P_ > runMax) runMax = P_; else if (P_ < 0.7 * runMax) decayed = true;
             }
         }
         double Pn = cbm;
@@ -184,11 +187,17 @@ public:
         // jumps well above the click inside the hold time, restart the note right there (on the beat)
         const bool upgrade = gateOn && i - lastOn <= hold && i - lastOn > 15 * BL
                              && Pn > 2.5 * std::max (onP, (double) phb[(bi - 10) & 63]) && Pn > pkP * 0.3;
-        if (upgrade || (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.15) && i - lastOn > hold)) { onset = true; gateOn = true; }
+        // fast playing: a re-pick on a ringing string only lifts the level by about as much as the last
+        // note had decayed (often 1.5-2x at 16ths). Accept a smaller jump (1.5x at Pick Sens 2) when
+        // the previous note has clearly died away, it is at least 70 ms old, and the new level is
+        // close to that note's own peak (so damping noise and small bounces don't count)
+        const bool fastPick = decayed && i - lastOn > fastGap && Pn > (1 + (p.pickSens - 1) * 0.5) * Mn
+                              && Pn > 0.6 * notePkP && Pn > std::max (thr * 1.5, pkP * 0.15);
+        if (upgrade || fastPick || (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.15) && i - lastOn > hold)) { onset = true; gateOn = true; }
         else if (gateOn && Pn < std::max (thr, notePkP * 0.12)) { gateOn = false; fs = 3; as = 3; }
         if (onset)
         {
-            notePk = eF; notePkP = Pn; lastOn = (double) i; fs = 1; as = 1; onP = Pn;
+            notePk = eF; notePkP = Pn; lastOn = (double) i; fs = 1; as = 1; onP = Pn; runMax = Pn; decayed = false;
             refOn = upgrade ? refOn : refP;
         }
 
@@ -220,16 +229,17 @@ public:
 
         // ---- oscillator bank: every oscillator is drawn from the DI's own phase (no pitch tracking) ----
         const double gAmp = std::min (1.0, agd * 40.0);
-        const double o1 = oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, ph, dt, 0.0, acc[0], onset));
-        const double o2 = p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, ph, dt, p.osc2Semi, acc[1], onset)) : 0.0;
-        const double o3 = p.osc3Lvl > 0 ? oscWave (p.osc3Wave, true,  oscPhase (p.osc3Range, ph, dt, p.osc3Semi, acc[2], onset)) : 0.0;
+        const double o1 = oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, ph, dt, 0.0, acc[0]));
+        const double o2 = p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, ph, dt, p.osc2Semi, acc[1])) : 0.0;
+        const double o3 = p.osc3Lvl > 0 ? oscWave (p.osc3Wave, true,  oscPhase (p.osc3Range, ph, dt, p.osc3Semi, acc[2])) : 0.0;
         if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
         const double sub = subv * std::abs (sat);       // octave down
         const double ra = std::abs (sat); upM += (ra - upM) * upA;
         const double up = (ra - upM) * 2.0;             // octave up
         const double cln = th (yn * 0.9);               // the DI waveform itself
+        const double nz = p.noiseLvl > 0 ? rnd() * 0.6 : 0.0;   // white noise (Model D mixer)
         double m = (p.satLvl * sat + p.foldLvl * fold + p.subLvl * sub + p.upLvl * up + p.cleanLvl * cln
-                    + (p.sawLvl * o1 + p.osc2Lvl * o2 + p.osc3Lvl * o3) * gAmp) * 0.55;
+                    + (p.sawLvl * o1 + p.osc2Lvl * o2 + p.osc3Lvl * o3 + p.noiseLvl * nz) * gAmp) * 0.55;
 
         // detune voices: the modulated DI frequency-shifted up and down (no delay, so no flam)
         if (wX > 0)
@@ -324,8 +334,9 @@ private:
     struct OscPh { double t, dt; };
 
     // phase of one oscillator: range shifts the DI's phase by octaves; a Frequency offset runs a phase
-    // accumulator at the DI's rate times the interval, re-aligned to the DI on every pick
-    OscPh oscPhase (int range, double ph, double dt, float semi, double& accum, bool onset) const
+    // accumulator at the DI's rate times the interval and runs free (like a real Moog), so the beating
+    // lands somewhere different on every note
+    OscPh oscPhase (int range, double ph, double dt, float semi, double& accum) const
     {
         const int o = std::clamp (range, 0, 4) - 1;               // -1 (32') .. +3 (2')
         double t, d;
@@ -333,7 +344,6 @@ private:
         else       { const double mul = (double) (1 << o); t = ph * mul; t -= std::floor (t); d = dt * mul; }
         if (std::abs (semi) < 1e-3) { accum = t; return { t, d }; }
         const double ratio = std::pow (2.0, semi / 12.0);
-        if (onset) accum = t;
         accum += d * ratio; accum -= std::floor (accum);
         return { accum, std::min (d * ratio, 0.1) };
     }
@@ -405,7 +415,7 @@ private:
     double hs1[32] {}, hs2[32] {}; double hD1 = 0, hD2 = 0, phP = 0, ktf = 110, thU = 0, thD = 0;
     float eh[4096] {};
     double hpY = 0, hpX = 0, cEnv = 0, agc = 0, agd = 0, eF = 0, eS = 0;
-    double onP = 0, vel = 1, velS = 1, refOn = 0;
+    double onP = 0, vel = 1, velS = 1, refOn = 0, runMax = 0, fastGap = 3087; bool decayed = false;
     bool gateOn = false; double lastOn = -1e9, pk = 0, notePk = 0; double tfS = 1;
     double h0X = 0, h0Y = 0, cbm = 0, pkP = 0, notePkP = 0; int bc = 0, BL = 44, PW = 13; int64_t bi = 0;
     float bm[64] {}, phb[64] {};
