@@ -4,13 +4,12 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "PluginProcessor.h"
 
-// Baseline panel: built entirely from Parameters.h (sections, labels, Korean tooltips), so every
-// engine parameter shows up even before a designed UI replaces this file. See docs/UI_HANDOFF.md.
-// Vintage synth front panel: walnut end cheeks, black silkscreened panel, skirted knobs.
+// Model D panel. Control values, host IDs and Korean hover help come from Parameters.h.
 class PanelLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
     PanelLookAndFeel();
+    int theme = 0;
     void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos,
                            float startAngle, float endAngle, juce::Slider&) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
@@ -32,6 +31,7 @@ public:
 
 private:
     void timerCallback() override;
+    void applyTheme (int selected);
 
     // one panel control: a knob (Float / Choice) or a switch (Bool)
     struct Control
@@ -44,7 +44,6 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
         juce::Rectangle<int> labelArea;
     };
-    struct Section { juce::String title; int cols; std::vector<int> knobIndex; juce::Rectangle<int> area; };
 
     void addControl (const bsyn::spec::Param& d, bool small);
 
@@ -53,18 +52,14 @@ private:
     juce::TooltipWindow tooltipWindow { this, 1000 };   // descriptions appear after 1 s of hovering
 
     std::vector<Control> controls;
-    std::vector<Section> sections;
-    std::vector<int> setupKnobs;
 
-    int ioGroupIndex = -1;
+    juce::ComboBox presetBox, themeBox;
 
-    juce::ComboBox presetBox;
-
-    juce::Rectangle<int> panelArea, topArea, displayArea, setupArea;
+    juce::Rectangle<int> panelArea, displayArea, overloadArea, setupArea, badgeArea;
     uint32_t lastTrig = 0;
     int trigFlash = 0;
     bool gateLed = false;
-    float freq = 0.0f;
+    float freq = 0.0f, input = 0.0f, filterEnv = 0.0f, ampEnv = 0.0f;
     int overloadHold = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BassSynthEditor)
