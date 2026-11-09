@@ -23,6 +23,9 @@ struct Params
     float pickSens = 2.0f;
     float tail = 0.4f;                 // 0 = off
     float subLP = 120.0f, hyst = 0.15f; // internal: period detector for the note detector (not on the panel)
+    // internal Model D character (not on the panel):
+    float overshoot = 1.15f;           // both contours peak this far above "maximum" before falling back (the punch)
+    float resFade = 150.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
     float tone = 250.0f;               // Hz, low-pass on the External (DI) signal
     float vintage = 0.3f;              // 0 = stable reissue .. 1 = old unit: osc 2/3 drift on their own
 
@@ -227,10 +230,12 @@ public:
         // follows the waveform at once, no period measuring
         const double uu = biquad2 (hp, cs, zs);
         double hI, hQ; hilbert (uu, hs1, hD1, hI, hQ);
+        dbgI = hI; dbgQ = hQ;
         const double ph = std::atan2 (-hQ, hI) / TAU + 0.5;
         double dph = ph - phP; if (dph < -0.5) dph += 1; else if (dph > 0.5) dph -= 1;
         if (ph - phP < -0.5) ++cyc;     // one DI cycle completed (counts cycles for the 32' range)
         phP = ph;
+        dbgDph = dph;
         const double dt = std::min (std::max (dph, 1e-4), 0.05);
 
         // ---- vintage drift: osc 2 and 3 each wander by a few cents on their own ----
@@ -290,10 +295,13 @@ public:
         // zero-delay-feedback ladder: the resonance feedback is solved within the same sample,
         // so the peak stays as strong at 5 kHz as at 150 Hz, like the analog ladder; tanh at the input and each stage
         const double gz = std::tan (PI * fc / (2 * sr)), Gz = gz / (1 + gz), G2 = Gz * Gz, G4 = G2 * G2;
+        // like the Minimoog, the resonance fades as the cutoff comes down, so low notes keep their body
+        const double rf = p.resFade > 0 ? fc / std::sqrt (fc * fc + (double) p.resFade * p.resFade) : 1.0;
+        const double kR = kRes * rf;
         for (int o = 0; o < 2; ++o)
         {
-            const double est = (G4 * m + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kRes * G4);
-            double a = th (m - kRes * est), v, yy;
+            const double est = (G4 * m + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kR * G4);
+            double a = th (m - kR * est), v, yy;
             v = (th (a) - l1) * Gz; yy = v + l1; l1 = yy + v; a = yy;
             v = (th (a) - l2) * Gz; yy = v + l2; l2 = yy + v; a = yy;
             v = (th (a) - l3) * Gz; yy = v + l3; l3 = yy + v; a = yy;
@@ -301,10 +309,12 @@ public:
         }
 
         // RC envelopes
-        if (fs == 1) { fe += (1.3 - fe) * cfA; if (fe >= 1) { fe = 1; fs = 2; } }
+        // the attack runs past "maximum" to the overshoot peak, then the decay brings it back
+        const double ov = std::max (1.0, (double) p.overshoot);
+        if (fs == 1) { fe += (1.3 * ov - fe) * cfA; if (fe >= ov) { fe = ov; fs = 2; } }
         else if (fs == 2) fe += (p.fS - fe) * cfD;
         else if (fs == 3) fe += (0 - fe) * (p.decaySw ? cfD : relFast);
-        if (as == 1) { ae += (1.3 - ae) * caA; if (ae >= 1) { ae = 1; as = 2; } }
+        if (as == 1) { ae += (1.3 * ov - ae) * caA; if (ae >= ov) { ae = ov; as = 2; } }
         else if (as == 2) ae += (p.aS - ae) * caD;
         else if (as == 3) ae += (0 - ae) * (p.decaySw ? caD : relFast);
 
@@ -316,7 +326,7 @@ public:
         if (gateOn && i - lastOn < 30 * BL)
             vel = std::min (1.0, std::max (0.2, notePkP / (0.4 * refOn + 1e-9)));
         velS += (vel - velS) * velA;
-        const double yv = y4 * (1 + p.res * 0.9) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        const double yv = y4 * (1 + p.res * rf * 0.9) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
@@ -328,6 +338,10 @@ public:
     double currentFreq() const { return lastFreq; }
     double inputPeak() const   { return inPk; }          // input level after Input Gain (1.0 = full scale)
     double filterContour() const { return fe; }
+    // probes for offline analysis (tests/eval_trigger.cpp)
+    double probeMagnitude() const { return std::sqrt (dbgI * dbgI + dbgQ * dbgQ); }   // level of the low band
+    double probePhaseStep() const { return dbgDph; }                                  // cycles per sample
+    double probePeriod() const    { return per; }                                     // samples
     double loudnessContour() const { return ae; }
     bool   gateIsOpen() const  { return gateOn; }
     uint32_t triggers() const  { return trigCount; }
@@ -456,7 +470,7 @@ private:
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
     double dcX = 0, dcY = 0;
-    double lastFreq = 0;
+    double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0;
     uint32_t trigCount = 0;
 };
 

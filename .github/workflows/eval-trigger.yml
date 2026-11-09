@@ -1,0 +1,49 @@
+name: Evaluate note triggering on real bass lines
+
+# Runs the plugin's note detector over annotated real bass recordings and stores the numbers
+# (report + block features, no audio) on the `eval-data` branch for offline tuning.
+on:
+  workflow_dispatch:
+  push:
+    branches: [ trigger-eval ]
+    paths: [ 'BassSynth/Source/SynthEngine.h', 'BassSynth/tests/eval_trigger.cpp', '.github/workflows/eval-trigger.yml' ]
+
+permissions:
+  contents: write
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache datasets
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: idmt-bass-v1
+
+      - name: Download IDMT-SMT-BASS-SINGLE-TRACKS (Fraunhofer IDMT, CC BY-NC-ND 4.0)
+        run: |
+          mkdir -p data && cd data
+          if [ ! -d single ]; then
+            curl -sSL -o single.zip "https://zenodo.org/records/7544099/files/IDMT-SMT-BASS-SINGLE-TRACKS.zip?download=1"
+            unzip -q single.zip -d single && rm single.zip
+          fi
+          find single -maxdepth 3 | head -30
+
+      - name: Build and run
+        run: |
+          g++ -O2 -std=c++17 BassSynth/tests/eval_trigger.cpp -o eval_trigger
+          ./eval_trigger data out
+
+      - name: Store results on the eval-data branch
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          cd out
+          git init -q -b eval-data
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          echo "Results of eval_trigger for commit $SHA. Features derived from IDMT-SMT-BASS-SINGLE-TRACKS (Fraunhofer IDMT, CC BY-NC-ND 4.0); no audio." > README.txt
+          git add -A && git commit -q -m "eval_trigger results for $SHA"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" eval-data
