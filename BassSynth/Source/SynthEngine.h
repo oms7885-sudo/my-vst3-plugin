@@ -46,6 +46,8 @@ struct Params
     float ftMul = 1.1f;                // the low-pass sits at this x the fundamental
     float ftThr = 0.25f, ftDelta = 0.05f;   // PeriodFinder: how periodic the band must be / how deep a dip must be
     float ftWin = 14.0f;               // ms: PeriodFinder's window
+    int   grain = 0;
+    float inertia = 0.0f;              // 0..1: how much the oscillators run on their own (0: the DI's phase as it is)
     bool  ftComp = true;               // take the low-pass's own phase lag back out
     bool  ftRing = true;               // tell the last note ringing on from this note's fundamental
     float ftOwn = 1.6f;                // ... by how much louder it must be after the pick than before
@@ -109,7 +111,7 @@ public:
         hold = 0.05 * sr; fastGap = 0.07 * sr; velA = 1 - std::exp (-1.0 / (0.003 * sr));
         inPkR = std::exp (-1.0 / (0.3 * sr)); drA = k (0.8);
         ktA = k (0.03);
-        fcA = k (0.004); fuA = k (0.008);
+        fcA = k (0.004); fuA = k (0.008); flyUp = k (0.002); flyDn = k (0.025);
         decD = std::max (1, (int) std::lround (sr / 2000.0)); pfWin = -1;
         lpCoef (250.0, cs);
         dcA = std::exp (-TAU * 15.0 / sr);
@@ -136,6 +138,7 @@ public:
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0; stF = stA = 0;
         pf.reset(); decS = 0; decI = 0; fcT = fcN = 250.0; fundHz = fundUse = fundS = 0; lagP = 0; ph2P = 0; hD2 = 0; cyc2 = 0;
+        flyOn = false; flyTh = flyW = unP = 0; flyB = 150; flyHold = 0;
         fCand = ownF = prevOwn = ringF = 0; fRun = 0; miss = 0; rawI = 0; std::fill (std::begin (rawW), std::end (rawW), 0.0);
         std::fill (std::begin (sv), std::end (sv), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
@@ -380,8 +383,36 @@ public:
                 const double r = fundS / fcN, q = 1.0 - r * r;
                 lag = (std::atan2 (r * KQ[0], q) + std::atan2 (r * KQ[1], q)) / TAU;
             }
-            const double un = (double) cyc2 + ph2 + lag, fl = std::floor (un);
-            cycO = (int64_t) fl; phO = un - fl; dphO = d2 + (lag - lagP); lagP = lag;
+            double un = (double) cyc2 + ph2 + lag;
+            lagP = lag;
+
+            // Inertia: the oscillators do not copy the DI's phase cycle by cycle but run on their own and are
+            // pulled to it (a second-order loop, critically damped), so the string's cycle-to-cycle wobble
+            // averages out. The loop is wide open at the pick (the attack is the DI's own) and closes once the
+            // period finder has the note; it opens again when the DI moves away from it (a new pitch
+            // without a pick) or the finder loses the note. At 0 the DI's phase is used as it is.
+            if (p.inertia > 0.0f)
+            {
+                if (onset || ! flyOn) { flyTh = un; flyW = std::min (std::max (d2, 0.0), 0.05); flyOn = true; flyB = 150.0; flyHold = 0; }
+                const double bLock = 150.0 * std::pow (2.0 / 150.0, (double) p.inertia);     // 150 Hz .. 2 Hz
+                const bool have = fundUse > 0 && miss == 0 && fcT < 249.0;
+                const double err = un - flyTh;
+                // the note the loop is holding is not what the DI is doing any more
+                if (std::abs (err) > 0.35 || (have && std::abs (flyW * sr / fundUse - 1.0) > 0.04 && flyB < 20.0)) flyHold = (int) (0.03 * sr);
+                if (flyHold > 0) --flyHold;
+                const double bT = have && flyHold == 0 ? bLock : 150.0;
+                if (bT < flyB && flyB > 149.0) flyW = fundS / sr;                              // closing: start from the pitch that was found
+                flyB += (bT - flyB) * (bT > flyB ? flyUp : flyDn);
+                const double wn = TAU * flyB / sr;
+                flyW += wn * wn * err;
+                flyW = std::min (std::max (flyW, 0.0), 0.05);
+                flyTh += flyW + 2.0 * wn * err;
+                un = flyTh;
+            }
+            else flyOn = false;
+            const double fl = std::floor (un);
+            cycO = (int64_t) fl; phO = un - fl; dphO = un - unP; unP = un;
+            if (dphO < -0.5 || dphO > 0.5) dphO = d2;
         }
         const double dt = std::min (std::max (dphO, 1e-4), 0.05);
         dbgOsc = (double) cycO + phO;
@@ -435,7 +466,15 @@ public:
         // fairly clean and lets the resonance speak, three at full overload the filter and flatten it.
         // (This level is 1/3.4 of the engine's earlier one: Moog cut the filter's input drive by that
         // much during production, R2 47k -> 160k, to reduce intermodulation distortion.)
-        m = th (m * mixIn) * 0.832;
+        {
+            // how the mixer bends when it is pushed (prototype): 0 the even, soft curve; 1 lopsided (one side
+            // gives way sooner: even harmonics as well); 2 lopsided with a hard top
+            const double x = m * mixIn;
+            if (p.grain == 1)      { const double b = 0.3, tb = std::tanh (b); m = (std::tanh (x + b) - tb) / (1.0 - tb * tb); }
+            else if (p.grain == 2) m = x > 0 ? x / std::sqrt (std::sqrt (1.0 + x * x * x * x)) : 1.5 * std::tanh (x / 1.5);
+            else                   m = th (x);
+            m *= 0.832;
+        }
 
         // filter modulation: osc 3 and noise, mixed, scaled by the "wheel"
         const double modSrc = (1.0 - p.modMix) * o3 + p.modMix * pnk * 2.5;
@@ -765,6 +804,7 @@ private:
     PeriodFinder pf;
     double fcT = 250, fcN = 250, fcA = 0, fuA = 0, fundHz = 0, fundUse = 0, fundS = 0, lagP = 0, decS = 0, dbgN = 0;
     double sv[4] {}, hs2[32] {}, hD2 = 0, ph2P = 0, pfWin = -1;
+    double flyTh = 0, flyW = 0, flyB = 150, flyUp = 0, flyDn = 0, unP = 0; bool flyOn = false; int flyHold = 0;
     double dbgF1 = 0, dbgFw = 0, dbgWind = 0, fCand = 0, ownF = 0, prevOwn = 0, ringF = 0, rawW[16] {};
     int64_t cyc2 = 0; int decD = 22, decI = 0, fRun = 0, miss = 0, rawI = 0;
     double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
