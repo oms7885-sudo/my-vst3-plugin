@@ -12,7 +12,7 @@ namespace
             { "Model D Bass", {} },
             { "Punch Sub",    { { "osc1Lvl", 0.4f }, { "osc3Lvl", 1.0f }, { "cutoff", 120.0f }, { "res", 0.12f },
                                 { "envAmt", 2.2f }, { "fD", 180.0f }, { "fS", 0.0f } } },
-            { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.57f }, { "envAmt", 4.6f }, { "fD", 420.0f }, { "fS", 0.05f },
+            { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.57f }, { "envAmt", 4.0f }, { "fD", 420.0f }, { "fS", 0.05f },
                                 { "osc1Lvl", 0.9f }, { "osc3Lvl", 0.3f } } },
             { "Fat Detune",   { { "osc1Lvl", 0.7f }, { "osc2Lvl", 0.7f }, { "osc2Freq", 0.06f }, { "osc3Lvl", 0.6f }, { "osc3Freq", -0.05f },
                                 { "cutoff", 260.0f }, { "envAmt", 2.4f }, { "res", 0.16f } } },
@@ -60,7 +60,29 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
             continue;
         }
         NormalisableRange<float> range (d.min, d.max);
-        if (d.centre > 0.0f && d.min > 0.0f && d.centre > d.min && d.centre < d.max)
+        if (d.timeDial)
+        {
+            // the Model D's time dial: 10 m-sec, 200, 600, 1 sec, 5, 10 at 0, 2, 4, 6, 8, 10 tenths of the travel
+            // (attack: below 10 ms in the first twentieth), logarithmic in between
+            struct Pt { float x, ms; };
+            std::vector<Pt> pts = { { 0.0f, 10.0f }, { 0.2f, 200.0f }, { 0.4f, 600.0f }, { 0.6f, 1000.0f }, { 0.8f, 5000.0f }, { 1.0f, 10000.0f } };
+            if (d.min < 10.0f) { pts[0].x = 0.05f; pts.insert (pts.begin(), { 0.0f, d.min }); }
+            range = NormalisableRange<float> (d.min, d.max,
+                [pts] (float, float, float x)
+                {
+                    x = jlimit (0.0f, 1.0f, x);
+                    size_t i = 1; while (i + 1 < pts.size() && x > pts[i].x) ++i;
+                    const float t = (x - pts[i - 1].x) / (pts[i].x - pts[i - 1].x);
+                    return pts[i - 1].ms * std::pow (pts[i].ms / pts[i - 1].ms, t);
+                },
+                [pts] (float, float, float v)
+                {
+                    v = jlimit (pts.front().ms, pts.back().ms, v);
+                    size_t i = 1; while (i + 1 < pts.size() && v > pts[i].ms) ++i;
+                    return pts[i - 1].x + (pts[i].x - pts[i - 1].x) * std::log (v / pts[i - 1].ms) / std::log (pts[i].ms / pts[i - 1].ms);
+                });
+        }
+        else if (d.centre > 0.0f && d.min > 0.0f && d.centre > d.min && d.centre < d.max)
         {
             // logarithmic knob: value = min * (max/min)^(x^g), with g chosen so the centre value sits at
             // 12 o'clock (g = 1, evenly spaced octaves, when the centre is the geometric mean)
@@ -72,15 +94,33 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
         }
         const String unit (d.unit);
         const bool signedUnit = unit == "st";
-        auto toText = [unit, signedUnit] (float v, int)
+        auto plain = [unit, signedUnit] (float v)
         {
             const float a = std::abs (v);
             String t = a >= 100.0f ? String (roundToInt (v)) : a >= 10.0f ? String (v, 1) : String (v, 2);
             if (signedUnit && v > 0.0f) t = "+" + t;
             return unit.isEmpty() ? t : t + " " + unit;
         };
-        out.push_back (std::make_unique<AudioParameterFloat> (pid, d.name, range, d.def,
-                           AudioParameterFloatAttributes().withLabel (unit).withStringFromValueFunction (toText)));
+        AudioParameterFloatAttributes attr;
+        if (d.dial0 != d.dial1)
+        {
+            // the value box shows the dial number as on the Model D; Cutoff adds the frequency after it
+            const float d0 = d.dial0, d1 = d.dial1;
+            const bool withUnit = unit == "Hz";
+            attr = attr.withStringFromValueFunction ([range, d0, d1, withUnit, plain] (float v, int)
+                   {
+                       const float n = d0 + (d1 - d0) * range.convertTo0to1 (v);
+                       String t = (d0 < 0.0f && n > 0.004f ? "+" : "") + String (std::abs (n) < 0.005f ? 0.0f : n, 1);
+                       return withUnit ? t + String::fromUTF8 (" \xc2\xb7 ") + plain (v) : t;
+                   })
+                   .withValueFromStringFunction ([range, d0, d1] (const String& t)
+                   {
+                       return range.convertFrom0to1 (jlimit (0.0f, 1.0f, (t.trimStart().getFloatValue() - d0) / (d1 - d0)));
+                   });
+        }
+        else
+            attr = attr.withLabel (unit).withStringFromValueFunction ([plain] (float v, int) { return plain (v); });
+        out.push_back (std::make_unique<AudioParameterFloat> (pid, d.name, range, d.def, attr));
     }
     return { out.begin(), out.end() };
 }
