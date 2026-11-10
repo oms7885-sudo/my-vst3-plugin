@@ -33,6 +33,12 @@ struct Params
     float overshoot = 1.22f;           // peak of a single note, relative to maximum sustain
     float overshootMax = 1.60f;        // highest peak quick re-triggering can build up to (1.22 x 1.31)
     float resFade = 150.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
+    // Fundamental tracking (prototype; off = the oscillators follow the phase of everything under 250 Hz):
+    // the low band of a bass note holds its 2nd and 3rd harmonics too, so its phase does not advance
+    // evenly and at times runs two or three cycles per period (a warped saw with extra teeth). When on,
+    // a low-pass that follows the note leaves only the fundamental before the phase is read, which
+    // gives an even ramp at one cycle per period. The filter opens wide again on every pick.
+    bool  fundTrack = false;
     float tone = 250.0f;               // Hz, low-pass on the External (DI) signal
     float vintage = 0.3f;              // 0 = stable reissue .. 1 = old unit: osc 2/3 drift on their own
 
@@ -88,6 +94,7 @@ public:
         hold = 0.05 * sr; fastGap = 0.07 * sr; velA = 1 - std::exp (-1.0 / (0.003 * sr));
         inPkR = std::exp (-1.0 / (0.3 * sr)); drA = k (0.8);
         ktA = k (0.03);
+        fcA = k (0.004); maxD = std::min (CycleRate::M - 2, (int) (sr / 26.0)); rmW = 100; guardN = (int) std::lround (0.012 * sr);
         lpCoef (250.0, cs);
         dcA = std::exp (-TAU * 15.0 / sr);
         reset();
@@ -112,6 +119,9 @@ public:
         seed = 777; drT = 0; dw[0] = dw[1] = dwT[0] = dwT[1] = 0;
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0; stF = stA = 0;
+        crW.reset(); crN.reset(); fcT = fcN = 250.0; lowW = 0; ph2P = 0; hD2 = 0; cyc2 = 0;
+        std::fill (std::begin (sv), std::end (sv), 0.0);
+        std::fill (std::begin (hs2), std::end (hs2), 0.0);
         dcX = dcY = 0;
         n = 0;
     }
@@ -256,7 +266,51 @@ public:
         if (ph - phP < -0.5) ++cyc;     // one DI cycle completed (counts cycles for the 32' range)
         phP = ph;
         dbgDph = dph;
-        const double dt = std::min (std::max (dph, 1e-4), 0.05);
+        double phO = ph, dphO = dph;    // what the oscillators are drawn from
+        int64_t cycO = cyc;
+        if (p.fundTrack)
+        {
+            if (onset) { crW.pick(); crN.pick(); fcT = 250.0; lowW = 0; }
+            // how fast the wide band's phase is turning (1 / the time its last full cycle took)
+            const double hzW = crW.push (dph, sr, maxD, guardN);
+            if (hzW > 28.0 && hzW < 600.0) crW.note (hzW);
+
+            // 4-pole low-pass that follows the note, then the phase of what is left
+            fcN += (fcT - fcN) * fcA;
+            double v = hp;
+            {
+                double g = PI * fcN / sr; g *= 1.0 + g * g / 3.0;              // tan() for small angles
+                static constexpr double KQ[2] = { 1.0 / 0.54119610, 1.0 / 1.3065630 };
+                for (int q = 0; q < 2; ++q)
+                {
+                    const double a1 = 1.0 / (1.0 + g * (g + KQ[q])), a2 = g * a1, a3 = g * a2;
+                    const double v3 = v - sv[2 * q + 1], v1 = a1 * sv[2 * q] + a2 * v3, v2 = sv[2 * q + 1] + a2 * sv[2 * q] + a3 * v3;
+                    sv[2 * q] = 2 * v1 - sv[2 * q]; sv[2 * q + 1] = 2 * v2 - sv[2 * q + 1]; v = v2;
+                }
+            }
+            double nI, nQ; hilbert (v, hs2, hD2, nI, nQ);
+            const double ph2 = std::atan2 (-nQ, nI) / TAU + 0.5;
+            double d2 = ph2 - ph2P; if (d2 < -0.5) d2 += 1; else if (d2 > 0.5) d2 -= 1;
+            if (ph2 - ph2P < -0.5) ++cyc2;
+            ph2P = ph2;
+            phO = ph2; dphO = d2; cycO = cyc2;
+
+            // the filtered band's own rate pulls the filter the rest of the way down to the fundamental
+            // (never below 0.45 x what the wide band shows: nothing real lives there)
+            const double hzN = crN.push (d2, sr, maxD, guardN);
+            if (hzN > 28.0 && hzN < 600.0 && hzN >= 0.45 * lowW) crN.note (hzN);
+
+            // The low end of the rates of the last 100 ms is the fundamental: with strong harmonics the
+            // phase runs 2-3 cycles per period part of the time, but it keeps coming back to one.
+            if (bc == 0)                                    // once per 1 ms block
+            {
+                const double lw = crW.low (rmW), ln = crN.low (rmW);
+                if (lw > 0) lowW = lw;
+                const double fund = ln > 0 && lw > 0 ? std::min (ln, lw) : std::max (ln, lw);
+                if (fund > 0) fcT = std::min (250.0, std::max (45.0, 1.35 * fund));
+            }
+        }
+        const double dt = std::min (std::max (dphO, 1e-4), 0.05);
 
         // ---- vintage drift: osc 2 and 3 each wander by a few cents on their own ----
         if (--drT <= 0)
@@ -269,14 +323,14 @@ public:
 
         // ---- oscillator bank: drawn from the DI's own phase (no pitch tracking) ----
         const double gAmp = std::min (1.0, agd * 40.0);
-        const double o1 = p.osc1On && p.osc1Lvl > 0 ? oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, ph, dt, 0.0, acc[0])) : 0.0;
-        const double o2 = p.osc2On && p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, ph, dt, p.osc2Freq + cents2 / 100.0, acc[1])) : 0.0;
+        const double o1 = p.osc1On && p.osc1Lvl > 0 ? oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, phO, dt, cycO, 0.0, acc[0])) : 0.0;
+        const double o2 = p.osc2On && p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, phO, dt, cycO, p.osc2Freq + cents2 / 100.0, acc[1])) : 0.0;
         const bool need3 = (p.osc3On && p.osc3Lvl > 0) || (p.filterMod && p.modAmt > 0 && p.modMix < 1);
         double o3 = 0;
         if (need3)
         {
             if (p.osc3Ctl)
-                o3 = oscWave (p.osc3Wave, true, oscPhase (p.osc3Range, ph, dt, p.osc3Freq + cents3 / 100.0, acc[2]));
+                o3 = oscWave (p.osc3Wave, true, oscPhase (p.osc3Range, phO, dt, cycO, p.osc3Freq + cents3 / 100.0, acc[2]));
             else
             {
                 // Osc 3 Control off: a fixed pitch set by Range, Frequency sweeps about 6 octaves
@@ -288,7 +342,7 @@ public:
                 o3 = oscWave (p.osc3Wave, true, { o3free, d3 });
             }
         }
-        if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
+        if (gateOn && dphO > 0) ktf += (std::min (std::max (sr * dphO, 30.0), 600.0) - ktf) * ktA;
         const double ext = th (yn * 0.9);               // External: the DI itself
         // noise source: white, or pink (Kellet's economy filter)
         const double wht = rnd();
@@ -363,6 +417,7 @@ public:
     double probePhaseStep() const { return dbgDph; }                                  // cycles per sample
     double probePeriod() const    { return per; }                                     // samples
     double loudnessContour() const { return ae; }
+    double probeTrackHz() const   { return fcN; }       // fundamental tracking: the following low-pass
     bool   gateIsOpen() const  { return gateOn; }
     uint32_t triggers() const  { return trigCount; }
 
@@ -407,17 +462,57 @@ private:
         return std::min (room, carry * (stack + room / 3.0));
     }
 
+    // Times the last full cycle of a phase that is fed in step by step, and keeps the low end of the
+    // rates of the last ~100 ms (one figure per millisecond).
+    struct CycleRate
+    {
+        static constexpr int M = 16383;
+        double ring[M + 1] {}, up = 0, cur = 1e9;
+        int64_t i = 0, on = 0, lag = 1, mi = 0;
+        float ms[128] {};
+        void reset() { std::fill (std::begin (ring), std::end (ring), 0.0); up = 0; i = 0; on = 0; lag = 1; pick(); }
+        void pick()  { on = i; cur = 1e9; std::fill (std::begin (ms), std::end (ms), 1e9f); }   // a new note: forget
+        // feed one phase step (cycles); returns the rate in Hz of the cycle that ends now, 0 if there is none
+        // yet. Only cycles that began `guard` samples after the pick count (its transient is over by then).
+        double push (double step, double sr, int maxD, int guard)
+        {
+            up += step; ++i; ring[i & M] = up;
+            const double tgt = up - 1.0;
+            const int64_t maxLag = std::min ((int64_t) maxD, i - on - guard);
+            if (maxLag < 2) return 0.0;
+            ++lag;
+            if (lag > maxLag) lag = maxLag;
+            while (lag > 1 && ring[(i - lag + 1) & M] <= tgt) --lag;
+            while (lag < maxLag && ring[(i - lag) & M] > tgt) ++lag;
+            const double a = ring[(i - lag) & M], b = ring[(i - lag + 1) & M];
+            return a <= tgt && b > a ? sr / ((double) lag - (tgt - a) / (b - a)) : 0.0;
+        }
+        void note (double hz) { if (hz < cur) cur = hz; }
+        // once per millisecond: close the block; returns the 4th lowest of the last `w` ms (a stray slow
+        // cycle should not count), 0 while there are too few
+        double low (int w)
+        {
+            ms[mi & 127] = (float) cur; ++mi; cur = 1e9;
+            float tmp[128]; int cnt = 0;
+            for (int q = 1; q <= w; ++q) { const float r = ms[(mi - q) & 127]; if (r < 1e8f) tmp[cnt++] = r; }
+            if (cnt < 5) return 0.0;
+            const int kth = std::min (3, cnt / 8);
+            std::nth_element (tmp, tmp + kth, tmp + cnt);
+            return (double) tmp[kth];
+        }
+    };
+
     struct OscPh { double t, dt; };
 
     // phase of one oscillator: range shifts the DI's phase by octaves (counting DI cycles for the low
     // ranges); a Frequency offset or vintage drift runs a phase accumulator at the DI's rate times the
     // interval and runs free (like a real Moog), so the beating lands somewhere different on every note
-    OscPh oscPhase (int range, double ph, double dt, float semi, double& accum) const
+    OscPh oscPhase (int range, double ph, double dt, int64_t cycles, float semi, double& accum) const
     {
         const int r = std::clamp (range, -1, 4);
         const int o = r < 0 ? -3 : r - 1;                         // LO = 3 octaves below 16', 32' = -1 .. 2' = +3
         double t, d;
-        if (o < 0) { const int64_t kd = (int64_t) 1 << -o; t = (ph + (double) (cyc % kd)) / (double) kd; d = dt / (double) kd; }
+        if (o < 0) { const int64_t kd = (int64_t) 1 << -o; t = (ph + (double) (cycles % kd)) / (double) kd; d = dt / (double) kd; }
         else       { const double mul = (double) (1 << o); t = ph * mul; t -= std::floor (t); d = dt * mul; }
         if (std::abs (semi) < 1e-3) { accum = t; return { t, d }; }
         const double ratio = std::pow (2.0, semi / 12.0);
@@ -501,6 +596,10 @@ private:
     int drT = 0; double dw[2] {}, dwT[2] {}; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
+    // fundamental tracking
+    CycleRate crW, crN;
+    double fcT = 250, fcN = 250, fcA = 0, lowW = 0, sv[4] {}, hs2[32] {}, hD2 = 0, ph2P = 0;
+    int64_t cyc2 = 0; int maxD = 1600, rmW = 100, guardN = 529;
     double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
     double dcX = 0, dcY = 0;
     double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0;
