@@ -23,6 +23,16 @@ struct Params
     float pickSens = 2.0f;
     float tail = 0.4f;                 // 0 = off
     float subLP = 120.0f, hyst = 0.15f; // internal: period detector for the note detector (not on the panel)
+    // internal Model D character (not on the panel):
+    // Both contours peak above "maximum sustain" before the decay brings them back (the Model D punch).
+    // What is documented: the attack ends at a fixed threshold while the sustain control tops out at
+    // roughly 80-85 % of that peak (service manual: flip-flop reset at the threshold; clone makers and
+    // Moog technicians: sustain "10" behaves like 8-8.5), so a single note peaks about 1.18-1.25 above
+    // maximum sustain. Re-triggering before the contour has settled pushes each peak higher, levelling
+    // off after three or four quick hits about 30 % above the normal peak (8 V -> 10.5 V on a clone).
+    float overshoot = 1.22f;           // peak of a single note, relative to maximum sustain
+    float overshootMax = 1.60f;        // highest peak quick re-triggering can build up to (1.22 x 1.31)
+    float resFade = 150.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
     float tone = 250.0f;               // Hz, low-pass on the External (DI) signal
     float vintage = 0.3f;              // 0 = stable reissue .. 1 = old unit: osc 2/3 drift on their own
 
@@ -101,7 +111,7 @@ public:
         std::fill (std::begin (pk3), std::end (pk3), 0.0); inPk = 0;
         seed = 777; drT = 0; dw[0] = dw[1] = dwT[0] = dwT[1] = 0;
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
-        fe = ae = 0; fs = as = 0;
+        fe = ae = 0; fs = as = 0; stF = stA = 0;
         dcX = dcY = 0;
         n = 0;
     }
@@ -159,8 +169,8 @@ public:
         eS += (eF - eS) * (eF > eS ? sA_ : sR_);
 
         // ---- note detector (on the uncompressed signal) ----
-        // peak of |x| over about one cycle of the current note; a note starts when that peak
-        // jumps above the lowest peak of the previous ~40 ms (catches short damped gaps at once)
+        // peak of |x| over the last 28 ms; a note starts when that peak jumps above the lowest peak of
+        // the previous ~40 ms. Settings checked against 17 annotated real bass lines (tests/eval_trigger.cpp)
         const double hp0 = hpA * (h0Y + x0 - h0X); h0X = x0; h0Y = hp0;
         {
             const double a0 = std::abs (hp0);
@@ -168,7 +178,10 @@ public:
             if (++bc >= BL)
             {
                 bc = 0;
-                PW = std::min (28, std::max (6, (int) std::ceil (1.15 * per / BL)));
+                // the window always spans the longest period a bass plays (28 ms). Sizing it from the
+                // measured period failed on real recordings: the period detector often locks to the 2nd
+                // harmonic, the window then covers half a cycle, and the level seems to jump on every cycle
+                PW = 28;
                 bm[bi & 63] = (float) cbm; cbm = 0;
                 double P_ = 0;
                 for (int q = 0; q < PW; ++q) P_ = std::max (P_, (double) bm[(bi - q) & 63]);
@@ -200,11 +213,21 @@ public:
         // the previous note has clearly died away, it is at least 70 ms old, and the new level is
         // close to that note's own peak (so damping noise and small bounces don't count)
         const bool fastPick = decayed && i - lastOn > fastGap && Pn > (1 + (p.pickSens - 1) * 0.5) * Mn
-                              && Pn > 0.6 * notePkP && Pn > std::max (thr * 1.5, pkP * 0.15);
-        if (upgrade || fastPick || (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.15) && i - lastOn > hold)) { onset = true; gateOn = true; }
+                              && Pn > 0.6 * notePkP && Pn > std::max (thr * 1.5, pkP * 0.25);
+        if (upgrade || fastPick || (Pn > p.pickSens * Mn && Pn > std::max (thr * 1.5, pkP * 0.25) && i - lastOn > hold)) { onset = true; gateOn = true; }
         else if (gateOn && Pn < std::max (thr, notePkP * 0.12)) { gateOn = false; fs = 3; as = 3; }
         if (onset)
         {
+            // a pick that lands while the last attack's peak is still standing (not yet back at the
+            // sustain level) lifts the next peak, a third of the way to the limit per hit
+            // (the click-then-pluck restart is one note and does not count as another hit)
+            if (! upgrade)
+            {
+                const double ov0 = std::max (1.0, (double) p.overshoot);
+                const double room = std::max (0.0, (double) p.overshootMax - ov0);
+                stF = stackUp (stF, fe, p.fS, ov0, room, fs == 1 || fs == 2);
+                stA = stackUp (stA, ae, p.aS, ov0, room, as == 1 || as == 2);
+            }
             notePk = eF; notePkP = Pn; lastOn = (double) i; fs = 1; as = 1; onP = Pn; runMax = Pn; decayed = false;
             refOn = upgrade ? refOn : refP;
         }
@@ -227,10 +250,12 @@ public:
         // follows the waveform at once, no period measuring
         const double uu = biquad2 (hp, cs, zs);
         double hI, hQ; hilbert (uu, hs1, hD1, hI, hQ);
+        dbgI = hI; dbgQ = hQ;
         const double ph = std::atan2 (-hQ, hI) / TAU + 0.5;
         double dph = ph - phP; if (dph < -0.5) dph += 1; else if (dph > 0.5) dph -= 1;
         if (ph - phP < -0.5) ++cyc;     // one DI cycle completed (counts cycles for the 32' range)
         phP = ph;
+        dbgDph = dph;
         const double dt = std::min (std::max (dph, 1e-4), 0.05);
 
         // ---- vintage drift: osc 2 and 3 each wander by a few cents on their own ----
@@ -290,10 +315,13 @@ public:
         // zero-delay-feedback ladder: the resonance feedback is solved within the same sample,
         // so the peak stays as strong at 5 kHz as at 150 Hz, like the analog ladder; tanh at the input and each stage
         const double gz = std::tan (PI * fc / (2 * sr)), Gz = gz / (1 + gz), G2 = Gz * Gz, G4 = G2 * G2;
+        // like the Minimoog, the resonance fades as the cutoff comes down, so low notes keep their body
+        const double rf = p.resFade > 0 ? fc / std::sqrt (fc * fc + (double) p.resFade * p.resFade) : 1.0;
+        const double kR = kRes * rf;
         for (int o = 0; o < 2; ++o)
         {
-            const double est = (G4 * m + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kRes * G4);
-            double a = th (m - kRes * est), v, yy;
+            const double est = (G4 * m + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kR * G4);
+            double a = th (m - kR * est), v, yy;
             v = (th (a) - l1) * Gz; yy = v + l1; l1 = yy + v; a = yy;
             v = (th (a) - l2) * Gz; yy = v + l2; l2 = yy + v; a = yy;
             v = (th (a) - l3) * Gz; yy = v + l3; l3 = yy + v; a = yy;
@@ -301,10 +329,12 @@ public:
         }
 
         // RC envelopes
-        if (fs == 1) { fe += (1.3 - fe) * cfA; if (fe >= 1) { fe = 1; fs = 2; } }
+        // the attack runs past "maximum" to the overshoot peak, then the decay brings it back
+        const double ov = std::max (1.0, (double) p.overshoot), ovF = ov + stF, ovA = ov + stA;
+        if (fs == 1) { fe += (1.3 * ovF - fe) * cfA; if (fe >= ovF) { fe = ovF; fs = 2; } }
         else if (fs == 2) fe += (p.fS - fe) * cfD;
         else if (fs == 3) fe += (0 - fe) * (p.decaySw ? cfD : relFast);
-        if (as == 1) { ae += (1.3 - ae) * caA; if (ae >= 1) { ae = 1; as = 2; } }
+        if (as == 1) { ae += (1.3 * ovA - ae) * caA; if (ae >= ovA) { ae = ovA; as = 2; } }
         else if (as == 2) ae += (p.aS - ae) * caD;
         else if (as == 3) ae += (0 - ae) * (p.decaySw ? caD : relFast);
 
@@ -316,7 +346,7 @@ public:
         if (gateOn && i - lastOn < 30 * BL)
             vel = std::min (1.0, std::max (0.2, notePkP / (0.4 * refOn + 1e-9)));
         velS += (vel - velS) * velA;
-        const double yv = y4 * (1 + p.res * 0.9) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        const double yv = y4 * (1 + p.res * rf * 0.9) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
@@ -328,6 +358,10 @@ public:
     double currentFreq() const { return lastFreq; }
     double inputPeak() const   { return inPk; }          // input level after Input Gain (1.0 = full scale)
     double filterContour() const { return fe; }
+    // probes for offline analysis (tests/eval_trigger.cpp)
+    double probeMagnitude() const { return std::sqrt (dbgI * dbgI + dbgQ * dbgQ); }   // level of the low band
+    double probePhaseStep() const { return dbgDph; }                                  // cycles per sample
+    double probePeriod() const    { return per; }                                     // samples
     double loudnessContour() const { return ae; }
     bool   gateIsOpen() const  { return gateOn; }
     uint32_t triggers() const  { return trigCount; }
@@ -361,6 +395,18 @@ private:
         }
         return q;
     }
+    // Peak build-up on quick re-triggering. `level` is the contour right now, `sustain` where its decay
+    // is heading, `ov0` the single-note peak, `room` how far above that the peak may grow. The share of
+    // the last peak still standing above the sustain level decides how much carries over; a contour
+    // that has settled (or was released) starts again from the single-note peak.
+    static double stackUp (double stack, double level, double sustain, double ov0, double room, bool sounding)
+    {
+        if (! sounding || room <= 0) return 0.0;
+        const double span = ov0 + stack - sustain;
+        const double carry = span > 1e-6 ? std::min (1.0, std::max (0.0, (level - sustain) / span)) : 0.0;
+        return std::min (room, carry * (stack + room / 3.0));
+    }
+
     struct OscPh { double t, dt; };
 
     // phase of one oscillator: range shifts the DI's phase by octaves (counting DI cycles for the low
@@ -455,8 +501,9 @@ private:
     int drT = 0; double dw[2] {}, dwT[2] {}; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
+    double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
     double dcX = 0, dcY = 0;
-    double lastFreq = 0;
+    double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0;
     uint32_t trigCount = 0;
 };
 
