@@ -47,7 +47,9 @@ struct Params
     float ftThr = 0.25f, ftDelta = 0.05f;   // PeriodFinder: how periodic the band must be / how deep a dip must be
     float ftWin = 14.0f;               // ms: PeriodFinder's window
     int   grain = 0;
-    float inertia = 0.0f;              // 0..1: how much the oscillators run on their own (0: the DI's phase as it is)
+    float inertia = 1.0f;              // 0..1: how much the oscillators run on their own (0: the DI's phase as it is).
+                                       // Internal, fixed at full: cycle length steady to about 0.1 % on a held note
+                                       // (0.6 % without; the Model D's oscillators are specified at 0.25 %).
     bool  ftComp = true;               // take the low-pass's own phase lag back out
     bool  ftRing = true;               // tell the last note ringing on from this note's fundamental
     float ftOwn = 1.6f;                // ... by how much louder it must be after the pick than before
