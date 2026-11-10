@@ -33,12 +33,14 @@ struct Params
     float overshoot = 1.22f;           // peak of a single note, relative to maximum sustain
     float overshootMax = 1.60f;        // highest peak quick re-triggering can build up to (1.22 x 1.31)
     float resFade = 150.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
-    // Fundamental tracking (prototype; off = the oscillators follow the phase of everything under 250 Hz):
-    // the low band of a bass note holds its 2nd and 3rd harmonics too, so its phase does not advance
-    // evenly and at times runs two or three cycles per period (a warped saw with extra teeth). When on,
-    // a low-pass that follows the note leaves only the fundamental before the phase is read, which
-    // gives an even ramp at one cycle per period. The filter opens wide again on every pick.
-    bool  fundTrack = false;
+    // Fundamental tracking (internal; off = the oscillators follow the phase of everything under 250 Hz).
+    // The low band of a bass note holds its 2nd and 3rd harmonics too, so its phase does not advance
+    // evenly and at times runs two or three cycles per period: a warped saw with extra teeth, whose
+    // shape depends on the note (measured on a real take: harmonics 2-8 off an ideal saw by 2.5 dB
+    // median, 8 dB at worst). With tracking, a low-pass that follows the note leaves only the
+    // fundamental before the phase is read, which gives an even ramp at one cycle per period
+    // (0.5 dB median, 3 dB at worst). The filter opens wide again on every pick, so the attack is as before.
+    bool  fundTrack = true;
     float tone = 250.0f;               // Hz, low-pass on the External (DI) signal
     float vintage = 0.3f;              // 0 = stable reissue .. 1 = old unit: osc 2/3 drift on their own
 
@@ -46,7 +48,7 @@ struct Params
     // Range: -1 = LO (osc 3 only), 0 = 32', 1 = 16' (the note you play), 2 = 8', 3 = 4', 4 = 2'.
     // Wave: 0 triangle, 1 triangle-saw (osc 3: reverse saw), 2 saw, 3 square, 4 wide pulse, 5 narrow pulse.
     int   osc1Range = 1, osc1Wave = 2, osc2Range = 1, osc2Wave = 2, osc3Range = 0, osc3Wave = 3;
-    float osc2Freq = 0.0f, osc3Freq = 0.0f;   // semitones, -9..+9 (Model D: up to a major sixth either way)
+    float osc2Freq = 0.0f, osc3Freq = 0.0f;   // semitones, -8..+8 (service manual: 14-17 semitones end to end)
     bool  osc3Ctl = true;                     // Osc 3 Control: on = follows the DI, off = fixed pitch (drone / LFO)
 
     // ---- mixer (Model D: a volume and an on/off switch per source) ----
@@ -60,7 +62,7 @@ struct Params
     bool  filterMod = false;
 
     // ---- filter ----
-    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f;
+    float cutoff = 160.0f, res = 0.24f, envAmt = 3.2f;   // res 0.78 = self-oscillation (Model D dial 7.5-8)
     bool  keyTrk1 = false, keyTrk2 = true;    // 1/3 + 2/3 keyboard control
     float fA = 3.0f, fD = 320.0f, fS = 0.1f;  // ms, ms, 0..1
 
@@ -135,7 +137,10 @@ public:
         P = p;
         mk = -p.cTh * (1.0 - 1.0 / p.cRat) * 0.5;
         thr = std::pow (10.0, p.gateDb / 20.0);
-        kRes = 4.1 * p.res;
+        // Emphasis scale: the service manual wants self-oscillation to begin between 7.5 and 8 on the dial
+        // and to carry on down to a cutoff under 300 Hz. With 5.2 it begins at 0.78 and (with resFade)
+        // holds down to about 200 Hz.
+        kRes = 5.2 * p.res;
         cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0);
         caA = k (p.aA / 3000.0); caD = k (p.aD / 3000.0);
         keyAmt = (p.keyTrk1 ? 1.0 / 3.0 : 0.0) + (p.keyTrk2 ? 2.0 / 3.0 : 0.0);
@@ -311,6 +316,7 @@ public:
             }
         }
         const double dt = std::min (std::max (dphO, 1e-4), 0.05);
+        dbgOsc = (double) cycO + phO;
 
         // ---- vintage drift: osc 2 and 3 each wander by a few cents on their own ----
         if (--drT <= 0)
@@ -336,7 +342,7 @@ public:
                 // Osc 3 Control off: a fixed pitch set by Range, Frequency sweeps about 6 octaves
                 const int r = std::clamp (p.osc3Range, -1, 4);
                 const double base = r < 0 ? 2.0 : 32.703 * std::pow (2.0, (double) r);   // LO = 2 Hz, 32' = C1
-                const double f3 = base * std::pow (2.0, p.osc3Freq / 9.0 * 3.0 + cents3 / 1200.0);
+                const double f3 = base * std::pow (2.0, p.osc3Freq / 8.0 * 3.0 + cents3 / 1200.0);
                 const double d3 = f3 / sr;
                 o3free += d3; o3free -= std::floor (o3free);
                 o3 = oscWave (p.osc3Wave, true, { o3free, d3 });
@@ -355,8 +361,11 @@ public:
         double m = ((p.osc1On ? p.osc1Lvl * o1 : 0.0) + (p.osc2On ? p.osc2Lvl * o2 : 0.0)
                     + (p.osc3On ? p.osc3Lvl * o3 : 0.0) + (p.noiseOn ? p.noiseLvl * nzS : 0.0)) * gAmp
                    + (p.extOn ? p.extLvl * ext : 0.0);
-        // the mixer feeds the ladder hot, like the Model D: more mixer level = more overload
-        m = th (m * 0.55 * mixDrive) / std::sqrt (mixDrive) * 1.6;
+        // The mixer feeds the ladder directly, like the Model D: one oscillator at a moderate volume stays
+        // fairly clean and lets the resonance speak, three at full overload the filter and flatten it.
+        // (This level is 1/3.4 of the engine's earlier one: Moog cut the filter's input drive by that
+        // much during production, R2 47k -> 160k, to reduce intermodulation distortion.)
+        m = th (m * mixIn) * 0.832;
 
         // filter modulation: osc 3 and noise, mixed, scaled by the "wheel"
         const double modSrc = (1.0 - p.modMix) * o3 + p.modMix * pnk * 2.5;
@@ -400,12 +409,12 @@ public:
         if (gateOn && i - lastOn < 30 * BL)
             vel = std::min (1.0, std::max (0.2, notePkP / (0.4 * refOn + 1e-9)));
         velS += (vel - velS) * velA;
-        const double yv = y4 * (1 + p.res * rf * 0.9) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        const double yv = y4 * ladderOut * (1 + 0.22 * kR) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
         if (onset) trigCount++;
-        return (float) (th (dc * outGain) + p.dry * input);
+        return (float) (softLimit (dc * outGain) + p.dry * input);
     }
 
     // for the editor display
@@ -418,6 +427,7 @@ public:
     double probePeriod() const    { return per; }                                     // samples
     double loudnessContour() const { return ae; }
     double probeTrackHz() const   { return fcN; }       // fundamental tracking: the following low-pass
+    double probeOscPhase() const  { return dbgOsc; }    // cycles the oscillators have run (16' range)
     bool   gateIsOpen() const  { return gateOn; }
     uint32_t triggers() const  { return trigCount; }
 
@@ -427,6 +437,15 @@ private:
 
 
     static double th (double q) { return q > 3 ? 1 : q < -3 ? -1 : q * (27 + q * q) / (27 + 9 * q * q); }
+    // output stage: untouched up to 0.8 of full scale (a synth's output does not squash its own
+    // attacks), then a soft knee that never passes full scale
+    static double softLimit (double v)
+    {
+        const double a = std::abs (v);
+        if (a <= 0.8) return v;
+        const double r = 0.8 + 0.2 * std::tanh ((a - 0.8) / 0.2);
+        return v < 0 ? -r : r;
+    }
     double k (double t) const { return 1.0 - std::exp (-1.0 / (std::max (t, 1e-5) * sr)); }
     double rnd()
     {
@@ -579,7 +598,8 @@ private:
     int ehL = 0, ehL2 = 0, openN = 0;
     double c[5] {}, cd[5] {}, cs[5] {};
     double mk = 0, thr = 0, kRes = 0, keyAmt = 2.0 / 3.0, relFast = 0, inPkR = 0, drA = 0;
-    static constexpr double mixDrive = 3.7;
+    static constexpr double mixIn = 0.6;        // mixer sum -> ladder input (was 2.035)
+    static constexpr double ladderOut = 1.75;   // level after the ladder, set so the default patch is as loud as before
     double cfA = 0, cfD = 0, caA = 0, caD = 0, inGain = 1, outGain = 1;
 
     // state
@@ -602,7 +622,7 @@ private:
     int64_t cyc2 = 0; int maxD = 1600, rmW = 100, guardN = 529;
     double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
     double dcX = 0, dcY = 0;
-    double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0;
+    double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0, dbgOsc = 0;
     uint32_t trigCount = 0;
 };
 

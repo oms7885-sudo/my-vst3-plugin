@@ -24,7 +24,8 @@ struct Param
     const char* section;   // panel section, see `sections`
     Kind kind;
     float min, max, def;   // Float: real units. Choice: 0 .. count-1. Bool: 0 / 1
-    float centre;          // Float: >0 = this value sits at 12 o'clock (log-feel knob); 0 = linear
+    float centre;          // Float: >0 = logarithmic knob with this value at 12 o'clock (the geometric mean of
+                           //        min and max = evenly spaced octaves); 0 = linear
     const char* unit;      // Float: display unit ("Hz", "ms", "dB", "st", ...)
     const char* choices;   // Choice: options separated by '|'
     const char* tip;       // Korean hover help: "TITLE\n설명"
@@ -56,20 +57,20 @@ inline constexpr Param params[] = {
       "OSC 3 CONTROL\n켜면(기본) Osc 3가 연주하는 음을 따라갑니다. 끄면 연주와 상관없이 고정된 높이로 돕니다. 이때 Frequency 노브가 약 6옥타브를 움직이고, Range를 LO에 두면 필터를 흔드는 LFO가 됩니다(약 0.25~16Hz)." },
     { "osc2Range", "Osc 2 Range", "Range", "Oscillators", Kind::Choice, 0.0f, 4.0f, 1.0f, 0.0f, "", rangeChoices,
       "OSC 2 RANGE\n오실레이터 2의 옥타브입니다. 16'이 연주하는 음 그대로이고, 32'은 한 옥타브 아래입니다." },
-    { "osc2Freq", "Osc 2 Frequency", "Frequency", "Oscillators", Kind::Float, -9.0f, 9.0f, 0.0f, 0.0f, "st", nullptr,
-      "OSC 2 FREQUENCY\n오실레이터 2의 음정을 Osc 1 기준으로 옮깁니다. 무그와 같이 위아래 최대 장6도(9반음)입니다. 살짝만 돌리면 디튠이 되어 맥놀이가 생깁니다. 0이 아니면 실제 무그처럼 자유롭게 돌아서, 맥놀이가 음마다 다른 곳에서 납니다. 더블클릭하면 0으로 돌아갑니다." },
+    { "osc2Freq", "Osc 2 Frequency", "Frequency", "Oscillators", Kind::Float, -8.0f, 8.0f, 0.0f, 0.0f, "st", nullptr,
+      "OSC 2 FREQUENCY\n오실레이터 2의 음정을 Osc 1 기준으로 옮깁니다. 범위는 실제 무그에 맞춘 위아래 8반음입니다(무그 정비 기준: 끝에서 끝까지 14~17반음). 살짝만 돌리면 디튠이 되어 맥놀이가 생깁니다. 0이 아니면 실제 무그처럼 자유롭게 돌아서, 맥놀이가 음마다 다른 곳에서 납니다. 더블클릭하면 0으로 돌아갑니다." },
     { "osc2Wave", "Osc 2 Waveform", "Waveform", "Oscillators", Kind::Choice, 0.0f, 5.0f, 2.0f, 0.0f, "", waveChoices,
       "OSC 2 WAVEFORM\n삼각파, 삼각-톱니, 톱니파, 사각파, 넓은 펄스, 좁은 펄스 중에서 고릅니다." },
     { "osc3Range", "Osc 3 Range", "Range", "Oscillators", Kind::Choice, 0.0f, 5.0f, 1.0f, 0.0f, "", range3Choices,
       "OSC 3 RANGE\n오실레이터 3의 옥타브입니다. 기본은 32'(한 옥타브 아래)으로, 무그에서 서브 베이스를 만드는 방식입니다. LO는 아주 낮은 높이로, Osc 3 Control을 끄면 필터를 흔드는 LFO로 쓰입니다." },
-    { "osc3Freq", "Osc 3 Frequency", "Frequency", "Oscillators", Kind::Float, -9.0f, 9.0f, 0.0f, 0.0f, "st", nullptr,
-      "OSC 3 FREQUENCY\n오실레이터 3의 음정을 옮깁니다(위아래 최대 9반음). 살짝 돌리면 디튠입니다. Osc 3 Control이 꺼져 있으면 이 노브가 약 6옥타브(LO에서는 LFO 속도)를 움직입니다." },
+    { "osc3Freq", "Osc 3 Frequency", "Frequency", "Oscillators", Kind::Float, -8.0f, 8.0f, 0.0f, 0.0f, "st", nullptr,
+      "OSC 3 FREQUENCY\n오실레이터 3의 음정을 옮깁니다(위아래 최대 8반음). 살짝 돌리면 디튠입니다. Osc 3 Control이 꺼져 있으면 이 노브가 약 6옥타브(LO에서는 LFO 속도)를 움직입니다." },
     { "osc3Wave", "Osc 3 Waveform", "Waveform", "Oscillators", Kind::Choice, 0.0f, 5.0f, 3.0f, 0.0f, "", wave3Choices,
       "OSC 3 WAVEFORM\n기본은 사각파로, 서브로 가장 흔히 쓰는 파형입니다. 더 깊고 깨끗한 서브는 삼각파입니다. 원래 무그처럼 삼각-톱니 대신 역톱니파가 있습니다(LFO로 쓸 때 내려가는 톱니)." },
 
     // ---------------------------------------------------------------- Mixer
     { "osc1Lvl", "Osc 1 Volume", "Osc 1", "Mixer", Kind::Float, 0.0f, 1.0f, 0.8f, 0.0f, "", nullptr,
-      "OSC 1\n오실레이터 1 볼륨입니다. 믹서 볼륨을 높게 올릴수록 무그처럼 필터 입력이 눌리며 두껍고 거칠어집니다(오버로드)." },
+      "OSC 1\n오실레이터 1 볼륨입니다. 무그처럼 믹서 볼륨의 합이 필터를 미는 세기입니다. 낮추면 깨끗하고 레조넌스(Emphasis)가 또렷하게 들리고, 여러 개를 높게 올리면 필터가 눌리며 두껍고 거칠어집니다(오버로드)." },
     { "osc1On", "Osc 1 On", "On", "Mixer", Kind::Bool, 0.0f, 1.0f, 1.0f, 0.0f, "", nullptr,
       "OSC 1 ON\n오실레이터 1을 믹서에 넣고 뺍니다." },
     { "osc2Lvl", "Osc 2 Volume", "Osc 2", "Mixer", Kind::Float, 0.0f, 1.0f, 0.0f, 0.0f, "", nullptr,
@@ -92,28 +93,28 @@ inline constexpr Param params[] = {
       "WHITE / PINK\n끄면 화이트(밝은) 노이즈, 켜면 핑크(어두운) 노이즈입니다." },
 
     // ---------------------------------------------------------------- Filter
-    { "cutoff", "Cutoff Frequency", "Cutoff", "Filter", Kind::Float, 50.0f, 5000.0f, 160.0f, 500.0f, "Hz", nullptr,
-      "CUTOFF\n필터가 열리는 기준 주파수입니다(50Hz~5kHz). 낮을수록 어둡고 두꺼운 소리가 납니다." },
-    { "res", "Emphasis", "Emphasis", "Filter", Kind::Float, 0.0f, 1.0f, 0.3f, 0.0f, "", nullptr,
-      "EMPHASIS\n레조넌스입니다(0~1). 올리면 컷오프 근처가 강조되어 \"와우\" 소리가 납니다. 끝까지 올리면 필터가 스스로 발진해 사인파를 냅니다." },
+    { "cutoff", "Cutoff Frequency", "Cutoff", "Filter", Kind::Float, 40.0f, 20000.0f, 160.0f, 894.4f, "Hz", nullptr,
+      "CUTOFF\n필터가 열리는 기준 주파수입니다. 범위는 실제 무그와 같은 40Hz~20kHz(9옥타브)이고, 노브를 돌리는 만큼 옥타브 단위로 고르게 움직입니다. 낮을수록 어둡고 두꺼운 소리가 납니다." },
+    { "res", "Emphasis", "Emphasis", "Filter", Kind::Float, 0.0f, 1.0f, 0.24f, 0.0f, "", nullptr,
+      "EMPHASIS\n레조넌스입니다(0~1). 올리면 컷오프 근처가 강조되어 \"와우\" 소리가 납니다. 눈금은 실제 무그에 맞췄습니다: 0.75~0.8 부근부터 필터가 스스로 발진해 사인파를 냅니다. 무그처럼 컷오프가 낮을수록 효과가 약해져서(약 200Hz 아래에서는 발진하지 않음) 저음이 꽉 차게 남습니다." },
     { "envAmt", "Amount of Contour", "Contour Amt", "Filter", Kind::Float, 0.0f, 6.0f, 3.2f, 0.0f, "oct", nullptr,
       "AMOUNT OF CONTOUR\n필터 엔벨로프가 컷오프를 얼마나 더 여는지 정합니다(0~6옥타브). 올릴수록 피킹할 때 \"뿌왕\" 하는 폭이 커집니다." },
     { "keyTrk1", "Keyboard Control 1", "Kbd Ctrl 1", "Filter", Kind::Bool, 0.0f, 1.0f, 0.0f, 0.0f, "", nullptr,
       "KEYBOARD CONTROL 1\n높은 음일수록 필터를 조금(1/3) 더 엽니다. 2번과 같이 켜면 완전히 따라갑니다(1옥타브 올라가면 필터도 1옥타브)." },
     { "keyTrk2", "Keyboard Control 2", "Kbd Ctrl 2", "Filter", Kind::Bool, 0.0f, 1.0f, 1.0f, 0.0f, "", nullptr,
       "KEYBOARD CONTROL 2\n높은 음일수록 필터를 더 많이(2/3) 엽니다. 1번과 같이 켜면 완전히 따라갑니다." },
-    { "fA", "Filter Attack", "Attack", "Filter", Kind::Float, 0.5f, 500.0f, 3.0f, 20.0f, "ms", nullptr,
-      "ATTACK (필터)\n피킹 후 필터가 최대로 열리기까지의 시간입니다. 길게 하면 소리가 \"와\" 하고 차오릅니다." },
-    { "fD", "Filter Decay", "Decay", "Filter", Kind::Float, 20.0f, 3000.0f, 320.0f, 250.0f, "ms", nullptr,
-      "DECAY (필터)\n최대로 열린 필터가 Sustain 위치까지 닫히는 시간입니다. \"뿌왕\"의 길이를 정합니다. Decay 스위치가 켜져 있으면 음이 끝난 뒤 필터가 닫히는 시간도 이 값입니다." },
+    { "fA", "Filter Attack", "Attack", "Filter", Kind::Float, 0.5f, 10000.0f, 3.0f, 20.0f, "ms", nullptr,
+      "ATTACK (필터)\n피킹 후 필터가 최대로 열리기까지의 시간입니다(최대 10초). 길게 하면 소리가 \"와\" 하고 차오릅니다." },
+    { "fD", "Filter Decay", "Decay", "Filter", Kind::Float, 10.0f, 10000.0f, 320.0f, 250.0f, "ms", nullptr,
+      "DECAY (필터)\n최대로 열린 필터가 Sustain 위치까지 닫히는 시간입니다(10ms~10초). \"뿌왕\"의 길이를 정합니다. Decay 스위치가 켜져 있으면 음이 끝난 뒤 필터가 닫히는 시간도 이 값입니다." },
     { "fS", "Filter Sustain", "Sustain", "Filter", Kind::Float, 0.0f, 1.0f, 0.1f, 0.0f, "", nullptr,
       "SUSTAIN (필터)\n음이 유지되는 동안 필터가 머무는 위치입니다. 0이면 끝까지 닫힙니다." },
 
     // ---------------------------------------------------------------- Loudness
-    { "aA", "Loudness Attack", "Attack", "Loudness", Kind::Float, 0.5f, 500.0f, 1.5f, 20.0f, "ms", nullptr,
-      "ATTACK (라우드니스)\n피킹 후 소리가 최대 크기까지 커지는 시간입니다. 베이스는 보통 최소로 둡니다." },
-    { "aD", "Loudness Decay", "Decay", "Loudness", Kind::Float, 20.0f, 4000.0f, 900.0f, 300.0f, "ms", nullptr,
-      "DECAY (라우드니스)\n최대 크기에서 Sustain 크기까지 줄어드는 시간입니다. Decay 스위치가 켜져 있으면 음이 끝난 뒤 소리가 사라지는 시간도 이 값입니다." },
+    { "aA", "Loudness Attack", "Attack", "Loudness", Kind::Float, 0.5f, 10000.0f, 1.5f, 20.0f, "ms", nullptr,
+      "ATTACK (라우드니스)\n피킹 후 소리가 최대 크기까지 커지는 시간입니다(최대 10초). 베이스는 보통 최소로 둡니다." },
+    { "aD", "Loudness Decay", "Decay", "Loudness", Kind::Float, 10.0f, 10000.0f, 900.0f, 300.0f, "ms", nullptr,
+      "DECAY (라우드니스)\n최대 크기에서 Sustain 크기까지 줄어드는 시간입니다(10ms~10초). Decay 스위치가 켜져 있으면 음이 끝난 뒤 소리가 사라지는 시간도 이 값입니다." },
     { "aS", "Loudness Sustain", "Sustain", "Loudness", Kind::Float, 0.0f, 1.0f, 0.75f, 0.0f, "", nullptr,
       "SUSTAIN (라우드니스)\n음이 유지되는 동안의 크기입니다." },
     { "decaySw", "Decay", "Decay", "Loudness", Kind::Bool, 0.0f, 1.0f, 0.0f, 0.0f, "", nullptr,
