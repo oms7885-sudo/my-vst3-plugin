@@ -1,10 +1,13 @@
 // Evaluates the note detector (pick triggering) on annotated real bass lines:
 // IDMT-SMT-BASS-SINGLE-TRACKS (Fraunhofer IDMT, CC BY-NC-ND 4.0), 17 lines with note annotations.
+// Also checks that the oscillators run at the annotated pitch, with and without fundamental tracking.
 //   eval_trigger <data dir> <out dir>
 // <data dir>/single/audio/NNN.wav, <data dir>/single/misc/notes_csv/NNN_note_parameters.csv
 // Writes <out dir>/report.txt, and per line a block-feature file (NNN.feat, float32 rows, 1 ms each)
 // plus the annotated note starts (NNN.gt) for tuning the detector offline. No audio is written.
 #include "../Source/SynthEngine.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -74,6 +77,38 @@ static std::vector<Gt> readCsv (const fs::path& p)
 
 struct Stat { int notes = 0, miss = 0, extra = 0; std::vector<double> lat; };
 
+// Does the oscillator run at the annotated pitch? Judged per note from the cycles it ran between
+// 50 ms after the note's start and its end (at most 450 ms), and in 40 ms slices within that span.
+struct Pitch
+{
+    int notes = 0, ok = 0, octUp = 0, between = 0, low = 0; double slices = 0, slicesOk = 0;
+    void add (const std::vector<double>& osc, double sr, double on, double off, int midi)
+    {
+        const double t1 = on + 0.05, t2 = std::min (off - 0.01, on + 0.45);
+        if (t2 - t1 < 0.06) return;
+        const size_t i1 = (size_t) (t1 * sr), i2 = std::min (osc.size() - 1, (size_t) (t2 * sr));
+        if (i2 <= i1) return;
+        const double ref = 440.0 * std::pow (2.0, (midi - 69) / 12.0);
+        const double r = (osc[i2] - osc[i1]) / ((double) (i2 - i1) / sr) / ref;
+        ++notes;
+        if (r > 0.94 && r < 1.06) ++ok; else if (r > 1.88 && r < 2.12) ++octUp; else if (r <= 0.94) ++low; else ++between;
+        const size_t w = (size_t) (0.04 * sr), h = (size_t) (0.02 * sr);
+        for (size_t a = i1; a + w <= i2; a += h)
+        {
+            const double rs = (osc[a + w] - osc[a]) / 0.04 / ref;
+            slices += 1; if (rs > 0.94 && rs < 1.06) slicesOk += 1;
+        }
+    }
+    void merge (const Pitch& o) { notes += o.notes; ok += o.ok; octUp += o.octUp; between += o.between; low += o.low; slices += o.slices; slicesOk += o.slicesOk; }
+    std::string text() const
+    {
+        char b[200];
+        std::snprintf (b, sizeof b, "on pitch %3d/%3d (%.0f%%), octave up %d, between %d, low %d; time on pitch %.0f%%",
+                       ok, notes, notes ? 100.0 * ok / notes : 0.0, octUp, between, low, slices > 0 ? 100.0 * slicesOk / slices : 0.0);
+        return b;
+    }
+};
+
 static double pct (std::vector<double> v, double q)
 {
     if (v.empty()) return 0; std::sort (v.begin(), v.end());
@@ -90,6 +125,28 @@ int main (int argc, char** argv)
     char buf[512];
 
     Stat all, fast, slow;
+    // Oscillator pitch: the plugin's defaults, the oscillators as they were before fundamental tracking,
+    // and a few settings of the tracker's internals. NS = lines without slap.
+    struct Var { const char* name; void (*set) (bsyn::Params&); Pitch all, ns; };
+    std::vector<Var> vars = {
+        { "tracking on (defaults)", [] (bsyn::Params&) {} },
+        { "tracking off",           [] (bsyn::Params& q) { q.fundTrack = false; } },
+        { "ringing-note test off",  [] (bsyn::Params& q) { q.ftRing = false; } },
+        { "again on",               [] (bsyn::Params& q) { q.ftAgain = true; } },
+        { "grew x1.25",             [] (bsyn::Params& q) { q.ftOwn = 1.25f; } },
+        { "grew x2.5",              [] (bsyn::Params& q) { q.ftOwn = 2.5f; } },
+        { "filter at 1.35 x",       [] (bsyn::Params& q) { q.ftMul = 1.35f; } },
+        { "filter at 0.9 x",        [] (bsyn::Params& q) { q.ftMul = 0.9f; } },
+        { "dip depth 0.15",         [] (bsyn::Params& q) { q.ftDelta = 0.15f; } },
+        { "periodic < 0.15",        [] (bsyn::Params& q) { q.ftThr = 0.15f; } },
+        { "periodic < 0.4",         [] (bsyn::Params& q) { q.ftThr = 0.4f; } },
+        { "hold 1 ms",              [] (bsyn::Params& q) { q.ftHold = 1; } },
+        { "window 10 ms",           [] (bsyn::Params& q) { q.ftWin = 10.0f; } },
+        { "window 20 ms",           [] (bsyn::Params& q) { q.ftWin = 20.0f; } },
+        { "no lag correction",      [] (bsyn::Params& q) { q.ftComp = false; } },
+    };
+    FILE* nf = std::fopen ((out / "notes.csv").string().c_str(), "w");
+    if (nf) std::fprintf (nf, "line,on,off,midi,ref_hz,ps,es,r_on,r_off,found_ok,found_none,found_up,found_low,first_ok_ms,cut_ratio,wind,h1_db,h2_db,h3_db\n");
     int lines = 0;
     for (int n = 1; n <= 17; ++n)
     {
@@ -110,6 +167,10 @@ int main (int argc, char** argv)
         bsyn::Engine eng; eng.prepare (sr); eng.setParams (p);
         bsyn::Params q = p; q.comp = false;   // probe pass: uncompressed, for the feature dump
         bsyn::Engine prb; prb.prepare (sr); prb.setParams (q);
+        std::vector<bsyn::Engine> ve (vars.size());
+        std::vector<std::vector<double>> osc (vars.size(), std::vector<double> (a.size()));
+        for (size_t v = 0; v < vars.size(); ++v) { bsyn::Params pv = p; vars[v].set (pv); ve[v].prepare (sr); ve[v].setParams (pv); }
+        std::vector<float> fnd (a.size()), cut (a.size()), wnd (a.size());      // the default tracker's view
 
         const int BL = std::max (1, (int) std::lround (0.001 * sr));
         std::vector<int64_t> trig;
@@ -124,6 +185,8 @@ int main (int argc, char** argv)
             const float x = a[i] * g;
             eng.process (x);
             prb.process (x);
+            for (size_t v = 0; v < vars.size(); ++v) { ve[v].process (x); osc[v][i] = ve[v].probeOscPhase(); }
+            fnd[i] = (float) ve[0].probeFundHz(); cut[i] = (float) ve[0].probeTrackHz(); wnd[i] = (float) ve[0].probeWinding();
             if (eng.triggers() != last) { last = eng.triggers(); trig.push_back ((int64_t) i); tb = true; }
             const double x0 = x * std::pow (10.0, p.inGainDb / 20.0);
             const double hp = hpA * (hY + x0 - hX); hX = x0; hY = hp;
@@ -171,14 +234,56 @@ int main (int argc, char** argv)
                        id, gt[0].ps.c_str(), gt[0].es.c_str(), a.size() / sr, pct (iois, 0.5), s.notes, s.miss, s.extra, pct (s.lat, 0.5), pct (s.lat, 0.9));
         say (buf);
         all.notes += s.notes; all.miss += s.miss; all.extra += s.extra; all.lat.insert (all.lat.end(), s.lat.begin(), s.lat.end());
+
+        bool slap = false;
+        for (auto& e : gt) slap = slap || e.ps == "ST" || e.ps == "SP";
+        for (size_t v = 0; v < vars.size(); ++v)
+        {
+            Pitch pv;
+            for (auto& e : gt) pv.add (osc[v], sr, e.on, e.off, e.pitch);
+            if (v < 2) say (std::string ("    oscillator, ") + vars[v].name + ": " + pv.text() + "\n");
+            vars[v].all.merge (pv);
+            if (! slap) vars[v].ns.merge (pv);
+        }
+        // one row per note: what the tracker saw (for looking into the notes that go wrong)
+        for (auto& e : gt)
+        {
+            const double t1 = e.on + 0.05, t2 = std::min (e.off - 0.01, e.on + 0.45);
+            if (t2 - t1 < 0.06 || ! nf) continue;
+            const size_t i1 = (size_t) (t1 * sr), i2 = std::min (a.size() - 1, (size_t) (t2 * sr));
+            if (i2 <= i1) continue;
+            const double ref = 440.0 * std::pow (2.0, (e.pitch - 69) / 12.0), span = (double) (i2 - i1) / sr;
+            int ok = 0, none = 0, up = 0, low = 0, cnt = 0; double firstOk = -1, cr = 0, wd = 0; int wn = 0;
+            for (size_t i = (size_t) (e.on * sr); i < i2; i += 44)
+            {
+                const double r = fnd[i] / ref;
+                if (firstOk < 0 && r > 0.94 && r < 1.06) firstOk = ((double) i / sr - e.on) * 1000.0;
+                if (i < i1) continue;
+                ++cnt; cr += cut[i] / ref;
+                if (wnd[i] > 0) { wd += wnd[i]; ++wn; }
+                if (fnd[i] <= 0) ++none; else if (r > 0.94 && r < 1.06) ++ok; else if (r >= 1.06) ++up; else ++low;
+            }
+            // level of the first three harmonics in the plugin's input (dB re full scale)
+            double h[3];
+            for (int k = 1; k <= 3; ++k)
+            {
+                double c = 0, q = 0; const double w = 6.283185307179586 * ref * k / sr;
+                for (size_t i = i1; i < i2; ++i) { c += a[i] * g * std::cos (w * (double) (i - i1)); q += a[i] * g * std::sin (w * (double) (i - i1)); }
+                h[k - 1] = 20.0 * std::log10 (2.0 * std::sqrt (c * c + q * q) / (double) (i2 - i1) + 1e-9);
+            }
+            std::fprintf (nf, "%s,%.3f,%.3f,%d,%.1f,%s,%s,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.0f,%.2f,%.2f,%.1f,%.1f,%.1f\n",
+                          std::string (id).c_str(), e.on, e.off, e.pitch, ref, e.ps.c_str(), e.es.c_str(),
+                          (osc[0][i2] - osc[0][i1]) / span / ref, (osc[1][i2] - osc[1][i1]) / span / ref,
+                          cnt ? (double) ok / cnt : 0.0, cnt ? (double) none / cnt : 0.0, cnt ? (double) up / cnt : 0.0, cnt ? (double) low / cnt : 0.0,
+                          firstOk, cnt ? cr / cnt : 0.0, wn ? wd / wn : 0.0, h[0], h[1], h[2]);
+        }
     }
-    std::snprintf (buf, sizeof buf, "\nlines %d  notes %d  missed %d (%.1f%%)  false %d (%.1f%%)  latency med %.1f p90 %.1f ms\n",
-                   lines, all.notes, all.miss, all.notes ? 100.0 * all.miss / all.notes : 0.0, all.extra, all.notes ? 100.0 * all.extra / all.notes : 0.0,
-                   pct (all.lat, 0.5), pct (all.lat, 0.9));
-    say (buf);
-    std::snprintf (buf, sizeof buf, "fast notes (< 150 ms after the previous): %d, missed %d (%.1f%%)\nother notes: %d, missed %d (%.1f%%)\n",
-                   fast.notes, fast.miss, fast.notes ? 100.0 * fast.miss / fast.notes : 0.0, slow.notes, slow.miss, slow.notes ? 100.0 * slow.miss / slow.notes : 0.0);
-    say (buf);
+
+    say ("\nOscillator pitch against the annotated notes, 50-450 ms into each note (all lines)\n");
+    for (auto& v : vars) { char b2[64]; std::snprintf (b2, sizeof b2, "  %-24s", v.name); say (b2 + v.all.text() + "\n"); }
+    say ("Oscillator pitch, lines without slap\n");
+    for (auto& v : vars) { char b2[64]; std::snprintf (b2, sizeof b2, "  %-24s", v.name); say (b2 + v.ns.text() + "\n"); }
+    if (nf) std::fclose (nf);
     if (rep) std::fclose (rep);
     return lines > 0 ? 0 : 2;
 }

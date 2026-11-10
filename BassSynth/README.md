@@ -28,7 +28,7 @@ UI 작업 분담과 파라미터 표는 [docs/UI_HANDOFF.md](docs/UI_HANDOFF.md)
 | 섹션 | 컨트롤 |
 |---|---|
 | CONTROLLERS | Mod Amount(모드 휠 역할), Modulation Mix(Osc 3 ↔ 노이즈), Filter Mod 스위치 |
-| OSCILLATORS | Osc 1·2·3 Range, Waveform, Osc 2·3 Frequency(±9반음), Osc 3 Control 스위치(끄면 고정 음 / LO에서 LFO) |
+| OSCILLATORS | Osc 1·2·3 Range, Waveform, Osc 2·3 Frequency(±8반음), Osc 3 Control 스위치(끄면 고정 음 / LO에서 LFO) |
 | MIXER | Osc 1·2·3, External(DI), Noise 볼륨과 각각의 On 스위치, 노이즈 화이트/핑크 |
 | FILTER | Cutoff, Emphasis, Amount of Contour, Keyboard Control 1·2 스위치, Attack, Decay, Sustain |
 | LOUDNESS | Attack, Decay, Sustain, Decay 스위치(무그식 릴리즈), Dynamics |

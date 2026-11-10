@@ -10,21 +10,21 @@ namespace
     {
         static const std::vector<Preset> p = {
             { "Model D Bass", {} },
-            { "Punch Sub",    { { "osc1Lvl", 0.4f }, { "osc3Lvl", 1.0f }, { "cutoff", 120.0f }, { "res", 0.15f },
+            { "Punch Sub",    { { "osc1Lvl", 0.4f }, { "osc3Lvl", 1.0f }, { "cutoff", 120.0f }, { "res", 0.12f },
                                 { "envAmt", 2.2f }, { "fD", 180.0f }, { "fS", 0.0f } } },
-            { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.72f }, { "envAmt", 4.6f }, { "fD", 420.0f }, { "fS", 0.05f },
+            { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.57f }, { "envAmt", 4.6f }, { "fD", 420.0f }, { "fS", 0.05f },
                                 { "osc1Lvl", 0.9f }, { "osc3Lvl", 0.3f } } },
             { "Fat Detune",   { { "osc1Lvl", 0.7f }, { "osc2Lvl", 0.7f }, { "osc2Freq", 0.06f }, { "osc3Lvl", 0.6f }, { "osc3Freq", -0.05f },
-                                { "cutoff", 260.0f }, { "envAmt", 2.4f }, { "res", 0.2f } } },
+                                { "cutoff", 260.0f }, { "envAmt", 2.4f }, { "res", 0.16f } } },
             // osc 3 as a slow LFO on the filter (Osc 3 Control off, Range LO, not in the mixer)
             { "Wobble",       { { "osc2Lvl", 0.6f }, { "osc2Range", 0.0f }, { "osc3Ctl", 0.0f }, { "osc3Range", 0.0f }, { "osc3Wave", 0.0f },
-                                { "osc3On", 0.0f }, { "filterMod", 1.0f }, { "modAmt", 0.55f }, { "cutoff", 220.0f }, { "res", 0.55f },
+                                { "osc3On", 0.0f }, { "filterMod", 1.0f }, { "modAmt", 0.55f }, { "cutoff", 220.0f }, { "res", 0.43f },
                                 { "envAmt", 1.0f }, { "fS", 0.6f } } },
             // osc 3 an octave up modulating the filter at audio rate: the Moog growl
             { "Growl",        { { "osc3Range", 3.0f }, { "osc3Wave", 0.0f }, { "osc3On", 0.0f }, { "osc2Lvl", 0.5f }, { "osc2Range", 0.0f },
-                                { "filterMod", 1.0f }, { "modAmt", 0.3f }, { "cutoff", 200.0f }, { "res", 0.4f } } },
+                                { "filterMod", 1.0f }, { "modAmt", 0.3f }, { "cutoff", 200.0f }, { "res", 0.32f } } },
             // fitted to the target stem (Change - "Change of Heart") from change_rec.wav
-            { "Heart Bass",   { { "cutoff", 394.7235f }, { "res", 0.0814f }, { "envAmt", 0.6314f }, { "fA", 0.732f }, { "fD", 42.3895f }, { "fS", 0.4991f }, { "aA", 0.7952f }, { "aD", 572.5412f }, { "aS", 0.5765f }, { "osc1Lvl", 0.4295f }, { "osc2Lvl", 0.5892f }, { "osc3Lvl", 0.4903f }, { "osc2Freq", 0.0199f }, { "osc3Freq", 0.0262f }, { "tone", 963.6975f }, { "dyn", 0.1813f }, { "vintage", 0.1061f }, { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc2Range", 1.0f }, { "osc2Wave", 1.0f }, { "osc3Range", 1.0f }, { "osc3Wave", 4.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 0.0f }, { "decaySw", 1.0f } } },
+            { "Heart Bass",   { { "cutoff", 405.11f }, { "res", 0.1701f }, { "envAmt", 0.5369f }, { "fA", 0.5164f }, { "fD", 21.5644f }, { "fS", 0.3777f }, { "aA", 1.3832f }, { "aD", 278.2665f }, { "aS", 0.5629f }, { "osc1Lvl", 0.2542f }, { "osc2Lvl", 0.7653f }, { "osc3Lvl", 0.4621f }, { "osc2Freq", 0.039f }, { "osc3Freq", 0.0274f }, { "tone", 748.3006f }, { "dyn", 0.0376f }, { "vintage", 0.0791f }, { "osc1Range", 1.0f }, { "osc1Wave", 3.0f }, { "osc2Range", 1.0f }, { "osc2Wave", 2.0f }, { "osc3Range", 1.0f }, { "osc3Wave", 3.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 0.0f }, { "decaySw", 1.0f } } },
         };
         return p;
     }
@@ -60,7 +60,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
             continue;
         }
         NormalisableRange<float> range (d.min, d.max);
-        if (d.centre > 0.0f) range.setSkewForCentre (d.centre);
+        if (d.centre > 0.0f && d.min > 0.0f && d.centre > d.min && d.centre < d.max)
+        {
+            // logarithmic knob: value = min * (max/min)^(x^g), with g chosen so the centre value sits at
+            // 12 o'clock (g = 1, evenly spaced octaves, when the centre is the geometric mean)
+            const float lo = d.min, hi = d.max, span = std::log (hi / lo);
+            const float g = std::log (std::log (d.centre / lo) / span) / std::log (0.5f);
+            range = NormalisableRange<float> (lo, hi,
+                [lo, hi, span, g] (float, float, float x) { return jlimit (lo, hi, lo * std::exp (span * std::pow (jlimit (0.0f, 1.0f, x), g))); },
+                [lo, hi, span, g] (float, float, float v) { return jlimit (0.0f, 1.0f, std::pow (std::log (jlimit (lo, hi, v) / lo) / span, 1.0f / g)); });
+        }
         const String unit (d.unit);
         const bool signedUnit = unit == "st";
         auto toText = [unit, signedUnit] (float v, int)

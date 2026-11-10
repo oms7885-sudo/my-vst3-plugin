@@ -33,6 +33,24 @@ struct Params
     float overshoot = 1.22f;           // peak of a single note, relative to maximum sustain
     float overshootMax = 1.60f;        // highest peak quick re-triggering can build up to (1.22 x 1.31)
     float resFade = 150.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
+    // Fundamental tracking (internal; off = the oscillators follow the phase of everything under 250 Hz).
+    // The low band of a bass note holds its 2nd and 3rd harmonics too, so its phase does not advance
+    // evenly and, when a harmonic is louder than the fundamental, runs two or three cycles per period:
+    // a warped saw with extra teeth, or a note that sounds an octave up. With tracking, a low-pass
+    // placed just above the fundamental leaves only the fundamental before the phase is read, which
+    // gives an even ramp at one cycle per period. Where the fundamental is comes from the period of
+    // the low band (PeriodFinder); the oscillators' phase itself is still read straight off the DI, so
+    // nothing is delayed. The filter opens wide on every pick (the attack is as it was) and closes on
+    // the fundamental as soon as one period of the new note has been seen.
+    bool  fundTrack = true;
+    float ftMul = 1.1f;                // the low-pass sits at this x the fundamental
+    float ftThr = 0.25f, ftDelta = 0.05f;   // PeriodFinder: how periodic the band must be / how deep a dip must be
+    float ftWin = 14.0f;               // ms: PeriodFinder's window
+    bool  ftComp = true;               // take the low-pass's own phase lag back out
+    bool  ftRing = true;               // tell the last note ringing on from this note's fundamental
+    float ftOwn = 1.6f;                // ... by how much louder it must be after the pick than before
+    bool  ftAgain = false;             // ... or by its being the last note's fundamental again (off: misfires on octave patterns)
+    int   ftHold = 3;                  // ms a period must hold before the filter goes there
     float tone = 250.0f;               // Hz, low-pass on the External (DI) signal
     float vintage = 0.3f;              // 0 = stable reissue .. 1 = old unit: osc 2/3 drift on their own
 
@@ -40,7 +58,7 @@ struct Params
     // Range: -1 = LO (osc 3 only), 0 = 32', 1 = 16' (the note you play), 2 = 8', 3 = 4', 4 = 2'.
     // Wave: 0 triangle, 1 triangle-saw (osc 3: reverse saw), 2 saw, 3 square, 4 wide pulse, 5 narrow pulse.
     int   osc1Range = 1, osc1Wave = 2, osc2Range = 1, osc2Wave = 2, osc3Range = 0, osc3Wave = 3;
-    float osc2Freq = 0.0f, osc3Freq = 0.0f;   // semitones, -9..+9 (Model D: up to a major sixth either way)
+    float osc2Freq = 0.0f, osc3Freq = 0.0f;   // semitones, -8..+8 (service manual: 14-17 semitones end to end)
     bool  osc3Ctl = true;                     // Osc 3 Control: on = follows the DI, off = fixed pitch (drone / LFO)
 
     // ---- mixer (Model D: a volume and an on/off switch per source) ----
@@ -54,7 +72,7 @@ struct Params
     bool  filterMod = false;
 
     // ---- filter ----
-    float cutoff = 160.0f, res = 0.3f, envAmt = 3.2f;
+    float cutoff = 160.0f, res = 0.24f, envAmt = 3.2f;   // res 0.78 = self-oscillation (Model D dial 7.5-8)
     bool  keyTrk1 = false, keyTrk2 = true;    // 1/3 + 2/3 keyboard control
     float fA = 3.0f, fD = 320.0f, fS = 0.1f;  // ms, ms, 0..1
 
@@ -88,6 +106,8 @@ public:
         hold = 0.05 * sr; fastGap = 0.07 * sr; velA = 1 - std::exp (-1.0 / (0.003 * sr));
         inPkR = std::exp (-1.0 / (0.3 * sr)); drA = k (0.8);
         ktA = k (0.03);
+        fcA = k (0.004); fuA = k (0.008);
+        decD = std::max (1, (int) std::lround (sr / 2000.0)); pfWin = -1;
         lpCoef (250.0, cs);
         dcA = std::exp (-TAU * 15.0 / sr);
         reset();
@@ -112,6 +132,10 @@ public:
         seed = 777; drT = 0; dw[0] = dw[1] = dwT[0] = dwT[1] = 0;
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0; stF = stA = 0;
+        pf.reset(); decS = 0; decI = 0; fcT = fcN = 250.0; fundHz = fundUse = fundS = 0; lagP = 0; ph2P = 0; hD2 = 0; cyc2 = 0;
+        fCand = ownF = prevOwn = ringF = 0; fRun = 0; miss = 0; rawI = 0; std::fill (std::begin (rawW), std::end (rawW), 0.0);
+        std::fill (std::begin (sv), std::end (sv), 0.0);
+        std::fill (std::begin (hs2), std::end (hs2), 0.0);
         dcX = dcY = 0;
         n = 0;
     }
@@ -123,9 +147,13 @@ public:
         if (! haveCoefs || p.subLP != P.subLP) lpCoef (p.subLP, cd);
         haveCoefs = true;
         P = p;
+        if (pfWin != p.ftWin) { pfWin = p.ftWin; pf.prepare (sr / decD, pfWin); }
         mk = -p.cTh * (1.0 - 1.0 / p.cRat) * 0.5;
         thr = std::pow (10.0, p.gateDb / 20.0);
-        kRes = 4.1 * p.res;
+        // Emphasis scale: the service manual wants self-oscillation to begin between 7.5 and 8 on the dial
+        // and to carry on down to a cutoff under 300 Hz. With 5.2 it begins at 0.78 and (with resFade)
+        // holds down to about 200 Hz.
+        kRes = 5.2 * p.res;
         cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0);
         caA = k (p.aA / 3000.0); caD = k (p.aD / 3000.0);
         keyAmt = (p.keyTrk1 ? 1.0 / 3.0 : 0.0) + (p.keyTrk2 ? 2.0 / 3.0 : 0.0);
@@ -256,7 +284,104 @@ public:
         if (ph - phP < -0.5) ++cyc;     // one DI cycle completed (counts cycles for the 32' range)
         phP = ph;
         dbgDph = dph;
-        const double dt = std::min (std::max (dph, 1e-4), 0.05);
+        double phO = ph, dphO = dph;    // what the oscillators are drawn from
+        int64_t cycO = cyc;
+        if (p.fundTrack)
+        {
+            // where the fundamental is: the period of the low band, looked at once a millisecond
+            if (onset)
+            {
+                pf.pick(); fcT = 250.0; fRun = 0; miss = 0;
+                prevOwn = ownF; ownF = 0;
+                // the pitch of what was sounding before the pick (5-15 ms back: this note's attack is not in it yet)
+                ringF = 0;
+                for (int q = 5; q <= 15 && ringF <= 0; ++q) ringF = rawW[(rawI - q) & 15];
+            }
+            decS += uu;
+            if (++decI >= decD)
+            {
+                pf.push (decS / decD, (double) cyc + ph); decS = 0; decI = 0;
+                if (pf.n & 1)
+                {
+                    double f1 = 0, fw = 0, f = 0;
+                    const bool got = pf.find (p.ftThr, p.ftDelta, 8, f1, fw);
+                    dbgF1 = f1; dbgFw = fw; dbgWind = 0;
+                    rawW[rawI & 15] = fw; ++rawI;
+                    if (got)
+                    {
+                        f = fw;
+                        // How many cycles the low band's phase runs in one such period: 1 when the fundamental
+                        // is the loudest thing in the band. More means something an octave (or more) above is
+                        // louder: a harmonic of this note - or a new note, with the last one ringing on
+                        // underneath it. It is this note's fundamental if what was sounding before the pick
+                        // had another pitch, or if it got louder with the pick; a note left ringing has the
+                        // old pitch and only fades. If it is not this note's, follow the loudest instead.
+                        const double wd = pf.wind (fw);
+                        dbgWind = wd;
+                        if (p.ftRing && wd > 1.3)
+                        {
+                            bool own = (ownF > 0 && std::abs (fw / ownF - 1.0) < 0.08)
+                                    || (p.ftAgain && prevOwn > 0 && std::abs (fw / prevOwn - 1.0) < 0.08);
+                            if (! own) own = (ringF > 0 && std::abs (ringF / fw - 1.0) > 0.10) || pf.grew (fw, p.ftOwn);
+                            if (own) ownF = fw;
+                            else
+                            {
+                                const double k = std::round (wd);
+                                f = std::abs (wd - k) < 0.2 && k <= 4 ? fw * k : 0.0;
+                            }
+                        }
+                        if (f > 0 && fRun > 0 && std::abs (f / fCand - 1.0) < 0.04) ++fRun; else fRun = f > 0 ? 1 : 0;
+                        fCand = f;
+                    }
+                    else fRun = 0;
+                    if (fRun >= p.ftHold)                    // it has held for a few milliseconds: take it
+                    {
+                        fundHz = f; fundUse = f; miss = 0;
+                        fcT = std::min (250.0, std::max (36.0, (double) p.ftMul * f));
+                    }
+                    else
+                    {
+                        fundHz = 0;
+                        if (++miss > 25) fcT = 250.0;        // nothing to go by for a while: back to the whole low band
+                    }
+                }
+            }
+
+            // 4-pole low-pass just above it, then the phase of what is left
+            fcN += (fcT - fcN) * fcA;
+            fundS += (fundUse - fundS) * fuA;
+            static constexpr double KQ[2] = { 1.0 / 0.54119610, 1.0 / 1.3065630 };
+            double v = hp;
+            {
+                double g = PI * fcN / sr; g *= 1.0 + g * g / 3.0;              // tan() for small angles
+                for (int q = 0; q < 2; ++q)
+                {
+                    const double a1 = 1.0 / (1.0 + g * (g + KQ[q])), a2 = g * a1, a3 = g * a2;
+                    const double v3 = v - sv[2 * q + 1], v1 = a1 * sv[2 * q] + a2 * v3, v2 = sv[2 * q + 1] + a2 * sv[2 * q] + a3 * v3;
+                    sv[2 * q] = 2 * v1 - sv[2 * q]; sv[2 * q + 1] = 2 * v2 - sv[2 * q + 1]; v = v2;
+                }
+            }
+            double nI, nQ; hilbert (v, hs2, hD2, nI, nQ);
+            dbgN = std::sqrt (nI * nI + nQ * nQ);
+            const double ph2 = std::atan2 (-nQ, nI) / TAU + 0.5;
+            double d2 = ph2 - ph2P; if (d2 < -0.5) d2 += 1; else if (d2 > 0.5) d2 -= 1;
+            if (ph2 - ph2P < -0.5) ++cyc2;
+            ph2P = ph2;
+
+            // The low-pass delays the fundamental by a known part of a cycle (more the closer it sits).
+            // Adding that back keeps the oscillators in step with the DI wherever the filter is, and
+            // keeps them from bending while it moves.
+            double lag = 0;
+            if (p.ftComp && fundS > 0)
+            {
+                const double r = fundS / fcN, q = 1.0 - r * r;
+                lag = (std::atan2 (r * KQ[0], q) + std::atan2 (r * KQ[1], q)) / TAU;
+            }
+            const double un = (double) cyc2 + ph2 + lag, fl = std::floor (un);
+            cycO = (int64_t) fl; phO = un - fl; dphO = d2 + (lag - lagP); lagP = lag;
+        }
+        const double dt = std::min (std::max (dphO, 1e-4), 0.05);
+        dbgOsc = (double) cycO + phO;
 
         // ---- vintage drift: osc 2 and 3 each wander by a few cents on their own ----
         if (--drT <= 0)
@@ -269,26 +394,26 @@ public:
 
         // ---- oscillator bank: drawn from the DI's own phase (no pitch tracking) ----
         const double gAmp = std::min (1.0, agd * 40.0);
-        const double o1 = p.osc1On && p.osc1Lvl > 0 ? oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, ph, dt, 0.0, acc[0])) : 0.0;
-        const double o2 = p.osc2On && p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, ph, dt, p.osc2Freq + cents2 / 100.0, acc[1])) : 0.0;
+        const double o1 = p.osc1On && p.osc1Lvl > 0 ? oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, phO, dt, cycO, 0.0, acc[0])) : 0.0;
+        const double o2 = p.osc2On && p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, phO, dt, cycO, p.osc2Freq + cents2 / 100.0, acc[1])) : 0.0;
         const bool need3 = (p.osc3On && p.osc3Lvl > 0) || (p.filterMod && p.modAmt > 0 && p.modMix < 1);
         double o3 = 0;
         if (need3)
         {
             if (p.osc3Ctl)
-                o3 = oscWave (p.osc3Wave, true, oscPhase (p.osc3Range, ph, dt, p.osc3Freq + cents3 / 100.0, acc[2]));
+                o3 = oscWave (p.osc3Wave, true, oscPhase (p.osc3Range, phO, dt, cycO, p.osc3Freq + cents3 / 100.0, acc[2]));
             else
             {
                 // Osc 3 Control off: a fixed pitch set by Range, Frequency sweeps about 6 octaves
                 const int r = std::clamp (p.osc3Range, -1, 4);
                 const double base = r < 0 ? 2.0 : 32.703 * std::pow (2.0, (double) r);   // LO = 2 Hz, 32' = C1
-                const double f3 = base * std::pow (2.0, p.osc3Freq / 9.0 * 3.0 + cents3 / 1200.0);
+                const double f3 = base * std::pow (2.0, p.osc3Freq / 8.0 * 3.0 + cents3 / 1200.0);
                 const double d3 = f3 / sr;
                 o3free += d3; o3free -= std::floor (o3free);
                 o3 = oscWave (p.osc3Wave, true, { o3free, d3 });
             }
         }
-        if (gateOn && dph > 0) ktf += (std::min (std::max (sr * dph, 30.0), 600.0) - ktf) * ktA;
+        if (gateOn && dphO > 0) ktf += (std::min (std::max (sr * dphO, 30.0), 600.0) - ktf) * ktA;
         const double ext = th (yn * 0.9);               // External: the DI itself
         // noise source: white, or pink (Kellet's economy filter)
         const double wht = rnd();
@@ -301,8 +426,11 @@ public:
         double m = ((p.osc1On ? p.osc1Lvl * o1 : 0.0) + (p.osc2On ? p.osc2Lvl * o2 : 0.0)
                     + (p.osc3On ? p.osc3Lvl * o3 : 0.0) + (p.noiseOn ? p.noiseLvl * nzS : 0.0)) * gAmp
                    + (p.extOn ? p.extLvl * ext : 0.0);
-        // the mixer feeds the ladder hot, like the Model D: more mixer level = more overload
-        m = th (m * 0.55 * mixDrive) / std::sqrt (mixDrive) * 1.6;
+        // The mixer feeds the ladder directly, like the Model D: one oscillator at a moderate volume stays
+        // fairly clean and lets the resonance speak, three at full overload the filter and flatten it.
+        // (This level is 1/3.4 of the engine's earlier one: Moog cut the filter's input drive by that
+        // much during production, R2 47k -> 160k, to reduce intermodulation distortion.)
+        m = th (m * mixIn) * 0.832;
 
         // filter modulation: osc 3 and noise, mixed, scaled by the "wheel"
         const double modSrc = (1.0 - p.modMix) * o3 + p.modMix * pnk * 2.5;
@@ -346,12 +474,12 @@ public:
         if (gateOn && i - lastOn < 30 * BL)
             vel = std::min (1.0, std::max (0.2, notePkP / (0.4 * refOn + 1e-9)));
         velS += (vel - velS) * velA;
-        const double yv = y4 * (1 + p.res * rf * 0.9) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        const double yv = y4 * ladderOut * (1 + 0.22 * kR) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
         if (onset) trigCount++;
-        return (float) (th (dc * outGain) + p.dry * input);
+        return (float) (softLimit (dc * outGain) + p.dry * input);
     }
 
     // for the editor display
@@ -363,6 +491,13 @@ public:
     double probePhaseStep() const { return dbgDph; }                                  // cycles per sample
     double probePeriod() const    { return per; }                                     // samples
     double loudnessContour() const { return ae; }
+    double probeTrackHz() const   { return fcN; }       // fundamental tracking: where the low-pass is
+    double probeFundHz() const    { return fundHz; }    // ... and the fundamental it found (0: none just now)
+    double probeNarrow() const    { return dbgN; }      // ... and the level of what it lets through
+    double probeFirstHz() const   { return dbgF1; }     // PeriodFinder: the loudest part's period
+    double probeWholeHz() const   { return dbgFw; }     // PeriodFinder: the whole sound's period
+    double probeWinding() const   { return dbgWind; }   // low-band phase cycles per such period
+    double probeOscPhase() const  { return dbgOsc; }    // cycles the oscillators have run (16' range)
     bool   gateIsOpen() const  { return gateOn; }
     uint32_t triggers() const  { return trigCount; }
 
@@ -372,6 +507,15 @@ private:
 
 
     static double th (double q) { return q > 3 ? 1 : q < -3 ? -1 : q * (27 + q * q) / (27 + 9 * q * q); }
+    // output stage: untouched up to 0.8 of full scale (a synth's output does not squash its own
+    // attacks), then a soft knee that never passes full scale
+    static double softLimit (double v)
+    {
+        const double a = std::abs (v);
+        if (a <= 0.8) return v;
+        const double r = 0.8 + 0.2 * std::tanh ((a - 0.8) / 0.2);
+        return v < 0 ? -r : r;
+    }
     double k (double t) const { return 1.0 - std::exp (-1.0 / (std::max (t, 1e-5) * sr)); }
     double rnd()
     {
@@ -407,17 +551,124 @@ private:
         return std::min (room, carry * (stack + room / 3.0));
     }
 
+    // Times the last full cycle of a phase that is fed in step by step, and keeps the low end of the
+    // rates of the last ~100 ms (one figure per millisecond).
+    // Period of the low band: YIN's difference function on a 2 kHz copy, slid along one sample at a time.
+    // d[t] = sum over the last W samples of (x[j] - x[j - t])^2, which is small when t is a whole number
+    // of periods; that holds whichever harmonic is the loudest, which is what the phase alone cannot tell.
+    struct PeriodFinder
+    {
+        static constexpr int N = 256, LMAX = 84, PRE = 96;
+        double ring[N] {}, uw[N] {}, pre[PRE] {}, d[LMAX + 1] {}, fs = 2000.0;
+        int64_t n = 0, on = 0;
+        int W = 28, lmin = 6, lmax = 74, ref = 1;
+        void prepare (double fsDec, double winMs)
+        {
+            fs = fsDec;
+            W = std::min (64, std::max (8, (int) std::lround (winMs * 0.001 * fs)));
+            lmin = std::max (2, (int) (fs / 320.0)); lmax = std::min (LMAX - 1, (int) std::ceil (fs / 27.0));
+            reset();
+        }
+        void reset()
+        {
+            std::fill (std::begin (ring), std::end (ring), 0.0); std::fill (std::begin (uw), std::end (uw), 0.0);
+            std::fill (std::begin (pre), std::end (pre), 0.0); std::fill (std::begin (d), std::end (d), 0.0);
+            n = 0; on = 0; ref = 1;
+        }
+        // a new note: keep what the band was doing up to 4 ms before it (the attack is not in there yet)
+        void pick()
+        {
+            on = n;
+            for (int j = 0; j < PRE; ++j) pre[j] = ring[(n - 8 - PRE + j) & (N - 1)];
+        }
+        // x: the low band; phase: its running phase in cycles (not wrapped)
+        void push (double x, double phase)
+        {
+            ring[n & (N - 1)] = x; uw[n & (N - 1)] = phase;
+            const double xo = ring[(n - W) & (N - 1)];
+            for (int t = 1; t <= lmax; ++t)
+            {
+                const double a = x - ring[(n - t) & (N - 1)], b = xo - ring[(n - W - t) & (N - 1)];
+                d[t] += a * a - b * b;
+            }
+            double sum = 0;                                   // one lag summed afresh each time: rounding never builds up
+            for (int j = 0; j < W; ++j) { const double a = ring[(n - j) & (N - 1)] - ring[(n - j - ref) & (N - 1)]; sum += a * a; }
+            d[ref] = sum; if (++ref > lmax) ref = 1;
+            ++n;
+        }
+        // cycles the band's phase has run over the last period of `hz`
+        double wind (double hz) const
+        {
+            const double lag = fs / hz; const int l0 = (int) lag; const double fr = lag - l0;
+            if (l0 + 2 >= N || n < l0 + 3) return 1.0;
+            const double a = uw[(n - 1 - l0) & (N - 1)], b = uw[(n - 2 - l0) & (N - 1)];
+            return uw[(n - 1) & (N - 1)] - (a + (b - a) * fr);
+        }
+        // level of the part of `buf` (len samples, oldest first) that swings at `hz`
+        double level (const double* buf, int len, double hz) const
+        {
+            const double w = TAU * hz / fs, wn = TAU / (double) (len + 1);
+            double c = 0, q = 0, sum = 0;
+            for (int j = 0; j < len; ++j)
+            {
+                const double h = 0.5 - 0.5 * std::cos (wn * (j + 1)), v = buf[j] * h;
+                c += v * std::cos (w * j); q += v * std::sin (w * j); sum += h;
+            }
+            return 2.0 * std::sqrt (c * c + q * q) / sum;
+        }
+        // Did the part at `hz` get louder with the last pick? Compares the same length of signal before the
+        // pick and now (at least a period and a half of it, all of it after the pick).
+        bool grew (double hz, double ratio) const
+        {
+            const int len = (int) std::min ((int64_t) PRE, n - on - 6);
+            if (len < (int) (1.5 * fs / hz)) return false;
+            double now[PRE];
+            for (int j = 0; j < len; ++j) now[j] = ring[(n - len + j) & (N - 1)];
+            return level (now, len, hz) > ratio * level (pre + (PRE - len), len, hz) + 1e-5;
+        }
+        // Looks for the period. `first` is the shortest lag at which the band repeats well (what the loudest
+        // part of the sound is doing), `whole` the shortest at which it repeats about as well as it ever
+        // does (the sound as a whole). The two differ when a harmonic is louder than the fundamental - or
+        // when the last note is still ringing underneath a new one. False when the band is not periodic,
+        // or when the stretch that would say so reaches back before the last pick.
+        bool find (double thr, double delta, int guard, double& first, double& whole) const
+        {
+            double cm[LMAX + 2], run = 0, deep = 1e9;
+            for (int t = 1; t <= lmax; ++t) { run += d[t]; cm[t] = run > 1e-18 ? d[t] * t / run : 1.0; }
+            if (run < 1e-12) return false;
+            for (int t = lmin; t < lmax; ++t) deep = std::min (deep, cm[t]);
+            if (deep > thr) return false;
+            int ta = 0, tb = 0;
+            for (int t = lmin; t < lmax; ++t)
+                if (cm[t] <= cm[t - 1] && cm[t] <= cm[t + 1])
+                {
+                    if (n - on < W + t + guard) break;
+                    if (ta == 0 && cm[t] < thr) ta = t;
+                    if (cm[t] <= deep + delta) { tb = t; break; }
+                }
+            if (ta == 0) return false;
+            if (tb == 0) tb = ta;
+            const auto hz = [&] (int t)
+            {
+                const double a = cm[t - 1], b = cm[t], c = cm[t + 1], den = a - 2 * b + c;
+                return fs / ((double) t + (den > 1e-12 ? std::min (0.5, std::max (-0.5, 0.5 * (a - c) / den)) : 0.0));
+            };
+            first = hz (ta); whole = tb == ta ? first : hz (tb);
+            return true;
+        }
+    };
+
     struct OscPh { double t, dt; };
 
     // phase of one oscillator: range shifts the DI's phase by octaves (counting DI cycles for the low
     // ranges); a Frequency offset or vintage drift runs a phase accumulator at the DI's rate times the
     // interval and runs free (like a real Moog), so the beating lands somewhere different on every note
-    OscPh oscPhase (int range, double ph, double dt, float semi, double& accum) const
+    OscPh oscPhase (int range, double ph, double dt, int64_t cycles, float semi, double& accum) const
     {
         const int r = std::clamp (range, -1, 4);
         const int o = r < 0 ? -3 : r - 1;                         // LO = 3 octaves below 16', 32' = -1 .. 2' = +3
         double t, d;
-        if (o < 0) { const int64_t kd = (int64_t) 1 << -o; t = (ph + (double) (cyc % kd)) / (double) kd; d = dt / (double) kd; }
+        if (o < 0) { const int64_t kd = (int64_t) 1 << -o; t = (ph + (double) (cycles % kd)) / (double) kd; d = dt / (double) kd; }
         else       { const double mul = (double) (1 << o); t = ph * mul; t -= std::floor (t); d = dt * mul; }
         if (std::abs (semi) < 1e-3) { accum = t; return { t, d }; }
         const double ratio = std::pow (2.0, semi / 12.0);
@@ -484,7 +735,8 @@ private:
     int ehL = 0, ehL2 = 0, openN = 0;
     double c[5] {}, cd[5] {}, cs[5] {};
     double mk = 0, thr = 0, kRes = 0, keyAmt = 2.0 / 3.0, relFast = 0, inPkR = 0, drA = 0;
-    static constexpr double mixDrive = 3.7;
+    static constexpr double mixIn = 0.6;        // mixer sum -> ladder input (was 2.035)
+    static constexpr double ladderOut = 1.75;   // level after the ladder, set so the default patch is as loud as before
     double cfA = 0, cfD = 0, caA = 0, caD = 0, inGain = 1, outGain = 1;
 
     // state
@@ -501,9 +753,15 @@ private:
     int drT = 0; double dw[2] {}, dwT[2] {}; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
+    // fundamental tracking
+    PeriodFinder pf;
+    double fcT = 250, fcN = 250, fcA = 0, fuA = 0, fundHz = 0, fundUse = 0, fundS = 0, lagP = 0, decS = 0, dbgN = 0;
+    double sv[4] {}, hs2[32] {}, hD2 = 0, ph2P = 0, pfWin = -1;
+    double dbgF1 = 0, dbgFw = 0, dbgWind = 0, fCand = 0, ownF = 0, prevOwn = 0, ringF = 0, rawW[16] {};
+    int64_t cyc2 = 0; int decD = 22, decI = 0, fRun = 0, miss = 0, rawI = 0;
     double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
     double dcX = 0, dcY = 0;
-    double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0;
+    double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0, dbgOsc = 0;
     uint32_t trigCount = 0;
 };
 
