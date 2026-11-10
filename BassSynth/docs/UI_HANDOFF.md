@@ -108,3 +108,10 @@ engine from the UI.
 `Source/PluginEditor.*` is a working baseline that builds every control straight from the table,
 so a new parameter always appears even before the designed UI has a place for it. A designed UI
 may replace it entirely, as long as every id in the table remains reachable.
+
+## 2026-11-10: panel changes to place
+
+- New control `extSrc` (Choice, "DI|Feedback", section Mixer): a two-position selector next to the External
+  volume and its On switch.
+- `gate` is now named "Trigger Threshold" (label "Trig Thresh") and, with `pickSens`, sits in section
+  **Controllers**. Place both there, next to the trigger display. The ids are unchanged.

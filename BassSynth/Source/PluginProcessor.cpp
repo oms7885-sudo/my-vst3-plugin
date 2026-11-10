@@ -15,14 +15,51 @@ namespace
             { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.57f }, { "envAmt", 4.0f }, { "fD", 420.0f }, { "fS", 0.05f },
                                 { "osc1Lvl", 0.9f }, { "osc3Lvl", 0.3f } } },
             { "Fat Detune",   { { "osc1Lvl", 0.7f }, { "osc2Lvl", 0.7f }, { "osc2Freq", 0.06f }, { "osc3Lvl", 0.6f }, { "osc3Freq", -0.05f },
-                                { "cutoff", 260.0f }, { "envAmt", 2.4f }, { "res", 0.16f } } },
+                                { "cutoff", 260.0f }, { "envAmt", 2.4f }, { "res", 0.16f },
+                                { "extSrc", 1.0f }, { "extOn", 1.0f }, { "extLvl", 0.4f }, { "outGain", -2.5f } } },   // feedback: thicker lows
             // osc 3 as a slow LFO on the filter (Osc 3 Control off, Range LO, not in the mixer)
             { "Wobble",       { { "osc2Lvl", 0.6f }, { "osc2Range", 0.0f }, { "osc3Ctl", 0.0f }, { "osc3Range", 0.0f }, { "osc3Wave", 0.0f },
                                 { "osc3On", 0.0f }, { "filterMod", 1.0f }, { "modAmt", 0.55f }, { "cutoff", 220.0f }, { "res", 0.43f },
                                 { "envAmt", 1.0f }, { "fS", 0.6f } } },
             // osc 3 an octave up modulating the filter at audio rate: the Moog growl
             { "Growl",        { { "osc3Range", 3.0f }, { "osc3Wave", 0.0f }, { "osc3On", 0.0f }, { "osc2Lvl", 0.5f }, { "osc2Range", 0.0f },
-                                { "filterMod", 1.0f }, { "modAmt", 0.3f }, { "cutoff", 200.0f }, { "res", 0.32f } } },
+                                { "filterMod", 1.0f }, { "modAmt", 0.3f }, { "cutoff", 200.0f }, { "res", 0.32f },
+                                { "extSrc", 1.0f }, { "extOn", 1.0f }, { "extLvl", 0.4f }, { "outGain", -3.0f } } },   // feedback: body under the growl
+            // From published Model D patch sheets, moved onto this panel (dial numbers -> real units).
+            // Classic Bass: MusicRadar, "create a classic Minimoog bass sound". Cutoff -3, Emphasis 0, Contour 2-3,
+            // filter decay 400-600 ms to sustain 0, loudness decay 0.8-1 s, sustain 10, both Keyboard Controls on.
+            { "Classic Bass", { { "osc1Range", 0.0f }, { "osc1Wave", 3.0f }, { "osc1Lvl", 1.0f },
+                                { "osc2Range", 1.0f }, { "osc2Wave", 4.0f }, { "osc2Lvl", 0.65f }, { "osc2Freq", -0.07f },
+                                { "osc3Range", 2.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.65f }, { "osc3Freq", 0.07f },
+                                { "cutoff", 138.6f }, { "res", 0.0f }, { "envAmt", 1.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 1.0f },
+                                { "fA", 7.0f }, { "fD", 500.0f }, { "fS", 0.0f },
+                                { "aA", 0.5f }, { "aD", 900.0f }, { "aS", 1.0f }, { "decaySw", 1.0f } } },
+            // ... and its thick version: output patched back into External Input, External Volume 6-7
+            { "Classic Bass Fat", { { "osc1Range", 0.0f }, { "osc1Wave", 3.0f }, { "osc1Lvl", 1.0f },
+                                { "osc2Range", 1.0f }, { "osc2Wave", 4.0f }, { "osc2Lvl", 0.65f }, { "osc2Freq", -0.07f },
+                                { "osc3Range", 2.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.65f }, { "osc3Freq", 0.07f },
+                                { "cutoff", 138.6f }, { "res", 0.0f }, { "envAmt", 1.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 1.0f },
+                                { "fA", 7.0f }, { "fD", 500.0f }, { "fS", 0.0f },
+                                { "aA", 0.5f }, { "aD", 900.0f }, { "aS", 1.0f }, { "decaySw", 1.0f },
+                                { "extSrc", 1.0f }, { "extOn", 1.0f }, { "extLvl", 0.65f }, { "outGain", -1.5f } } },
+            // Gary Numan, "Are 'Friends' Electric?" bass (Reverb): three saws at 16', Cutoff 0, Emphasis 3, Contour 5,
+            // quick attack, 600 ms decay, sustain full, Decay on. Mixer levels and detune are not given: estimated.
+            { "Friends Bass", { { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc1Lvl", 0.8f },
+                                { "osc2Range", 1.0f }, { "osc2Wave", 2.0f }, { "osc2Lvl", 0.8f }, { "osc2Freq", 0.05f },
+                                { "osc3Range", 2.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.8f },
+                                { "cutoff", 894.4f }, { "res", 0.3f }, { "envAmt", 2.0f },
+                                { "fA", 1.0f }, { "fD", 600.0f }, { "fS", 1.0f },
+                                { "aA", 1.0f }, { "aD", 600.0f }, { "aS", 1.0f }, { "decaySw", 1.0f } } },
+            // Michael Jackson, "Thriller" bass (MusicRadar, on a software Minimoog): saw 16', square 16' at half
+            // volume a few cents off, saw 8' at 70 %. The filter is given as clock positions only (cutoff and
+            // emphasis about 9 o'clock, contour 40 %, decay 10 o'clock): read off this panel's dials, so approximate.
+            // Sustains and the loudness contour are not given: estimated.
+            { "Thriller Bass", { { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc1Lvl", 0.8f },
+                                { "osc2Range", 1.0f }, { "osc2Wave", 3.0f }, { "osc2Lvl", 0.5f }, { "osc2Freq", 0.04f },
+                                { "osc3Range", 3.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.7f },
+                                { "cutoff", 189.0f }, { "res", 0.25f }, { "envAmt", 1.6f },
+                                { "fA", 30.0f }, { "fD", 410.0f }, { "fS", 0.3f },
+                                { "aA", 0.5f }, { "aD", 600.0f }, { "aS", 1.0f } } },
             // fitted to the target stem (Change - "Change of Heart") from change_rec.wav
             { "Heart Bass",   { { "cutoff", 405.11f }, { "res", 0.1701f }, { "envAmt", 0.5369f }, { "fA", 0.5164f }, { "fD", 21.5644f }, { "fS", 0.3777f }, { "aA", 1.3832f }, { "aD", 278.2665f }, { "aS", 0.5629f }, { "osc1Lvl", 0.2542f }, { "osc2Lvl", 0.7653f }, { "osc3Lvl", 0.4621f }, { "osc2Freq", 0.039f }, { "osc3Freq", 0.0274f }, { "tone", 748.3006f }, { "dyn", 0.0376f }, { "vintage", 0.0791f }, { "osc1Range", 1.0f }, { "osc1Wave", 3.0f }, { "osc2Range", 1.0f }, { "osc2Wave", 2.0f }, { "osc3Range", 1.0f }, { "osc3Wave", 3.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 0.0f }, { "decaySw", 1.0f } } },
         };
@@ -142,7 +179,7 @@ bsyn::Params BassSynthProcessor::readParams() const
     p.osc1Lvl = f ("osc1Lvl"); p.osc2Lvl = f ("osc2Lvl"); p.osc3Lvl = f ("osc3Lvl");
     p.extLvl = f ("extLvl"); p.noiseLvl = f ("noiseLvl");
     p.osc1On = b ("osc1On"); p.osc2On = b ("osc2On"); p.osc3On = b ("osc3On");
-    p.extOn = b ("extOn"); p.noiseOn = b ("noiseOn"); p.noisePink = b ("noisePink");
+    p.extOn = b ("extOn"); p.noiseOn = b ("noiseOn"); p.noisePink = b ("noisePink"); p.extFb = c ("extSrc") == 1;
     p.modMix = f ("modMix"); p.modAmt = f ("modAmt"); p.filterMod = b ("filterMod");
     p.cutoff = f ("cutoff"); p.res = f ("res"); p.envAmt = f ("envAmt");
     p.keyTrk1 = b ("keyTrk1"); p.keyTrk2 = b ("keyTrk2");
