@@ -1228,6 +1228,12 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
                                .translated (flipX ? r.getRight() : r.getX(), flipY ? r.getBottom() : r.getY());
     g.setColour (juce::Colours::white);
     g.drawImageTransformed (sprite, transform);
+    if (id == "decaySw")
+    {
+        const juce::Rectangle<float> indicator (r.getRight() + 5.0f, r.getCentreY() - 2.5f, 5.0f, 5.0f);
+        g.setColour (on ? C::amber : C::pilotOff);
+        g.fillEllipse (indicator);
+    }
     if (highlighted || b.hasKeyboardFocus (false))
     {
         g.setColour (colour (panelInk).withAlpha (0.40f));
@@ -1354,12 +1360,12 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
 void BassSynthEditor::resized()
 {
     panelArea = { cheekW, panelTop, getWidth() - 2 * cheekW, panelHeight };
-    displayArea = mainPanelBounds ({ (controllerLeftX + controllerRightX - 174) / 2, 104, 174, 130 });
+    displayArea = mainPanelBounds ({ (cheekW + controllerDivider - 174) / 2, 104, 174, 130 });
     overloadArea = mainPanelBounds ({ 786, 97, 100, 44 });
     const int setupTop = panelArea.getBottom() + setupGap;
     setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), getHeight() - setupTop - 11 };
     badgeArea = { panelX (1140), setupTop + 15, 202, 78 };
-    presetBox.setBounds (96, 10, 215, 25);
+    presetBox.setBounds (124, 10, 215, 25);
 
     const auto place = [] (Control& k, int x, int y, bool compact)
     {
@@ -1383,6 +1389,8 @@ void BassSynthEditor::resized()
 
         if (k.id == "noisePink")
             k.button->setBounds (x - 13, y + 17, 26, 45);
+        else if (k.id == "decaySw")
+            k.button->setBounds (x - 38, y + 19, 76, 28);
         else
             k.button->setBounds (x - 27, y + (mixerOnSwitch (k.id) ? 16 : 19), 54, 28);
     };
@@ -1414,7 +1422,20 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white);
     g.drawImage (textures.leftWood, left.toFloat());
     g.drawImage (textures.rightWood, right.toFloat());
-    g.drawImage (textures.header, rail.removeFromTop (panelArea.getY()).toFloat());
+    const auto header = rail.removeFromTop (panelArea.getY()).toFloat();
+    g.drawImage (textures.header, header);
+    static const juce::Image bolts[] {
+        decodeImage (panelArtwork::headerBoltLeft), decodeImage (panelArtwork::headerBoltCentre),
+        decodeImage (panelArtwork::headerBoltRight)
+    };
+    constexpr float boltX[] { 98.0f, 864.0f, 1631.0f };
+    for (size_t i = 0; i < std::size (bolts); ++i)
+    {
+        constexpr float boltSize = 19.0f;
+        const float x = header.getX() + header.getWidth() * boltX[i] / 1728.0f;
+        const float y = header.getY() + header.getHeight() * 59.0f / 88.0f;
+        g.drawImage (bolts[i], { x - boltSize * 0.5f, y - boltSize * 0.5f, boltSize, boltSize });
+    }
     drawLowerWood (g, rail.withY (panelArea.getBottom()).withBottom (getHeight()), textures.lowerWood);
 
     drawSurface (g, panelArea);
@@ -1499,15 +1520,16 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.setColour (rule);
     g.drawRoundedRectangle (displayArea.toFloat(), 4.0f, 1.0f);
     const int displayX = displayArea.getX(), displayY = displayArea.getY();
-    led (displayX + 17, displayY + 18, trigFlash > 0);
-    led (displayX + 93, displayY + 18, gateLed);
+    const int displayMid = displayArea.getCentreX();
+    led (displayMid - 62, displayY + 18, trigFlash > 0);
+    led (displayMid + 14, displayY + 18, gateLed);
     led (overloadArea.getCentreX(), overloadArea.getY() + 11, overloadHold > 0);
     g.setFont (panelFont (9.0f));
     g.setColour (ink);
     g.drawText ("OVERLOAD", overloadArea.withTrimmedTop (19).withHeight (15), juce::Justification::centred);
     g.setColour (C::silk);
-    g.drawText ("TRIG", juce::Rectangle<int> { displayX + 28, displayY + 10, 40, 16 }, juce::Justification::centredLeft);
-    g.drawText ("GATE", juce::Rectangle<int> { displayX + 104, displayY + 10, 50, 16 }, juce::Justification::centredLeft);
+    g.drawText ("TRIG", juce::Rectangle<int> { displayMid - 51, displayY + 10, 40, 16 }, juce::Justification::centredLeft);
+    g.drawText ("GATE", juce::Rectangle<int> { displayMid + 25, displayY + 10, 50, 16 }, juce::Justification::centredLeft);
 
     juce::String note = "--";
     if (freq > 0.0f)
@@ -1519,16 +1541,17 @@ void BassSynthEditor::paint (juce::Graphics& g)
     }
     g.setColour (C::amber);
     g.setFont (monoFont (16.0f));
-    g.drawText (note, juce::Rectangle<int> { displayX + 11, displayY + 35, 146, 26 }, juce::Justification::centred);
+    g.drawText (note, displayArea.reduced (11, 0).withY (displayY + 35).withHeight (26), juce::Justification::centred);
     const auto meter = [&] (const char* label, int y, float value)
     {
         g.setFont (panelFont (8.5f));
         g.setColour (C::silk);
         g.drawText (label, juce::Rectangle<int> { displayX + 10, displayY + y, 40, 13 }, juce::Justification::centredLeft);
         g.setColour (juce::Colour (0xff4a3b25));
-        g.fillRect (displayX + 52, displayY + y + 5, 101, 3);
+        const int meterWidth = displayArea.getWidth() - 64;
+        g.fillRect (displayX + 52, displayY + y + 5, meterWidth, 3);
         g.setColour (C::amber);
-        g.fillRect (displayX + 52, displayY + y + 5, juce::roundToInt (101.0f * juce::jlimit (0.0f, 1.0f, value)), 3);
+        g.fillRect (displayX + 52, displayY + y + 5, juce::roundToInt ((float) meterWidth * juce::jlimit (0.0f, 1.0f, value)), 3);
     };
     meter ("INPUT", 65, input);
     meter ("FILTER", 84, filterEnv);
