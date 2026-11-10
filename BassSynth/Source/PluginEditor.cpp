@@ -1999,6 +1999,16 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
     panel.addAndMakeVisible (presetBox);
 
     presetBox.setTitle ("Preset");
+    savePresetButton.setTooltip ("Save the current settings as a user preset");
+    loadPresetButton.setTooltip ("Load a saved user preset");
+    savePresetButton.onClick = [this] { choosePresetFile (true); };
+    loadPresetButton.onClick = [this] { choosePresetFile (false); };
+    for (auto* button : { &savePresetButton, &loadPresetButton })
+    {
+        button->setColour (juce::TextButton::buttonColourId, lnf.findColour (juce::ComboBox::backgroundColourId));
+        button->setColour (juce::TextButton::textColourOffId, C::silk);
+        panel.addAndMakeVisible (*button);
+    }
     const int extraRows = juce::jmax (0, (auxiliaryCount - 1) / auxiliaryColumns);
     const int designHeight = editorH + extraRows * auxiliaryRowHeight;
     panel.setSize (editorW, designHeight);
@@ -2013,7 +2023,98 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
 BassSynthEditor::~BassSynthEditor()
 {
     stopTimer();
+    presetFileChooser.reset();
     setLookAndFeel (nullptr);
+}
+
+void BassSynthEditor::choosePresetFile (bool save)
+{
+    if (presetFileChooser != nullptr)
+        return;
+
+    const auto folder = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory)
+                            .getChildFile ("BassLadderSynth").getChildFile ("Presets");
+    if (const auto result = folder.createDirectory(); result.failed())
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "User presets",
+                                               "Could not open the preset folder. " + result.getErrorMessage(), {}, this);
+        return;
+    }
+
+    const auto initialFile = save ? folder.getChildFile ("My Preset.preset") : folder;
+    presetFileChooser = std::make_unique<juce::FileChooser> (save ? "Save user preset" : "Load user preset",
+                                                            initialFile, "*.preset", true, false, this);
+    const int flags = juce::FileBrowserComponent::canSelectFiles
+                    | (save ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
+                            : juce::FileBrowserComponent::openMode);
+    const juce::Component::SafePointer<BassSynthEditor> safe (this);
+    presetFileChooser->launchAsync (flags, [safe, save, folder] (const juce::FileChooser& chooser)
+    {
+        if (safe == nullptr)
+            return;
+
+        const auto file = chooser.getResult();
+        safe->presetFileChooser.reset();
+        if (file == juce::File {})
+            return;
+
+        if (save && file.getParentDirectory() != folder)
+        {
+            juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon, "Save user preset",
+                                                   "Choose a file in " + folder.getFullPathName(), {}, safe.getComponent());
+            return;
+        }
+
+        safe->handlePresetFile (file, save);
+    });
+}
+
+void BassSynthEditor::handlePresetFile (const juce::File& file, bool save)
+{
+    const auto showError = [this, save] (const juce::String& message)
+    {
+        juce::AlertWindow::showMessageBoxAsync (juce::MessageBoxIconType::WarningIcon,
+                                               save ? "Save user preset" : "Load user preset", message, {}, this);
+    };
+
+    if (! file.hasFileExtension (".preset"))
+    {
+        showError ("Choose a file with the .preset extension.");
+        return;
+    }
+
+    juce::MemoryBlock state;
+    if (save)
+    {
+        proc.getStateInformation (state);
+        if (state.isEmpty() || ! file.replaceWithData (state.getData(), state.getSize()))
+        {
+            showError ("Could not save the preset.");
+            return;
+        }
+    }
+    else
+    {
+        constexpr int maxPresetSize = 1024 * 1024;
+        juce::FileInputStream stream (file);
+        if (! stream.openedOk() || stream.readIntoMemoryBlock (state, maxPresetSize + 1) > maxPresetSize)
+        {
+            showError ("Could not read the preset.");
+            return;
+        }
+
+        const auto size = (int) state.getSize();
+        const auto xml = juce::AudioProcessor::getXmlFromBinary (state.getData(), size);
+        if (xml == nullptr || ! xml->hasTagName (proc.apvts.state.getType()))
+        {
+            showError ("This file does not contain a Bass Ladder Synth preset.");
+            return;
+        }
+
+        proc.setStateInformation (state.getData(), size);
+    }
+
+    presetBox.setText ("User: " + file.getFileNameWithoutExtension(), juce::dontSendNotification);
 }
 
 void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
@@ -2079,6 +2180,8 @@ void BassSynthEditor::layoutPanel()
     setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), panel.getHeight() - setupTop - setupGap };
     badgeArea = { panelX (1140), setupTop + 15, 202, 78 };
     presetBox.setBounds (124, 10, 215, 25);
+    savePresetButton.setBounds (presetBox.getRight() + 8, presetBox.getY(), 56, presetBox.getHeight());
+    loadPresetButton.setBounds (savePresetButton.getRight() + 6, presetBox.getY(), 56, presetBox.getHeight());
 
     const auto place = [] (Control& k, int x, int y, bool compact)
     {

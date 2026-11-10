@@ -54,6 +54,8 @@ private:
     };
 
     void addControl (const bsyn::spec::Param& d, bool small);
+    void choosePresetFile (bool save);
+    void handlePresetFile (const juce::File&, bool save);
 
     BassSynthProcessor& proc;
     PanelLookAndFeel lnf;
@@ -64,6 +66,8 @@ private:
     std::vector<juce::Line<float>> mixerLinks;
 
     juce::ComboBox presetBox;
+    juce::TextButton savePresetButton { "Save" }, loadPresetButton { "Load" };
+    std::unique_ptr<juce::FileChooser> presetFileChooser;
 
     juce::Rectangle<int> panelArea, displayArea, overloadArea, setupArea, badgeArea;
     uint32_t lastTrig = 0;
