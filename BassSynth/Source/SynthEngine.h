@@ -24,7 +24,14 @@ struct Params
     float tail = 0.4f;                 // 0 = off
     float subLP = 120.0f, hyst = 0.15f; // internal: period detector for the note detector (not on the panel)
     // internal Model D character (not on the panel):
-    float overshoot = 1.15f;           // both contours peak this far above "maximum" before falling back (the punch)
+    // Both contours peak above "maximum sustain" before the decay brings them back (the Model D punch).
+    // What is documented: the attack ends at a fixed threshold while the sustain control tops out at
+    // roughly 80-85 % of that peak (service manual: flip-flop reset at the threshold; clone makers and
+    // Moog technicians: sustain "10" behaves like 8-8.5), so a single note peaks about 1.18-1.25 above
+    // maximum sustain. Re-triggering before the contour has settled pushes each peak higher, levelling
+    // off after three or four quick hits about 30 % above the normal peak (8 V -> 10.5 V on a clone).
+    float overshoot = 1.22f;           // peak of a single note, relative to maximum sustain
+    float overshootMax = 1.60f;        // highest peak quick re-triggering can build up to (1.22 x 1.31)
     float resFade = 150.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
     float tone = 250.0f;               // Hz, low-pass on the External (DI) signal
     float vintage = 0.3f;              // 0 = stable reissue .. 1 = old unit: osc 2/3 drift on their own
@@ -104,7 +111,7 @@ public:
         std::fill (std::begin (pk3), std::end (pk3), 0.0); inPk = 0;
         seed = 777; drT = 0; dw[0] = dw[1] = dwT[0] = dwT[1] = 0;
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
-        fe = ae = 0; fs = as = 0;
+        fe = ae = 0; fs = as = 0; stF = stA = 0;
         dcX = dcY = 0;
         n = 0;
     }
@@ -211,6 +218,16 @@ public:
         else if (gateOn && Pn < std::max (thr, notePkP * 0.12)) { gateOn = false; fs = 3; as = 3; }
         if (onset)
         {
+            // a pick that lands while the last attack's peak is still standing (not yet back at the
+            // sustain level) lifts the next peak, a third of the way to the limit per hit
+            // (the click-then-pluck restart is one note and does not count as another hit)
+            if (! upgrade)
+            {
+                const double ov0 = std::max (1.0, (double) p.overshoot);
+                const double room = std::max (0.0, (double) p.overshootMax - ov0);
+                stF = stackUp (stF, fe, p.fS, ov0, room, fs == 1 || fs == 2);
+                stA = stackUp (stA, ae, p.aS, ov0, room, as == 1 || as == 2);
+            }
             notePk = eF; notePkP = Pn; lastOn = (double) i; fs = 1; as = 1; onP = Pn; runMax = Pn; decayed = false;
             refOn = upgrade ? refOn : refP;
         }
@@ -313,11 +330,11 @@ public:
 
         // RC envelopes
         // the attack runs past "maximum" to the overshoot peak, then the decay brings it back
-        const double ov = std::max (1.0, (double) p.overshoot);
-        if (fs == 1) { fe += (1.3 * ov - fe) * cfA; if (fe >= ov) { fe = ov; fs = 2; } }
+        const double ov = std::max (1.0, (double) p.overshoot), ovF = ov + stF, ovA = ov + stA;
+        if (fs == 1) { fe += (1.3 * ovF - fe) * cfA; if (fe >= ovF) { fe = ovF; fs = 2; } }
         else if (fs == 2) fe += (p.fS - fe) * cfD;
         else if (fs == 3) fe += (0 - fe) * (p.decaySw ? cfD : relFast);
-        if (as == 1) { ae += (1.3 * ov - ae) * caA; if (ae >= ov) { ae = ov; as = 2; } }
+        if (as == 1) { ae += (1.3 * ovA - ae) * caA; if (ae >= ovA) { ae = ovA; as = 2; } }
         else if (as == 2) ae += (p.aS - ae) * caD;
         else if (as == 3) ae += (0 - ae) * (p.decaySw ? caD : relFast);
 
@@ -378,6 +395,18 @@ private:
         }
         return q;
     }
+    // Peak build-up on quick re-triggering. `level` is the contour right now, `sustain` where its decay
+    // is heading, `ov0` the single-note peak, `room` how far above that the peak may grow. The share of
+    // the last peak still standing above the sustain level decides how much carries over; a contour
+    // that has settled (or was released) starts again from the single-note peak.
+    static double stackUp (double stack, double level, double sustain, double ov0, double room, bool sounding)
+    {
+        if (! sounding || room <= 0) return 0.0;
+        const double span = ov0 + stack - sustain;
+        const double carry = span > 1e-6 ? std::min (1.0, std::max (0.0, (level - sustain) / span)) : 0.0;
+        return std::min (room, carry * (stack + room / 3.0));
+    }
+
     struct OscPh { double t, dt; };
 
     // phase of one oscillator: range shifts the DI's phase by octaves (counting DI cycles for the low
@@ -472,6 +501,7 @@ private:
     int drT = 0; double dw[2] {}, dwT[2] {}; uint32_t seed = 777;
     double y1 = 0, y2 = 0, y3 = 0, y4 = 0, l1 = 0, l2 = 0, l3 = 0, l4 = 0;
     double fe = 0, ae = 0; int fs = 0, as = 0;
+    double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
     double dcX = 0, dcY = 0;
     double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0;
     uint32_t trigCount = 0;
