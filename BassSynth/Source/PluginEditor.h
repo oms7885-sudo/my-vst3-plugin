@@ -14,6 +14,7 @@ public:
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     juce::Slider::SliderLayout getSliderLayout (juce::Slider&) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
+    void positionComboBoxText (juce::ComboBox&, juce::Label&) override;
     // Korean hover help: name line + wrapped description
     juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
                                            juce::Rectangle<int> parentArea) override;
@@ -41,7 +42,7 @@ private:
         BassSynthEditor& owner;
     };
 
-    // one panel control: a knob (Float / Choice) or a switch (Bool)
+    // One parameter control: a knob, switch or choice selector.
     struct Control
     {
         juce::String id, label;
@@ -50,6 +51,8 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sliderAttachment;
         std::unique_ptr<juce::ToggleButton> button;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
+        std::unique_ptr<juce::ComboBox> selector;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> selectorAttachment;
         juce::Rectangle<int> labelArea;
     };
 

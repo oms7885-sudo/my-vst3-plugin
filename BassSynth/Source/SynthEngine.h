@@ -65,6 +65,9 @@ struct Params
     float osc1Lvl = 0.8f, osc2Lvl = 0.0f, osc3Lvl = 0.5f, extLvl = 0.0f, noiseLvl = 0.0f;
     bool  osc1On = true, osc2On = true, osc3On = true, extOn = false, noiseOn = false;
     bool  noisePink = false;
+    // External source. false: the DI. true: the plugin's own output, the Model D trick of patching the
+    // output back into External Input; External Volume then sets how hard the mixer is overdriven.
+    bool  extFb = false;
 
     // ---- modulation (filter only) ----
     float modMix = 0.0f;               // 0 = osc 3 .. 1 = noise
@@ -136,7 +139,7 @@ public:
         fCand = ownF = prevOwn = ringF = 0; fRun = 0; miss = 0; rawI = 0; std::fill (std::begin (rawW), std::end (rawW), 0.0);
         std::fill (std::begin (sv), std::end (sv), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
-        dcX = dcY = 0;
+        dcX = dcY = 0; fbZ = 0;
         n = 0;
     }
 
@@ -414,7 +417,9 @@ public:
             }
         }
         if (gateOn && dphO > 0) ktf += (std::min (std::max (sr * dphO, 30.0), 600.0) - ktf) * ktA;
-        const double ext = th (yn * 0.9);               // External: the DI itself
+        // External: the DI itself, or the output patched back in (taken after the loudness contour, so it
+        // is there only while a note sounds; one sample late, as any loop must be)
+        const double ext = p.extFb ? fbZ * fbGain : th (yn * 0.9);
         // noise source: white, or pink (Kellet's economy filter)
         const double wht = rnd();
         pk3[0] = 0.99765 * pk3[0] + wht * 0.0990460;
@@ -476,6 +481,7 @@ public:
         velS += (vel - velS) * velA;
         const double yv = y4 * ladderOut * (1 + 0.22 * kR) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
+        fbZ = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
         if (onset) trigCount++;
@@ -736,6 +742,8 @@ private:
     double c[5] {}, cd[5] {}, cs[5] {};
     double mk = 0, thr = 0, kRes = 0, keyAmt = 2.0 / 3.0, relFast = 0, inPkR = 0, drA = 0;
     static constexpr double mixIn = 0.6;        // mixer sum -> ladder input (was 2.035)
+    static constexpr double fbGain = 3.0;          // output -> External Input, in phase: fills out the lows (about +7 dB
+                                                // below 80 Hz at full External Volume) and overdrives the mixer
     static constexpr double ladderOut = 1.75;   // level after the ladder, set so the default patch is as loud as before
     double cfA = 0, cfD = 0, caA = 0, caD = 0, inGain = 1, outGain = 1;
 
@@ -760,7 +768,7 @@ private:
     double dbgF1 = 0, dbgFw = 0, dbgWind = 0, fCand = 0, ownF = 0, prevOwn = 0, ringF = 0, rawW[16] {};
     int64_t cyc2 = 0; int decD = 22, decI = 0, fRun = 0, miss = 0, rawI = 0;
     double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
-    double dcX = 0, dcY = 0;
+    double dcX = 0, dcY = 0, fbZ = 0;
     double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0, dbgOsc = 0;
     uint32_t trigCount = 0;
 };
