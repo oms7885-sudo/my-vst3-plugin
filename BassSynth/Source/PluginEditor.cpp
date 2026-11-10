@@ -998,22 +998,6 @@ namespace
         "01iR45/i67StxXPi4rNAV+60IseV5XLBdHfk+zJR5Yo0nFOytSTIcwXRbBbX3KfEzW52xd9PIr2mCc52mDsdMHJIgPgHxiTncaj4w8YAAAAASUVO"
         "RK5CYII=";
 
-    const char mockupOverload[] =
-        "iVBORw0KGgoAAAANSUhEUgAAAFQAAAAQCAYAAACIoli7AAAAAW9yTlQBz6J3mgAABBJJREFUWMPt2GmoVVUUB/DfMzW1wayUTCq1MKKRSqGBVCoL"
-        "o3lAIiscSCMxoiyiTw1UhhBKaUbiiCQUKWqpVGZlSlEkjRZalmWDA6kpvtI+7HW429O5r2c8COItuKw9rL3P2v817X0btm/5Tiu1HLX5rxX4v1Er"
-        "oC1MrYC2MLWtGDsSt6MzPsdSbMnmB+MqTMBXFesfwcNoxFAch1/QER3wbvxgJHZgJ1bjp9JeI7EBS5o4wwXxjbX48B/OOwRr8FnFXH8MwFbswtv4"
-        "4kABbSgVpfG4r0JuJm7LAF2EFaFETs9jBE4IIPZV7LUJ3dGtAsDxuD/a7bAHb8VByzQSU0tjjRiG2XXO24j5uKFi7s2K7yzHwAMBNA/5qQHmDxiE"
-        "0yVP/R63YmHILQ5QLqrYb4TkaRuysTU4Gr1wFs6O8W7BJ6NrKD8O58V4QwZCmZ4KfeejL07BLdiOWbi6Yk03KSKr5uDw4JfjktBnANb/G0AHShZf"
-        "hB5Yhk8wQwqnybgC/UJ+TPC7sr0eCj689I1V2Ixv8DF+jPEewafgVzVPKCKhQ/Ddpf1uxr14AtfgAyk05+AoTMcrYaScFgdvi0kVWHQJgyzB66HP"
-        "GPSMvZtFRcgvwJWx6bY6svsC6EFZfz16R3+XFMI9S2vgBbSP9kLMC+OslqJgBp7FaMnT5ki5fHOAc22255foo+bB9XR9Eg9Ef5TkFAOltNK3Yv23"
-        "UipqXxr/DYdqZgEvhM4Jvq0J2RU4s9TvhSOkUO4ghWIVDZcK1FDJs6h53nQpGkZLYVZ4w96SjgX1CVCbor24NOtPwkb758TxFevaVYxt0rTxKgHd"
-        "1QzZk7Au6z+aAfJytJ+pWLcuFGpAJzWP7pLJnCrdJKoKQBnQnTi5Gecqqm1fKczb4BicFuPl4tuoOl93bi6YubJvBB9cR+4mHIuJ2dgy/Cwl+V51"
-        "wGT/ApUb7rDg0/CqFOJVtKPUXxp8SB354gwTgj8evLuUv1dlsndn7YPVoqKgM6Ri9umBAlrkmkXSvS6ny/Ai/sTc0tw9WXtcaa4Ik051vl2AOy8D"
-        "4f1svkgJf5TWDQs+VzJkTtfFGVZK90i4WEpPAyTjn487Y25stnav/a9xJ6rda8dqJhWAblELo3ekpL45+GtSJa16BBT5biZ+L80V+ahf7FP8CiWL"
-        "bxd5eRTOlQpVcUBSkSrWPi3l+Y6S56+TDL0j5l8K/Qun2Bq8v3SfXYD3pAI1ViqgxZ20K44PQ+7D1zgI10tVv1mUg7RW8qrHcKMUkqsCrMlN7DFb"
-        "ehlVGWulFGodM5CK19WamP8o+s8FuBeGHnukVNRb7aW2Kfhu6fHwoJSODpHuy1OkaCIVy41hkCqaKL34+kR/mnSbKAy5HHf4u6M0SQ2tf9+1LP0F"
-        "kav2z5N4JgcAAAAASUVORK5CYII=";
-
     const char mockupModAmount[] =
         "iVBORw0KGgoAAAANSUhEUgAAAGAAAAAdCAYAAABVJGknAAAIYUlEQVRo3u2ae7DWRRnHPxzO4RJnA1bDkBZBvNBoEWCSYxeY0UiassAZyCgvaUxF"
         "hjhZIAoSTg0kCGLpaJGXxttk03ECpYG8UWCUolM5osBpVSBlARe5CZz+2GfPu+/y+73UnMPgNOc7887uPvvs83v29uyzz77QgQ504L+Ad7bbsdbh"
@@ -1275,7 +1259,6 @@ namespace
             { "outGain", decodeImage (mockupVolume), 12 },
             { "FILTER MOD", decodeImage (mockupFilterMod), 18 },
             { "OSC. 3 CONTROL", decodeImage (mockupOscControl), 18 },
-            { "OVERLOAD", decodeImage (mockupOverload), 10 },
             { "MOD AMOUNT", decodeImage (mockupModAmount), 18 },
             { "MOD MIX", decodeImage (mockupModMix), 18 },
         };
@@ -1345,7 +1328,7 @@ namespace
     constexpr int controllerPanelLeft = cheekW + mainBezelSideInset;
     constexpr int controllerCentreX = (controllerPanelLeft + controllerDivider) / 2;
     constexpr int controllerLeftX = controllerCentreX - 51, controllerRightX = controllerCentreX + 51;
-    constexpr int controllerRowY = 265;
+    constexpr int controllerRowY = 249, triggerRowY = 370;
     constexpr int oscillatorRow (int index) { return 90 + 119 * index; }
 
     bool bridgesDivider (const juce::String& id)
@@ -1369,7 +1352,7 @@ namespace
     struct Placement { const char* id; int x, y; };
     constexpr Placement mainControls[] {
         { "modAmt", controllerLeftX, controllerRowY }, { "modMix", controllerRightX, controllerRowY },
-        { "gate", 204, 98 }, { "pickSens", 204, 173 },
+        { "gate", controllerLeftX, triggerRowY }, { "pickSens", controllerRightX, triggerRowY },
         { "filterMod", modifierDivider, 115 },
         { "osc1Range", oscillatorRangeX, oscillatorRow (0) }, { "osc1Wave", oscillatorWaveformX, oscillatorRow (0) },
         { "osc2Range", oscillatorRangeX, oscillatorRow (1) }, { "osc2Freq", oscillatorFrequencyX, oscillatorRow (1) - 7 },
@@ -1380,7 +1363,7 @@ namespace
         { "osc1Lvl", 649, oscillatorRow (0) }, { "osc1On", 730, oscillatorRow (0) + 31 },
         { "osc2Lvl", 649, oscillatorRow (1) }, { "osc2On", 730, oscillatorRow (1) + 31 },
         { "osc3Lvl", 649, oscillatorRow (2) }, { "osc3On", 730, oscillatorRow (2) + 31 },
-        { "extLvl", 810, 151 }, { "extOn", 730, 181 }, { "extSrc", 889, 147 },
+        { "extLvl", 810, 151 }, { "extOn", 730, 181 }, { "extSrc", 810, 80 },
         { "noiseLvl", 810, 275 }, { "noiseOn", 730, 305 }, { "noisePink", 873, 297 },
         { "cutoff", modifierLeftX, 91 }, { "res", modifierCentreX, 91 }, { "envAmt", modifierRightX, 91 },
         { "fA", modifierLeftX, 216 }, { "fD", modifierCentreX, 216 }, { "fS", modifierRightX, 216 },
@@ -1719,6 +1702,8 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const auto id = b.getComponentID();
     const bool vertical = id == "noisePink";
     const bool mixer = mixerOnSwitch (id);
+    const bool externalSource = id == "extSrc";
+    const bool blue = mixer || vertical || externalSource;
     const bool compressor = id == "comp";
     const bool silver = compressor || id == "decaySw";
     const bool on = b.getToggleState();
@@ -1726,10 +1711,10 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const float position = rocker != nullptr ? rocker->getPosition() : (on ? 1.0f : 0.0f);
 
     auto area = b.getLocalBounds().toFloat();
-    const auto body = mixer || compressor ? area.removeFromTop ((float) mixerRockerHeight) : area;
-    const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (mixer ? 54.0f : 51.0f),
+    const auto body = mixer || compressor || externalSource ? area.removeFromTop ((float) mixerRockerHeight) : area;
+    const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (blue ? 54.0f : 51.0f),
                                                    vertical ? 43.0f : 22.0f);
-    const auto& sprite = switchPhoto (position, mixer || vertical, silver);
+    const auto& sprite = switchPhoto (position, blue, silver);
     g.setColour (juce::Colours::white.withAlpha (pressed ? 0.92f : 1.0f));
     if (vertical)
     {
@@ -1751,7 +1736,17 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
         return;
     }
 
-    if (vertical)
+    if (externalSource)
+    {
+        static const auto choices = juce::StringArray::fromTokens (utf8 (bsyn::spec::find ("extSrc")->choices), "|", "");
+        g.setFont (panelFont (11.0f));
+        g.setColour (on ? C::silkDim : colour (panelInk));
+        area.removeFromLeft (10.0f);
+        g.drawText (choices[0].toUpperCase(), area.removeFromLeft (26.0f), juce::Justification::centred);
+        g.setColour (on ? colour (panelInk) : C::silkDim);
+        g.drawText (choices[1].toUpperCase(), area, juce::Justification::centred);
+    }
+    else if (vertical)
     {
         g.setFont (panelFont (11.0f));
         g.setColour (on ? C::silkDim : colour (panelInk));
@@ -1806,6 +1801,8 @@ juce::Slider::SliderLayout PanelLookAndFeel::getSliderLayout (juce::Slider& slid
         layout.textBoxBounds.translate (0, -9);
     else if (oscillator || loudness)
         layout.textBoxBounds.translate (0, loudness ? -7 : -8);
+    else if (id == "gate" || id == "pickSens")
+        layout.textBoxBounds.translate (0, -7);
     return layout;
 }
 
@@ -1817,18 +1814,6 @@ juce::Label* PanelLookAndFeel::createSliderTextBox (juce::Slider& s)
     l->setColour (juce::Label::outlineColourId, juce::Colours::transparentBlack);
     l->setColour (juce::Label::backgroundColourId, juce::Colours::transparentBlack);
     return l;
-}
-
-void PanelLookAndFeel::positionComboBoxText (juce::ComboBox& box, juce::Label& label)
-{
-    if (box.getComponentID() == "extSrc")
-    {
-        label.setBounds (4, 0, box.getWidth() - 19, box.getHeight());
-        label.setFont (panelFont (12.0f, false));
-        return;
-    }
-
-    LookAndFeel_V4::positionComboBoxText (box, label);
 }
 
 //==============================================================================
@@ -1976,7 +1961,9 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
     Control k;
     k.id = d.id; k.label = utf8 (d.label); k.small = small;
     if (k.id == "osc3Ctl") k.label = "Osc. 3 Control";
-    if (d.kind == bsyn::spec::Kind::Bool)
+    const bool externalSource = k.id == "extSrc" && d.kind == bsyn::spec::Kind::Choice
+                             && d.min == 0.0f && d.max == 1.0f;
+    if (d.kind == bsyn::spec::Kind::Bool || externalSource)
     {
         k.button = std::make_unique<AnimatedRocker>();
         k.button->setComponentID (d.id);
@@ -1984,16 +1971,6 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
         k.button->setTooltip (tipFor (d.id));
         k.buttonAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, d.id, *k.button);
         panel.addAndMakeVisible (*k.button);
-    }
-    else if (k.id == "extSrc" && d.kind == bsyn::spec::Kind::Choice)
-    {
-        k.selector = std::make_unique<juce::ComboBox>();
-        k.selector->setComponentID (d.id);
-        k.selector->setTitle (utf8 (d.name));
-        k.selector->setTooltip (tipFor (d.id));
-        k.selector->addItemList (juce::StringArray::fromTokens (utf8 (d.choices), "|", ""), 1);
-        k.selectorAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment> (proc.apvts, d.id, *k.selector);
-        panel.addAndMakeVisible (*k.selector);
     }
     else
     {
@@ -2037,8 +2014,8 @@ void BassSynthEditor::resized()
 void BassSynthEditor::layoutPanel()
 {
     panelArea = { cheekW, panelTop, panel.getWidth() - 2 * cheekW, panelHeight };
-    displayArea = mainPanelBounds ({ controllerPanelLeft + 8, 104, 117, 138 });
-    overloadArea = mainPanelBounds ({ 780, 97, 100, 44 });
+    displayArea = mainPanelBounds ({ controllerCentreX - 87, 104, 174, 130 });
+    displayArea.setCentre (panelX (controllerCentreX), displayArea.getCentreY());
     const int setupTop = panelArea.getBottom() + setupGap;
     setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), panel.getHeight() - setupTop - setupGap };
     badgeArea = { panelX (1140), setupTop + 15, 202, 78 };
@@ -2048,8 +2025,7 @@ void BassSynthEditor::layoutPanel()
 
     const auto place = [] (Control& k, int x, int y, bool compact)
     {
-        const bool triggerDial = k.id == "gate" || k.id == "pickSens";
-        const int labelWidth = triggerDial ? 78 : (compact ? 94 : 98);
+        const int labelWidth = compact ? 94 : 98;
         const auto positionY = [=] (int offset, int height)
         {
             return compact ? y + offset : panelY (y + offset + height / 2) - height / 2;
@@ -2061,18 +2037,11 @@ void BassSynthEditor::layoutPanel()
             labelOffset = 3;
 
         k.labelArea = { x - labelWidth / 2, positionY (labelOffset, 18), labelWidth, 18 };
-        if (k.selector)
-        {
-            k.labelArea = { x - 34, positionY (0, 17), 49, 17 };
-            k.selector->setBounds (x - 33, positionY (17, 16), 66, 16);
-            return;
-        }
-
         if (k.slider)
         {
-            const int width = compact || triggerDial ? 74 : 98;
+            const int width = compact ? 74 : 98;
             const bool filterEnvelope = k.id == "fA" || k.id == "fD" || k.id == "fS";
-            const int height = triggerDial ? 58 : (compact ? 80 : (filterEnvelope ? 86 : 104));
+            const int height = compact ? 80 : (filterEnvelope ? 86 : 104);
             const int top = compact ? y + 17 : panelY (y + 17);
             const int bottom = compact ? top + height : panelY (y + 17 + height);
             k.slider->setBounds (x - width / 2, top, width, bottom - top);
@@ -2084,6 +2053,8 @@ void BassSynthEditor::layoutPanel()
 
         if (k.id == "noisePink")
             k.button->setBounds (x - 17, positionY (17, 45) - 12, 34, 69);
+        else if (k.id == "extSrc")
+            k.button->setBounds (x - 43, positionY (16, mixerRockerHeight), 86, mixerRockerHeight + 13);
         else if (k.id == "comp")
             k.button->setBounds (x - 27, positionY (19, mixerRockerHeight), 54, mixerRockerHeight + 13);
         else if (k.id == "decaySw")
@@ -2244,7 +2215,7 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
         if (! k.small && drawMockupLabel (g, key, k.labelArea))
             continue;
         g.setColour (ink);
-        const bool compactLabel = k.small || k.button != nullptr || k.selector != nullptr || k.id == "gate" || k.id == "pickSens";
+        const bool compactLabel = k.small || k.button != nullptr;
         const float labelSize = compactLabel ? 13.0f : 16.0f;
         g.setFont (panelFont (labelSize));
         g.drawFittedText (text, k.labelArea, juce::Justification::centred, 2, 0.78f);
@@ -2269,8 +2240,6 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
     g.drawRoundedRectangle (displayArea.toFloat(), 4.0f, 1.0f);
     const int displayX = displayArea.getX(), displayY = displayArea.getY();
     const int displayMid = displayArea.getCentreX();
-    led (overloadArea.getCentreX(), overloadArea.getY() + 11, overloadHold > 0);
-    drawMockupLabel (g, "OVERLOAD", overloadArea.withTrimmedTop (19).withHeight (15));
 
     const auto status = [&] (const char* label, int centreX, bool active)
     {
@@ -2321,9 +2290,6 @@ void BassSynthEditor::timerCallback()
     input = proc.displayInput.load();
     filterEnv = proc.displayFilterEnv.load();
     ampEnv = proc.displayAmpEnv.load();
-    const bool wasOverloaded = overloadHold > 0;
-    if (input > 0.9f) overloadHold = 8; else if (overloadHold > 0) --overloadHold;
-    if (wasOverloaded != (overloadHold > 0)) panel.repaint (overloadArea);
     panel.repaint (displayArea);
 }
 

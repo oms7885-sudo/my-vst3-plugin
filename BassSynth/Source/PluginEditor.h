@@ -14,7 +14,6 @@ public:
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     juce::Slider::SliderLayout getSliderLayout (juce::Slider&) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
-    void positionComboBoxText (juce::ComboBox&, juce::Label&) override;
     // Korean hover help: name line + wrapped description
     juce::Rectangle<int> getTooltipBounds (const juce::String& tipText, juce::Point<int> screenPos,
                                            juce::Rectangle<int> parentArea) override;
@@ -51,8 +50,6 @@ private:
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sliderAttachment;
         std::unique_ptr<juce::ToggleButton> button;
         std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> buttonAttachment;
-        std::unique_ptr<juce::ComboBox> selector;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> selectorAttachment;
         juce::Rectangle<int> labelArea;
     };
 
@@ -72,12 +69,11 @@ private:
     juce::TextButton savePresetButton { "Save" }, loadPresetButton { "Load" };
     std::unique_ptr<juce::FileChooser> presetFileChooser;
 
-    juce::Rectangle<int> panelArea, displayArea, overloadArea, setupArea, badgeArea;
+    juce::Rectangle<int> panelArea, displayArea, setupArea, badgeArea;
     uint32_t lastTrig = 0;
     int trigFlash = 0;
     bool gateLed = false;
     float freq = 0.0f, input = 0.0f, filterEnv = 0.0f, ampEnv = 0.0f;
-    int overloadHold = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BassSynthEditor)
 };
