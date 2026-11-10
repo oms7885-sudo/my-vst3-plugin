@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #undef BASS_SYNTH_EDITOR_ARTWORK
 #include <algorithm>
+#include <array>
 #include <iterator>
 
 namespace
@@ -157,134 +158,45 @@ namespace
         "AAAAAP//AAAAAAAAAAAAAAABAAEACAACAAAAFAABAAAAJAACd2dodAEAAABpdGFsARwAAQACAAMAAQACAR0AAAAAAAEAAAAA";
 
     // UI photo cutouts from the supplied Model D reference.
-    // Rocker artwork cropped from the Ash/Graphite mockup.
+    // The two physical rocker positions, cropped from the supplied switch close-up.
     const char blueOn[] =
-        "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"
-        "fwGzWkAmy05UfwAAAABJRU5ErkJggg==";
+        "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"
+        "WYjbhf/Z";
     const char blueOff[] =
-        "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";
-    const char amberOn[] =
-        "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";
-    const char amberOff[] =
-        "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";
-    const char neutral[] =
-        "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";
-    const char blueVertical[] =
-        "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"
-        "orOoN3XfP8sAAAAASUVORK5CYII=";
+        "/9j/4AAQSkZJRgABAQEAkACQAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0M"
+        "DgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAAvAHAD"
+        "ASIAAhEBAxEB/8QAHQAAAgMBAQADAAAAAAAAAAAABAkCAwgFBwABBv/EAEUQAAECBAMDBgYOCwAAAAAAAAEAAgMEBREGCSEHEjEIEzJBsdIUIlFx"
+        "gdEKFxkjJkJicoKRkqHBwhUzNDZDRlJhorLw/8QAGgEAAwADAQAAAAAAAAAAAAAAAQIEAAMFBv/EACURAAEEAQMEAwEBAAAAAAAAAAEAAgMEBRVR"
+        "UhESIUEjQqEkYf/aAAwDAQACEQMRAD8AV1yH+QviTl71ivOp2JIVFh0pxLnRmlwfxNtCF7872P8AY6j9DaDTSD8gj8y6WQyBCouOHuHSfY/U5MFk"
+        "zCfCb4ttF6Grj4Xwte4Lz9zITMmcxh8BLjiex+NoQPi4/pv2T3lX7gNtEg/z9TR6D3kykQ4btN0/WqY9PhvBJbqqNNrcf1THJWd/xLhZkK4+YLO2"
+        "iU4eXxT3kVK5DeORqdo9PZu/Id3kwqJSobviWKhEp7IUF9m9SYY2t6al1Kzul9e4OY9n4hd7Y1OeBwJae8q4mQXj4C/tg0z7B7y35KtYxtt0aI2E"
+        "1ruLU2mV9koyljdLnm8hjaJDJELHlNJ+ae8hpTIa2pxHuIxrS+bZq53/ADkybwVh+KERApYFGnd0Hxmfghplb2E2qWd/xLTgZGe0B8Qh+PKYCOsN"
+        "PeR8tkVY8eNdoEgL8QGnvLdcpKCAeHArowHsYLWWadW9BLqVrksIQsiPGjG3O0GSu0Fxsx2v+SytyhNi83yccdfoebr8SoRoEbce5hIB1TpIE0yH"
+        "veXcPYUnjMrmT7fM5uuP7Rrrx1UOQpwsh7mDyrsdcmkm7XnwtMZE0AnC2NyB/Ft/st7SryyG3XW3BYcyI5cNwdjbymOfzLdgli0AgdSvpHrXYP8A"
+        "FFeH9Dyr4Dxui6uBB0QjCR1cFcyML66qgtU3crTD+9DzUO0B/XoiGvuVGN+pf5lg6hYR1XEl4NgEXBbuhfILNB5CrmwhcWC2dy0hvtWy4BR0GIGU"
+        "yZHyfwXPBLF9Rp3mZCZ+aexKR1Thfm3kXPnKAnZt0K4HUpNn+cBsetRfBEfVYOqBVDKw9u/fjuO7EoXMXqfhO3mcudfCD2pvrqWXh9gbFjuxJ+zF"
+        "qcYG3yc008IPauflD8C6OJHzhbLyITv4Txmernz+Zb4ENvNg31sk/cjflk13kGYWrLjRJOpy9Xi7zX86d5vHq9K9chZ+NRhwx8Epc6f1n1rTUuQt"
+        "ia0u8qi3TmdM5zR4KY/EDWniFWXMaekl0DPzqLiPgjLfbPrQ87nzVeKz3rCcq0/3efWqRkYOSlOPn4pkMOK0u0OhU48ZogO16ksiZz58SMPi4ZlB"
+        "9MoaJn24qLHAYckhfTplA5GA/ZMMfPxTM5QtinjojmQwWcdAleyOfXiaWFnYbknfTK6Uvn+V61nYXlD5nlDUIOSAx8/FMufCAvchCzkEPkZoX0DS"
+        "fuS4zn81gt/dWVv88+tQdn7Vt0nFhHCsp762xO+fJ50wyEHJB2OsH6rc7Hthm9+tTbUGtcLHRLrmc6+tRL7uHpdpJv0jouZNZ1GJS483RJZv0iiM"
+        "nX3SjGWNkzaSnmxC7hYMd2JQ2ZA5sbbhNubY3mSL+lehy2driyXBAo0pcgjpdRWctt22ab5R2N4dQZJCBMx4u/EbvANv6SoMheiki7WFdDH0pYpe"
+        "548L/9k=";
     const char topEdge[] =
         "iVBORw0KGgoAAAANSUhEUgAAAGAAAAANCAIAAADZkPzrAAADtElEQVRIx5VXzW7kNgwmKUq2Z5LsFosCRXvppfdiD32Unvswfdsu0CZ1"
         "xjv6IXtgrDgTqsDyIAgcmSI/fiQ1+Ofvn1NKy7LM88zMANBaE5GUkqqKSDuIqpZ6IaK4CxEhIgAkRTsQQogxImIppZQSYxQRMwUAiGif"
@@ -1274,19 +1186,67 @@ namespace
         float start = 0.0f, target = 0.0f;
     };
 
-    const juce::Image& switchPhoto (bool on, bool vertical, bool blue, bool silver)
+    using RockerFrames = std::array<juce::Image, 11>;
+
+    RockerFrames makeRockerFrames (float red, float green, float blue)
     {
-        static const auto blueOnPhoto = decodeImage (blueOn);
-        static const auto blueOffPhoto = decodeImage (blueOff);
-        static const auto amberOnPhoto = decodeImage (amberOn);
-        static const auto amberOffPhoto = decodeImage (amberOff);
-        static const auto neutralPhoto = decodeImage (neutral);
-        static const auto blueVerticalPhoto = decodeImage (blueVertical);
-        if (vertical)
-            return blueVerticalPhoto;
-        if (silver)
-            return neutralPhoto;
-        return blue ? (on ? blueOnPhoto : blueOffPhoto) : (on ? amberOnPhoto : amberOffPhoto);
+        const auto off = decodeImage (blueOff);
+        const auto on = decodeImage (blueOn);
+        const int width = off.getWidth(), height = off.getHeight();
+        // The bezel stays fixed. Only the two molded facet edges move along the rocker.
+        const std::array<float, 4> offEdges { 4.0f, 47.0f, 79.0f, 107.0f };
+        const std::array<float, 4> onEdges  { 4.0f, 34.0f, 66.0f, 107.0f };
+        const juce::Image::BitmapData offPixels (off, juce::Image::BitmapData::readOnly);
+        const juce::Image::BitmapData onPixels (on, juce::Image::BitmapData::readOnly);
+        const auto sample = [width] (const juce::Image::BitmapData& image, float x, int y)
+        {
+            const int left = (int) x;
+            return image.getPixelColour (left, y).interpolatedWith (image.getPixelColour (juce::jmin (left + 1, width - 1), y),
+                                                                   x - (float) left);
+        };
+
+        RockerFrames frames;
+        for (size_t i = 0; i < frames.size(); ++i)
+        {
+            const float position = (float) i / (float) (frames.size() - 1);
+            const float brightness = juce::jmap (position, 0.88f, 1.0f);
+            auto edges = offEdges;
+            for (size_t edge = 1; edge < edges.size() - 1; ++edge)
+                edges[edge] = juce::jmap (position, offEdges[edge], onEdges[edge]);
+
+            frames[i] = juce::Image (juce::Image::RGB, width, height, false);
+            juce::Image::BitmapData pixels (frames[i], juce::Image::BitmapData::writeOnly);
+            for (int x = 0; x < width; ++x)
+            {
+                float offX = (float) x, onX = (float) x;
+                if (offX > edges.front() && offX < edges.back())
+                {
+                    const size_t band = offX < edges[1] ? 0 : (offX < edges[2] ? 1 : 2);
+                    const float within = (offX - edges[band]) / (edges[band + 1] - edges[band]);
+                    offX = juce::jmap (within, offEdges[band], offEdges[band + 1]);
+                    onX = juce::jmap (within, onEdges[band], onEdges[band + 1]);
+                }
+
+                for (int y = 0; y < height; ++y)
+                {
+                    const auto colour = sample (offPixels, offX, y).interpolatedWith (sample (onPixels, onX, y), position);
+                    pixels.setPixelColour (x, y, juce::Colour::fromFloatRGBA (
+                        juce::jlimit (0.0f, 1.0f, colour.getFloatRed() * red * brightness),
+                        juce::jlimit (0.0f, 1.0f, colour.getFloatGreen() * green * brightness),
+                        juce::jlimit (0.0f, 1.0f, colour.getFloatBlue() * blue * brightness), 1.0f));
+                }
+            }
+        }
+        return frames;
+    }
+
+    const juce::Image& switchPhoto (float position, bool blue, bool silver)
+    {
+        static const auto blueFrames = makeRockerFrames (1.0f, 1.0f, 1.0f);
+        static const auto amberFrames = makeRockerFrames (1.51f, 0.73f, 0.34f);
+        static const auto silverFrames = makeRockerFrames (1.43f, 1.16f, 1.0f);
+        const auto& frames = silver ? silverFrames : (blue ? blueFrames : amberFrames);
+        return frames[(size_t) juce::roundToInt (position * (float) (frames.size() - 1))];
     }
 
     bool drawMockupLabel (juce::Graphics& g, const juce::String& key, juce::Rectangle<int> bounds)
@@ -1972,59 +1932,18 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const auto body = mixer || compressor ? area.removeFromTop ((float) mixerRockerHeight) : area;
     const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (mixer ? 54.0f : 51.0f),
                                                    vertical ? 43.0f : 22.0f);
-    // The rocker pivots at its centre. The two ends move in opposite directions.
-    const float tilt = 2.0f * position - 1.0f;
-    const float foreshortening = std::abs (tilt) * 2.0f;
-    const auto face = frame.reduced (vertical ? 0.0f : foreshortening * 0.5f,
-                                     vertical ? foreshortening * 0.5f : 0.0f);
-    const auto centre = frame.getCentre();
-    const auto pivot = juce::AffineTransform::translation (-centre.x, -centre.y)
-                           .sheared (vertical ? tilt * 4.0f / frame.getHeight() : 0.0f,
-                                     vertical ? 0.0f : tilt * 4.0f / frame.getWidth())
-                           .translated (centre.x, centre.y);
-
-    g.setColour (juce::Colour (0xff121214));
-    g.fillRoundedRectangle (frame, 1.0f);
-    const auto drawState = [&] (bool state, float opacity)
+    const auto& sprite = switchPhoto (position, mixer || vertical, silver);
+    g.setColour (juce::Colours::white.withAlpha (pressed ? 0.92f : 1.0f));
+    if (vertical)
     {
-        const auto& sprite = switchPhoto (state, vertical, mixer, silver);
-        const bool flipX = silver && state;
-        // The dim horizontal sprites are stored vertically mirrored.
-        const bool flipY = vertical ? state : ! silver && ! state;
-        const float scaleX = face.getWidth() / (float) sprite.getWidth();
-        const float scaleY = face.getHeight() / (float) sprite.getHeight();
-        const auto transform = juce::AffineTransform::scale (flipX ? -scaleX : scaleX, flipY ? -scaleY : scaleY)
-                                   .translated (flipX ? face.getRight() : face.getX(), flipY ? face.getBottom() : face.getY())
-                                   .followedBy (pivot);
-        g.setColour (juce::Colours::white.withAlpha (opacity));
+        const auto transform = juce::AffineTransform::scale (frame.getHeight() / (float) sprite.getWidth(),
+                                                             frame.getWidth() / (float) sprite.getHeight())
+                                   .rotated (juce::MathConstants<float>::halfPi)
+                                   .translated (frame.getRight(), frame.getY());
         g.drawImageTransformed (sprite, transform);
-    };
-    if (position < 1.0f)
-        drawState (false, 1.0f);
-    if (position > 0.0f)
-        drawState (true, position);
-
-    juce::Path surface;
-    surface.addRectangle (face);
-    surface.applyTransform (pivot);
-    const float dim = (silver || vertical ? (1.0f - position) * 0.22f : 0.0f) + (pressed ? 0.06f : 0.0f);
-    if (dim > 0.0f)
-    {
-        g.setColour (juce::Colours::black.withAlpha (dim));
-        g.fillPath (surface);
     }
-
-    const auto start = vertical ? juce::Point<float> (centre.x, frame.getY())
-                                : juce::Point<float> (frame.getX(), centre.y);
-    const auto end = vertical ? juce::Point<float> (centre.x, frame.getBottom())
-                              : juce::Point<float> (frame.getRight(), centre.y);
-    const auto shadow = juce::Colours::black.withAlpha (std::abs (tilt) * 0.33f);
-    const auto highlight = juce::Colours::white.withAlpha (std::abs (tilt) * 0.12f);
-    juce::ColourGradient depth (tilt < 0.0f ? shadow : highlight, start,
-                               tilt < 0.0f ? highlight : shadow, end, false);
-    depth.addColour (0.5, juce::Colours::transparentBlack);
-    g.setGradientFill (depth);
-    g.fillPath (surface);
+    else
+        g.drawImage (sprite, frame, juce::RectanglePlacement::stretchToFit);
 
     if (mixer || compressor)
     {
