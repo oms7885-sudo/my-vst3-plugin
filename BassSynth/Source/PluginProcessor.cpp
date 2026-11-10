@@ -24,7 +24,7 @@ namespace
             { "Growl",        { { "osc3Range", 3.0f }, { "osc3Wave", 0.0f }, { "osc3On", 0.0f }, { "osc2Lvl", 0.5f }, { "osc2Range", 0.0f },
                                 { "filterMod", 1.0f }, { "modAmt", 0.3f }, { "cutoff", 200.0f }, { "res", 0.32f } } },
             // fitted to the target stem (Change - "Change of Heart") from change_rec.wav
-            { "Heart Bass",   { { "cutoff", 394.7235f }, { "res", 0.0814f }, { "envAmt", 0.6314f }, { "fA", 0.732f }, { "fD", 42.3895f }, { "fS", 0.4991f }, { "aA", 0.7952f }, { "aD", 572.5412f }, { "aS", 0.5765f }, { "osc1Lvl", 0.4295f }, { "osc2Lvl", 0.5892f }, { "osc3Lvl", 0.4903f }, { "osc2Freq", 0.0199f }, { "osc3Freq", 0.0262f }, { "tone", 963.6975f }, { "dyn", 0.1813f }, { "vintage", 0.1061f }, { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc2Range", 1.0f }, { "osc2Wave", 1.0f }, { "osc3Range", 1.0f }, { "osc3Wave", 4.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 0.0f }, { "decaySw", 1.0f } } },
+            { "Heart Bass",   { { "cutoff", 405.11f }, { "res", 0.1701f }, { "envAmt", 0.5369f }, { "fA", 0.5164f }, { "fD", 21.5644f }, { "fS", 0.3777f }, { "aA", 1.3832f }, { "aD", 278.2665f }, { "aS", 0.5629f }, { "osc1Lvl", 0.2542f }, { "osc2Lvl", 0.7653f }, { "osc3Lvl", 0.4621f }, { "osc2Freq", 0.039f }, { "osc3Freq", 0.0274f }, { "tone", 748.3006f }, { "dyn", 0.0376f }, { "vintage", 0.0791f }, { "osc1Range", 1.0f }, { "osc1Wave", 3.0f }, { "osc2Range", 1.0f }, { "osc2Wave", 2.0f }, { "osc3Range", 1.0f }, { "osc3Wave", 3.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 0.0f }, { "decaySw", 1.0f } } },
         };
         return p;
     }

@@ -133,7 +133,7 @@ public:
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0; stF = stA = 0;
         pf.reset(); decS = 0; decI = 0; fcT = fcN = 250.0; fundHz = fundUse = fundS = 0; lagP = 0; ph2P = 0; hD2 = 0; cyc2 = 0;
-        fCand = ownF = prevOwn = 0; fRun = 0; miss = 0;
+        fCand = ownF = prevOwn = ringF = 0; fRun = 0; miss = 0; rawI = 0; std::fill (std::begin (rawW), std::end (rawW), 0.0);
         std::fill (std::begin (sv), std::end (sv), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
         dcX = dcY = 0;
@@ -293,6 +293,9 @@ public:
             {
                 pf.pick(); fcT = 250.0; fRun = 0; miss = 0;
                 prevOwn = ownF; ownF = 0;
+                // the pitch of what was sounding before the pick (5-15 ms back: this note's attack is not in it yet)
+                ringF = 0;
+                for (int q = 5; q <= 15 && ringF <= 0; ++q) ringF = rawW[(rawI - q) & 15];
             }
             decS += uu;
             if (++decI >= decD)
@@ -303,21 +306,23 @@ public:
                     double f1 = 0, fw = 0, f = 0;
                     const bool got = pf.find (p.ftThr, p.ftDelta, 8, f1, fw);
                     dbgF1 = f1; dbgFw = fw; dbgWind = 0;
+                    rawW[rawI & 15] = fw; ++rawI;
                     if (got)
                     {
                         f = fw;
                         // How many cycles the low band's phase runs in one such period: 1 when the fundamental
                         // is the loudest thing in the band. More means something an octave (or more) above is
                         // louder: a harmonic of this note - or a new note, with the last one ringing on
-                        // underneath it. The fundamental of the note just picked got louder at the pick; a
-                        // note left ringing did not. If it is not this note's, follow the loudest instead.
+                        // underneath it. It is this note's fundamental if what was sounding before the pick
+                        // had another pitch, or if it got louder with the pick; a note left ringing has the
+                        // old pitch and only fades. If it is not this note's, follow the loudest instead.
                         const double wd = pf.wind (fw);
                         dbgWind = wd;
                         if (p.ftRing && wd > 1.3)
                         {
                             bool own = (ownF > 0 && std::abs (fw / ownF - 1.0) < 0.08)
                                     || (p.ftAgain && prevOwn > 0 && std::abs (fw / prevOwn - 1.0) < 0.08);
-                            if (! own) own = pf.grew (fw, p.ftOwn);
+                            if (! own) own = (ringF > 0 && std::abs (ringF / fw - 1.0) > 0.10) || pf.grew (fw, p.ftOwn);
                             if (own) ownF = fw;
                             else
                             {
@@ -752,8 +757,8 @@ private:
     PeriodFinder pf;
     double fcT = 250, fcN = 250, fcA = 0, fuA = 0, fundHz = 0, fundUse = 0, fundS = 0, lagP = 0, decS = 0, dbgN = 0;
     double sv[4] {}, hs2[32] {}, hD2 = 0, ph2P = 0, pfWin = -1;
-    double dbgF1 = 0, dbgFw = 0, dbgWind = 0, fCand = 0, ownF = 0, prevOwn = 0;
-    int64_t cyc2 = 0; int decD = 22, decI = 0, fRun = 0, miss = 0;
+    double dbgF1 = 0, dbgFw = 0, dbgWind = 0, fCand = 0, ownF = 0, prevOwn = 0, ringF = 0, rawW[16] {};
+    int64_t cyc2 = 0; int decD = 22, decI = 0, fRun = 0, miss = 0, rawI = 0;
     double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
     double dcX = 0, dcY = 0;
     double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0, dbgOsc = 0;
