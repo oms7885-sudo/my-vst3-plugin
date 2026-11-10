@@ -1,0 +1,90 @@
+line 001 (MU/VI, 16.7s, median gap 278 ms): notes  44  missed   0  false   1  latency med 14.2 p90 28.1 ms
+    oscillator, tracking on (defaults): on pitch  30/ 44 (68%), octave up 0, between 11, low 3; time on pitch 89%
+    oscillator, tracking off: on pitch   5/ 44 (11%), octave up 10, between 29, low 0; time on pitch 23%
+line 002 (FS/VI, 19.2s, median gap 300 ms): notes  48  missed   1  false   2  latency med 6.8 p90 32.1 ms
+    oscillator, tracking on (defaults): on pitch  28/ 47 (60%), octave up 3, between 16, low 0; time on pitch 71%
+    oscillator, tracking off: on pitch   2/ 47 (4%), octave up 17, between 28, low 0; time on pitch 15%
+line 003 (MU/NO, 20.9s, median gap 326 ms): notes  70  missed   0  false   1  latency med 12.2 p90 28.3 ms
+    oscillator, tracking on (defaults): on pitch  43/ 65 (66%), octave up 0, between 7, low 15; time on pitch 85%
+    oscillator, tracking off: on pitch  26/ 65 (40%), octave up 14, between 21, low 4; time on pitch 48%
+line 004 (FS/NO, 16.7s, median gap 261 ms): notes  56  missed   1  false   7  latency med 12.0 p90 40.7 ms
+    oscillator, tracking on (defaults): on pitch  22/ 55 (40%), octave up 4, between 25, low 4; time on pitch 53%
+    oscillator, tracking off: on pitch   4/ 55 (7%), octave up 25, between 25, low 1; time on pitch 8%
+line 005 (PK/NO, 18.6s, median gap 291 ms): notes  66  missed   1  false   2  latency med 5.9 p90 27.6 ms
+    oscillator, tracking on (defaults): on pitch  23/ 66 (35%), octave up 8, between 25, low 10; time on pitch 55%
+    oscillator, tracking off: on pitch   3/ 66 (5%), octave up 12, between 50, low 1; time on pitch 3%
+line 006 (PK/NO, 14.8s, median gap 231 ms): notes  44  missed   0  false   2  latency med 14.9 p90 30.5 ms
+    oscillator, tracking on (defaults): on pitch   9/ 44 (20%), octave up 2, between 19, low 14; time on pitch 41%
+    oscillator, tracking off: on pitch   0/ 44 (0%), octave up 18, between 26, low 0; time on pitch 1%
+line 007 (ST/NO, 20.2s, median gap 316 ms): notes  56  missed   1  false   1  latency med 6.9 p90 36.3 ms
+    oscillator, tracking on (defaults): on pitch  11/ 56 (20%), octave up 2, between 35, low 8; time on pitch 42%
+    oscillator, tracking off: on pitch   4/ 56 (7%), octave up 9, between 42, low 1; time on pitch 4%
+line 008 (FS/NO, 29.5s, median gap 231 ms): notes  68  missed   5  false   4  latency med 17.5 p90 42.7 ms
+    oscillator, tracking on (defaults): on pitch  47/ 68 (69%), octave up 0, between 19, low 2; time on pitch 80%
+    oscillator, tracking off: on pitch   7/ 68 (10%), octave up 15, between 46, low 0; time on pitch 29%
+line 009 (MU/BE, 15.4s, median gap 240 ms): notes  40  missed   2  false   7  latency med 23.6 p90 44.6 ms
+    oscillator, tracking on (defaults): on pitch  27/ 40 (68%), octave up 0, between 10, low 3; time on pitch 82%
+    oscillator, tracking off: on pitch  10/ 40 (25%), octave up 7, between 23, low 0; time on pitch 48%
+line 010 (FS/NO, 26.5s, median gap 207 ms): notes  68  missed   4  false   2  latency med 18.9 p90 39.8 ms
+    oscillator, tracking on (defaults): on pitch  38/ 68 (56%), octave up 2, between 17, low 11; time on pitch 69%
+    oscillator, tracking off: on pitch  15/ 68 (22%), octave up 10, between 43, low 0; time on pitch 33%
+line 011 (MU/NO, 24.5s, median gap 573 ms): notes  60  missed   2  false   2  latency med 10.9 p90 47.5 ms
+    oscillator, tracking on (defaults): on pitch  40/ 60 (67%), octave up 0, between 20, low 0; time on pitch 91%
+    oscillator, tracking off: on pitch  23/ 60 (38%), octave up 11, between 26, low 0; time on pitch 52%
+line 012 (FS/NO, 21.3s, median gap 333 ms): notes  60  missed   2  false   4  latency med 15.4 p90 34.0 ms
+    oscillator, tracking on (defaults): on pitch  30/ 60 (50%), octave up 3, between 19, low 8; time on pitch 64%
+    oscillator, tracking off: on pitch  12/ 60 (20%), octave up 13, between 35, low 0; time on pitch 18%
+line 013 (ST/NO, 17.3s, median gap 270 ms): notes  56  missed  10  false   0  latency med 20.1 p90 41.5 ms
+    oscillator, tracking on (defaults): on pitch  17/ 56 (30%), octave up 7, between 30, low 2; time on pitch 39%
+    oscillator, tracking off: on pitch   0/ 56 (0%), octave up 17, between 39, low 0; time on pitch 0%
+line 014 (PK/NO, 24.5s, median gap 382 ms): notes  52  missed   3  false   1  latency med 12.1 p90 33.9 ms
+    oscillator, tracking on (defaults): on pitch  28/ 52 (54%), octave up 11, between 11, low 2; time on pitch 64%
+    oscillator, tracking off: on pitch   1/ 52 (2%), octave up 26, between 25, low 0; time on pitch 2%
+line 015 (FS/NO, 20.0s, median gap 312 ms): notes  52  missed   0  false   0  latency med 5.2 p90 21.5 ms
+    oscillator, tracking on (defaults): on pitch  21/ 52 (40%), octave up 2, between 26, low 3; time on pitch 66%
+    oscillator, tracking off: on pitch   2/ 52 (4%), octave up 14, between 36, low 0; time on pitch 3%
+line 016 (SP/NO, 19.2s, median gap 300 ms): notes  52  missed   0  false   0  latency med -7.1 p90 30.6 ms
+    oscillator, tracking on (defaults): on pitch  12/ 52 (23%), octave up 2, between 32, low 6; time on pitch 52%
+    oscillator, tracking off: on pitch   1/ 52 (2%), octave up 7, between 44, low 0; time on pitch 2%
+line 017 (FS/NO, 26.8s, median gap 400 ms): notes  56  missed   5  false   2  latency med 25.0 p90 54.9 ms
+    oscillator, tracking on (defaults): on pitch  22/ 56 (39%), octave up 0, between 7, low 27; time on pitch 45%
+    oscillator, tracking off: on pitch  17/ 56 (30%), octave up 12, between 13, low 14; time on pitch 39%
+
+Oscillator pitch against the annotated notes, 50-450 ms into each note (all lines)
+  tracking on (defaults)  on pitch 448/941 (48%), octave up 46, between 329, low 118; time on pitch 65%
+  tracking off            on pitch 132/941 (14%), octave up 237, between 551, low 21; time on pitch 22%
+  ringing-note test off   on pitch 487/941 (52%), octave up 8, between 299, low 147; time on pitch 72%
+  again on                on pitch 465/941 (49%), octave up 22, between 318, low 136; time on pitch 69%
+  grew x1.25              on pitch 462/941 (49%), octave up 32, between 327, low 120; time on pitch 68%
+  grew x2.5               on pitch 422/941 (45%), octave up 58, between 349, low 112; time on pitch 61%
+  filter at 1.35 x        on pitch 418/941 (44%), octave up 44, between 388, low 91; time on pitch 63%
+  filter at 0.9 x         on pitch 463/941 (49%), octave up 37, between 291, low 150; time on pitch 65%
+  dip depth 0.15          on pitch 481/941 (51%), octave up 50, between 337, low 73; time on pitch 68%
+  periodic < 0.15         on pitch 442/941 (47%), octave up 55, between 351, low 93; time on pitch 64%
+  periodic < 0.4          on pitch 468/941 (50%), octave up 40, between 303, low 130; time on pitch 66%
+  hold 1 ms               on pitch 475/941 (50%), octave up 43, between 303, low 120; time on pitch 66%
+  window 10 ms            on pitch 494/941 (52%), octave up 30, between 288, low 129; time on pitch 67%
+  window 20 ms            on pitch 385/941 (41%), octave up 54, between 404, low 98; time on pitch 63%
+  no lag correction       on pitch 480/941 (51%), octave up 41, between 295, low 125; time on pitch 65%
+  inertia 0.5             on pitch 447/941 (48%), octave up 46, between 330, low 118; time on pitch 65%
+  inertia 0.8             on pitch 446/941 (47%), octave up 46, between 332, low 117; time on pitch 65%
+  inertia 1.0             on pitch 446/941 (47%), octave up 46, between 332, low 117; time on pitch 65%
+Oscillator pitch, lines without slap
+  tracking on (defaults)  on pitch 408/777 (53%), octave up 35, between 232, low 102; time on pitch 68%
+  tracking off            on pitch 127/777 (16%), octave up 204, between 426, low 20; time on pitch 25%
+  ringing-note test off   on pitch 441/777 (57%), octave up 0, between 212, low 124; time on pitch 75%
+  again on                on pitch 423/777 (54%), octave up 12, between 228, low 114; time on pitch 72%
+  grew x1.25              on pitch 418/777 (54%), octave up 21, between 234, low 104; time on pitch 71%
+  grew x2.5               on pitch 383/777 (49%), octave up 48, between 249, low 97; time on pitch 64%
+  filter at 1.35 x        on pitch 381/777 (49%), octave up 33, between 280, low 83; time on pitch 67%
+  filter at 0.9 x         on pitch 420/777 (54%), octave up 23, between 208, low 126; time on pitch 68%
+  dip depth 0.15          on pitch 441/777 (57%), octave up 37, between 235, low 64; time on pitch 72%
+  periodic < 0.15         on pitch 406/777 (52%), octave up 44, between 243, low 84; time on pitch 67%
+  periodic < 0.4          on pitch 425/777 (55%), octave up 31, between 210, low 111; time on pitch 69%
+  hold 1 ms               on pitch 431/777 (55%), octave up 35, between 208, low 103; time on pitch 69%
+  window 10 ms            on pitch 444/777 (57%), octave up 25, between 195, low 113; time on pitch 71%
+  window 20 ms            on pitch 352/777 (45%), octave up 42, between 296, low 87; time on pitch 66%
+  no lag correction       on pitch 438/777 (56%), octave up 32, between 197, low 110; time on pitch 68%
+  inertia 0.5             on pitch 407/777 (52%), octave up 35, between 233, low 102; time on pitch 68%
+  inertia 0.8             on pitch 406/777 (52%), octave up 35, between 235, low 101; time on pitch 68%
+  inertia 1.0             on pitch 406/777 (52%), octave up 35, between 235, low 101; time on pitch 68%
