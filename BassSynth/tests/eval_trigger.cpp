@@ -144,6 +144,8 @@ int main (int argc, char** argv)
         { "window 10 ms",           [] (bsyn::Params& q) { q.ftWin = 10.0f; } },
         { "window 20 ms",           [] (bsyn::Params& q) { q.ftWin = 20.0f; } },
         { "no lag correction",      [] (bsyn::Params& q) { q.ftComp = false; } },
+        { "inertia off",            [] (bsyn::Params& q) { q.inertia = 0.0f; } },
+        { "inertia 0.5",            [] (bsyn::Params& q) { q.inertia = 0.5f; } },
     };
     FILE* nf = std::fopen ((out / "notes.csv").string().c_str(), "w");
     if (nf) std::fprintf (nf, "line,on,off,midi,ref_hz,ps,es,r_on,r_off,found_ok,found_none,found_up,found_low,first_ok_ms,cut_ratio,wind,h1_db,h2_db,h3_db\n");
