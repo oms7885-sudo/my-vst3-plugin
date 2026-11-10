@@ -657,7 +657,9 @@ namespace
     }
 
     constexpr int referenceWidth = 1400, editorW = 1480, editorH = 634, cheekW = 26;
-    constexpr int panelTop = 40, panelHeight = 461, panelTopTrim = 24, setupGap = 10;
+    constexpr int referencePanelTop = 64, referencePanelHeight = 461;
+    constexpr int panelTop = 56, panelHeight = 426;
+    constexpr int setupHeight = 112, setupGap = (editorH - panelTop - panelHeight - setupHeight) / 2;
     constexpr int auxiliaryColumns = 11, auxiliaryRowHeight = 112;
 
     int panelX (int x)
@@ -665,10 +667,15 @@ namespace
         return cheekW + juce::roundToInt ((x - cheekW) * (editorW - 2.0f * cheekW) / (referenceWidth - 2.0f * cheekW));
     }
 
+    int panelY (int y)
+    {
+        return panelTop + juce::roundToInt ((y - referencePanelTop) * (float) panelHeight / referencePanelHeight);
+    }
+
     juce::Rectangle<int> mainPanelBounds (juce::Rectangle<int> reference)
     {
         const int left = panelX (reference.getX());
-        return { left, reference.getY() - panelTopTrim, panelX (reference.getRight()) - left, reference.getHeight() };
+        return { left, panelY (reference.getCentreY()) - reference.getHeight() / 2, panelX (reference.getRight()) - left, reference.getHeight() };
     }
     constexpr juce::uint32 panelInk = 0xfff3eee3, panelRule = 0xff9c9891, badgeColour = 0xff252526;
 
@@ -1164,7 +1171,8 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
         for (const auto& mark : marks)
         {
             const auto a = angleAt (mark.position);
-            const auto at = point (a, radius + (compact ? 0.0f : 1.0f));
+            auto at = point (a, radius + (compact ? 0.0f : 1.0f));
+            at.y = juce::jmax (at.y, (float) y + 5.5f);
             g.drawLine ({ point (a, skirt + 2.0f), point (a, skirt + (compact ? 4.0f : 6.0f)) }, 1.0f);
             g.drawFittedText (mark.label, juce::Rectangle<float> (at.x - 10.0f, at.y - 5.5f, 20.0f, 11.0f)
                                              .getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
@@ -1269,7 +1277,7 @@ juce::Slider::SliderLayout PanelLookAndFeel::getSliderLayout (juce::Slider& slid
     const bool oscillator = id.startsWith ("osc") && (id.endsWith ("Range") || id.endsWith ("Freq") || id.endsWith ("Wave"));
     const bool loudness = id == "aA" || id == "aD" || id == "aS";
     if (oscillator || loudness)
-        layout.textBoxBounds.translate (0, -12);
+        layout.textBoxBounds.translate (0, loudness ? -7 : -8);
     return layout;
 }
 
@@ -1363,14 +1371,18 @@ void BassSynthEditor::resized()
     displayArea = mainPanelBounds ({ (cheekW + controllerDivider - 174) / 2, 104, 174, 130 });
     overloadArea = mainPanelBounds ({ 786, 97, 100, 44 });
     const int setupTop = panelArea.getBottom() + setupGap;
-    setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), getHeight() - setupTop - 11 };
+    setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), setupHeight };
     badgeArea = { panelX (1140), setupTop + 15, 202, 78 };
     presetBox.setBounds (124, 10, 215, 25);
 
     const auto place = [] (Control& k, int x, int y, bool compact)
     {
         const int labelWidth = compact ? 94 : 98;
-        k.labelArea = { x - labelWidth / 2, y, labelWidth, 18 };
+        const auto positionY = [=] (int offset, int height)
+        {
+            return compact ? y + offset : panelY (y + offset + height / 2) - height / 2;
+        };
+        k.labelArea = { x - labelWidth / 2, positionY (0, 18), labelWidth, 18 };
         if (k.id == "osc2Freq" || k.id == "osc3Freq")
             k.labelArea.translate (0, 3);
         if (k.slider)
@@ -1378,21 +1390,23 @@ void BassSynthEditor::resized()
             const int width = compact ? 74 : 98;
             const bool filterEnvelope = k.id == "fA" || k.id == "fD" || k.id == "fS";
             const int height = compact ? 80 : (filterEnvelope ? 86 : 104);
-            k.slider->setBounds (x - width / 2, y + 17, width, height);
+            const int top = compact ? y + 17 : panelY (y + 17);
+            const int bottom = compact ? top + height : panelY (y + 17 + height);
+            k.slider->setBounds (x - width / 2, top, width, bottom - top);
             return;
         }
 
         if (bridgesDivider (k.id))
-            k.labelArea = { x - 80, y - 2, 74, 23 };
+            k.labelArea = { x - 80, positionY (-2, 23), 74, 23 };
         else if (mixerOnSwitch (k.id))
-            k.labelArea = { x - 24, y + 38, 48, 15 };
+            k.labelArea = { x - 24, positionY (38, 15), 48, 15 };
 
         if (k.id == "noisePink")
-            k.button->setBounds (x - 13, y + 17, 26, 45);
+            k.button->setBounds (x - 13, positionY (17, 45), 26, 45);
         else if (k.id == "decaySw")
-            k.button->setBounds (x - 38, y + 19, 76, 28);
+            k.button->setBounds (x - 38, positionY (19, 28), 76, 28);
         else
-            k.button->setBounds (x - 27, y + (mixerOnSwitch (k.id) ? 16 : 19), 54, 28);
+            k.button->setBounds (x - 27, positionY (mixerOnSwitch (k.id) ? 16 : 19, 28), 54, 28);
     };
 
     const int step = setupArea.getWidth() / auxiliaryColumns;
@@ -1400,7 +1414,7 @@ void BassSynthEditor::resized()
     for (auto& k : controls)
     {
         if (const auto* slot = findPlacement (k.id))
-            place (k, panelX (slot->x), slot->y - panelTopTrim, false);
+            place (k, panelX (slot->x), slot->y, false);
         else
         {
             const int row = auxiliaryIndex / auxiliaryColumns;
@@ -1444,7 +1458,7 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.setColour (rule);
     for (const int x : { controllerDivider, oscillatorDivider, modifierDivider, outputDivider })
         g.drawVerticalLine (panelX (x), (float) panelArea.getY() + 5.0f, (float) panelArea.getBottom() - 9.0f);
-    g.drawHorizontalLine (envelopeDivider - panelTopTrim, (float) panelX (modifierDivider), (float) panelX (outputDivider));
+    g.drawHorizontalLine (panelY (envelopeDivider), (float) panelX (modifierDivider), (float) panelX (outputDivider));
 
     g.setColour (colour (0xff322c26));
     g.setFont (panelFont (11.0f));
