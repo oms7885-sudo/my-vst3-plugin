@@ -12,11 +12,11 @@ UI 작업 분담과 파라미터 표는 [docs/UI_HANDOFF.md](docs/UI_HANDOFF.md)
 2. 왼쪽 목록에서 **Build Bass Ladder Synth (Windows VST3)** 를 고릅니다.
 3. 가장 최근의 초록색 체크 표시 빌드를 누릅니다.
 4. 아래쪽 **Artifacts**에서 `BassLadderSynth-VST3-Windows`를 내려받습니다.
-5. 압축을 풀면 나오는 `Bass Ladder Synth.vst3` 폴더를 `C:\Program Files\Common Files\VST3`에 복사합니다.
+5. 압축을 풀면 나오는 `mOog.vst3` 폴더를 `C:\Program Files\Common Files\VST3`에 복사합니다.
 
 ## 큐베이스에서 쓰기
 
-1. 베이스 DI가 들어오는 **오디오 트랙**의 **Insert**에 `Bass Ladder Synth`를 겁니다.
+1. 베이스 DI가 들어오는 **오디오 트랙**의 **Insert**에 `mOog`를 겁니다.
 2. 끝. 원음도 같이 듣고 싶으면 **Dry DI**를 올리세요.
 
 ## 신호 흐름

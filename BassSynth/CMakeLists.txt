@@ -22,7 +22,7 @@ juce_add_plugin(BassLadderSynth
     PLUGIN_MANUFACTURER_CODE  Omsk
     PLUGIN_CODE               Blsy
     FORMATS                   VST3
-    PRODUCT_NAME              "Bass Ladder Synth"
+    PRODUCT_NAME              "mOog"
     IS_SYNTH                  FALSE
     NEEDS_MIDI_INPUT          FALSE
     NEEDS_MIDI_OUTPUT         FALSE
