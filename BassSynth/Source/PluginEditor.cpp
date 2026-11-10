@@ -157,40 +157,126 @@ namespace
         "AAAAAP//AAAAAAAAAAAAAAABAAEACAACAAAAFAABAAAAJAACd2dodAEAAABpdGFsARwAAQACAAMAAQACAR0AAAAAAAEAAAAA";
 
     // UI photo cutouts from the supplied Model D reference.
+    // Mixer rocker cut from the supplied Model D reference photo.
     const char blueOn[] =
-        "iVBORw0KGgoAAAANSUhEUgAAADAAAAAVCAIAAACPAfpVAAAE2ElEQVRIx8VWS2scRxCuqn7M7M7OSLvajSRCEl9sgyEHgQgkwQffffDF"
-        "/zK3HEyOIcnBIQ8HXYwJQRJIa0nWvnce/aocWlqbsCKxEaQoBqamp+vrevWHT588NsY0TVOWZV3XnU4HERERAEII3nvvfQihKApmZmYA"
-        "ICIiEkIQESJqrYnIGFOWpfdea52maZIk1lpjjDEmhCCEUEoJIeK2IQRmRkQpZbQ754wx1lrZ2yye/37w4uBP2PoEpiX4I1gJIhABIiCC"
-        "K0EpcA6YAQDSVCaJ955DAGsBEZQCa8EYEELluR1fwlpBXG/vbivkB599JGez2XQ6lVn28NGjvL/bFiFGiK4Fr94dEZVlOR6PrbVJkiCi"
-        "MUZrbYxBRKWUc66ua6VUnueDVrLWbwhhrf35q1fT4UmrJWVd15PJhFndvXv38/0vl1XzLpoVoKyjAWCxWFxcXFRVJYRg5qZp0jS11q4A"
-        "VVWllCqK4sGnH6917JxbH7jeT7/+8H2oRrLdbiulggmxki4W9h8RIiIA0MYSUVk2o6VrmqC1RCTjZd1cZyyAc1AbVIyhgbkTax0b49fa"
-        "e72eMcbMZtJaK6VMEmTm5XLpWSMAAjC/VQCYL5dEVFXVsqqstQGAiKxzLoQYIc/snKuaxoWgkmSyqG4AZNbaq6qaz+e+LOXx8fHl5aVV"
-        "BRFJKYW/KmJ6RwGg2NwEACWEqesKQBLFipBSMhEiSiIgkteqcH2t4PrAQVVVsWFlu90mouC9tdZ7H5rqqu2J3iqAzgkRDVjJRoSGvGNm"
-        "sDWJQN4iIpEn70RoRAjka8l2rWNBvNbOzFmWETVyf3//bDw/uljEeGYqNjuuFBEQ0S6niOirJZiSXC1RISKjV2w5GESUgSE4GYwMLIMh"
-        "36yP0A1tT0TtdtvZmXz49VfffPvdYjSbG64g8dbEoSdREhP4K/hJqgipAVuzaiAEUAjYAAdWFoCQgLQj5wSS1F62vWyvdez9+qJWSg2H"
-        "w+2OoGfPng2HQwDY3NzsdDpwS8I3yE3rV9eDPDo6YmbKc611VVXv4fPfAL3X+oiGmWWv19vY2JhjGkKoqkrge+1za4BWIuOEbUIDAEmS"
-        "ONN82Eb/EdBNRf0WkPe+LEtvXV3XH3ys2wR0VU2I3ntjzP+VsrgeEclaq7WWeZ7neZqmtxWhDzhAxCRfHp7UHoWE86NXD7/YOz4bxTkU"
-        "+dfqhyzLmqZR3utu1xgT6RUVRVmWotUiohCCFwKSRGuttW61WlmWDQaDxWIxHA6Lomi32ycnJxsbG6PRaDAYdLvd4XC4XC77/X6apsXk"
-        "5S/KXJ5eyu3t7cqL8/Hi4MVv8/m8rE286oUQq9kAAEKImFPnXBxukZk45+LKEEKkFkoppVSeytlslmVZnudxmuR5joiTyUQIkSRJJKj9"
-        "fp+IDg8P5fiv4XC4s7Mju0Xeyjby89Hri9GLn39cTsdwXXrvAopX+sq4+sTMEZn33lrLzBHQoFucnJww82AwsNaev34NzJtbW5M3bwa7"
-        "u1rrs7Mz7/3u7i4RnZ6ebrXw/v37e3t7+PTJ485mL4B8M5lNp9OOvkrnitpF33Vdr1K5ghKfkSk75yKgSJP7RVsIEcmk1nqxWHjv+/3+"
-        "ZDKJJLrVaoUQzs/PpZT37t37/Y+DnZ2dO3fu/A0+Kf/g9hPDeQAAAABJRU5ErkJggg==";
+        "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"
+        "QSn4eLcBbGrY1DBRetROsM17PdAuag2tmdFzkTkowNjklFn3q4b0G4J/j8p/EbH/Lpn/NInSAEWwoUcrgWf+PuF/FOl/JpmfJvE4qSFq3J/uePvh"
+        "B/zu7/wO//Af/yN+8zc+4Ztffstf/cVf8vj8A6dp4eHhnvvzHV9+/CXruvLmzRtEhO+++46npyfaJEq2xt35jJlxt42dVOxiuI7wt5em8OZoYyOA"
+        "IfSMd7a/9Qw0YQsntn5sX9vPl7G9sEQhU4gY7ULmXxP+zzL555L+xyS/r8IfEfFnCJ9G8hgZpAdEH+4rfWiaGr/58cf87Ld+yj/57d/m7//Wzzgv"
+        "d0yTcvnpT/nFt1+TDp988glv377lJz/5Ceu6cj6feXp6wt1Z15X/B4qjGtFN2CZ5AAAAhGVYSWZNTQAqAAAACAAFARIAAwAAAAEAAQAAARoABQAA"
+        "AAEAAABKARsABQAAAAEAAABSASgAAwAAAAEAAgAAh2kABAAAAAEAAABaAAAAAAAAAEgAAAABAAAASAAAAAEAA6ABAAMAAAABAAEAAKACAAQAAAAB"
+        "AAACxqADAAQAAAABAAAGAAAAAAAjrYOEAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTExLTEwVDA4OjI3OjQ2KzAwOjAwTGcGOgAAACV0RVh0ZGF0"
+        "ZTptb2RpZnkAMjAyNi0xMS0xMFQwODoyNzo0NSswMDowMAzSpBsAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTEtMTBUMDg6Mjk6NTUrMDA6"
+        "MDCJpLXpAAAAEXRFWHRleGlmOkNvbG9yU3BhY2UAMQ+bAkkAAAASdEVYdGV4aWY6RXhpZk9mZnNldAA5MFmM3psAAAAYdEVYdGV4aWY6UGl4ZWxY"
+        "RGltZW5zaW9uADcxMFukDZ4AAAAZdEVYdGV4aWY6UGl4ZWxZRGltZW5zaW9uADE1Mza64B9xAAAAAElFTkSuQmCC";
     const char blueOff[] =
-        "iVBORw0KGgoAAAANSUhEUgAAADAAAAAVCAIAAACPAfpVAAAEMUlEQVRIx82W244kRxGG/4iMrEMfdsaza8DCsgQ2FkICISSbC8QdbwpP"
-        "wMsgISHLsgWz4Jnp6e7qqsqMAxfltRdTI7FoLxxXmZWR8X8ZEVlK+t2nvwHAzMycUmJmEam1quryHcAyJaKIiAgARLQ4M3PbtgAiwt3d"
-        "PV5ZKWVxIKLXHfiVfef7fr8HIGa26Ln7srzZbGqttVZ3XyCW6X6//wbo9QPc3t4uiPhPa5pmUV1OtbAuKqu2LEnT4jTr41RGxf15jtOJ"
-        "q65uILx0cIBz7rlp1cnmGcHo/CkF5EwiEYFSoAoiMPN2D4C8wBReYcpuESYWbdtIqdZ2/c9/8vHPfvGrH3/w0267j4eH1fjMJYJADMnO"
-        "uVQ9X8owXmqsA9VaRYSIVHUcx2malpSDE9zgGq5klawgPCL+/Kc/+likenDTvHPz4sOPPv7lrz+5fvHuePhqVaBtwiLUEWAFD7MeT8Mw"
-        "DCTbp0rAzBExTdP5fB6GodYKYK4aEXAjL2Q1TOFKcCY0TRIPaqSJlI+X6bMvvsz//Aq0XjJJ6u41EEiKNE7l8XweLlO/fW/dX+QV0Hw6"
-        "TefzuABVM7jDFW6wwm7hJSJSQkpJFNw1fddvu34LaWpQSmlVYK6TOkAcKYESpElNn4z1iT511SWURQQRiyxxK4SSwxNZDSJ4JWcOqwrV"
-        "IuY8TnVSh7Sb3T43G70c14FiFgpwk1IDaRJ7eOLIhuapHqIIIhLmnJKJJCIicp/gIEYEERAgCgSBgJQgNWBVx6kM4zRcJqpIp8uqgOoc"
-        "TsFu2SJZVdTLNE8j5fJUhiglIrJSdBzqOJoZAJ0rwig8TMkLqSI0IrpOmFlUdf+s3eyedZstlmnu12+ZkCECDGlAeYRqUkvuMa36962k"
-        "lCIiWRi7k9WoAFIjAMMVZmSC5IgE92lSIsgHfrDSjSXd2eYqcB0Hz1frGXLllNUx25xbkq5j6HA5Mq/fslmrIDGzCXsOz+SoEaFeAxRL"
-        "keAeHmZwDSAC8t+Bln/xU7asRgT9D85vZD/64XNVfQOg+Na+Hb8tGgC3L++AN8nQKtBbZEoM8+8TkAhnou8R0Fwc/0fJ8Fpfv12gLNjt"
-        "dvym215nwlu9ZVVRa5XPdX/TvXi/yzdsu+3zzdWH9fHl6gajGyLqmXPORDRNU5jxixtJ7WoKgSalJCKqms1ENW+3u93u77d/3e/3Dw8P"
-        "h8NwdXUlsh/HsWma5zfPhmGQd3Yd6/zl3/7yxeefPY56HMabxtZzk5OZRcTyVgRQSiml9N2z1SyamYh0XZdSGsfx4eHheDyWUn7w3u7x"
-        "8TEirq+viej+/n4Z390fAdAffv9b7nYh/XGs//jX3d39Yct1HUh4ISCinHPTNMsDF/F1I37zil0Gfd+XUuZ5VlURadv262Po4zRN19fX"
-        "XdcdDoeUUt/3p9Pp/d0u5/xvXrF1cA0IjAsAAAAASUVORK5CYII=";
+        "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"
+        "WsPMOKhW0ybCKOLLjMCHp865tKmh0/7cYhVRE4Z6wipuUm3rxJf9oSYPn4i7StG9QkXt6tIXWm9FkDWYqVlZlKDU+QCUvuEZXR9Nsc3bmSKj+Gd6"
+        "NTdpmjPtfYw6ptOumHrHR9TzOTZLtzYDrYG6j1E3rqU5TGowJzcXiZncHkpG4uZThyhtaiNfV1Z3UhVP25C8e8IqsD2+hsCyHFBTYj4G4jr2x+VK"
+        "E4FYiTdEUJvP8EQyApqWmS85nwqZM7aaxNwEhxr8eeRujRZJTzc0kv8D5YTEeUoMzgsAAACEZVhJZk1NACoAAAAIAAUBEgADAAAAAQABAAABGgAF"
+        "AAAAAQAAAEoBGwAFAAAAAQAAAFIBKAADAAAAAQACAACHaQAEAAAAAQAAAFoAAAAAAAAASAAAAAEAAABIAAAAAQADoAEAAwAAAAEAAQAAoAIABAAA"
+        "AAEAAALGoAMABAAAAAEAAAYAAAAAACOtg4QAAAAldEVYdGRhdGU6Y3JlYXRlADIwMjYtMTEtMTBUMDg6Mjk6NTUrMDA6MDCv7CyKAAAAJXRFWHRk"
+        "YXRlOm1vZGlmeQAyMDI2LTExLTEwVDA4OjI5OjU1KzAwOjAw3rGUNgAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNi0xMS0xMFQwODoyOTo1NSsw"
+        "MDowMImktekAAAARdEVYdGV4aWY6Q29sb3JTcGFjZQAxD5sCSQAAABJ0RVh0ZXhpZjpFeGlmT2Zmc2V0ADkwWYzemwAAABh0RVh0ZXhpZjpQaXhl"
+        "bFhEaW1lbnNpb24ANzEwW6QNngAAABl0RVh0ZXhpZjpQaXhlbFlEaW1lbnNpb24AMTUzNrrgH3EAAAAASUVORK5CYII=";
     const char amberOn[] =
         "iVBORw0KGgoAAAANSUhEUgAAADAAAAAVCAIAAACPAfpVAAAFDklEQVRIx83WS29jWREH8KrzvK/EsePuttMdT4b00FE2tNjACtECIcGK"
         "JZ+Gj8MnYAlCYjdSd2skesP0zASiOOnY8b2+tq/PvedVLCJFoPGsSa3PkX7619Gpwt/++pec8zzPu65jjDHGqqrinIcQjo+Pl8tl0zTj"
@@ -697,9 +783,17 @@ namespace
         return id == "filterMod" || id == "keyTrk1" || id == "keyTrk2";
     }
 
+    struct MixerChannel { const char* level; const char* toggle; };
+    constexpr MixerChannel mixerChannels[] {
+        { "osc1Lvl", "osc1On" }, { "extLvl", "extOn" }, { "osc2Lvl", "osc2On" },
+        { "noiseLvl", "noiseOn" }, { "osc3Lvl", "osc3On" }
+    };
+    constexpr int mixerRockerHeight = 28;
+
     bool mixerOnSwitch (const juce::String& id)
     {
-        return id == "osc1On" || id == "osc2On" || id == "osc3On" || id == "extOn" || id == "noiseOn";
+        return std::any_of (std::begin (mixerChannels), std::end (mixerChannels),
+                            [&] (const auto& channel) { return id == channel.toggle; });
     }
 
     struct Placement { const char* id; int x, y; };
@@ -715,8 +809,8 @@ namespace
         { "osc1Lvl", 649, oscillatorRow (0) }, { "osc1On", 730, oscillatorRow (0) + 31 },
         { "osc2Lvl", 649, oscillatorRow (1) }, { "osc2On", 730, oscillatorRow (1) + 31 },
         { "osc3Lvl", 649, oscillatorRow (2) }, { "osc3On", 730, oscillatorRow (2) + 31 },
-        { "extLvl", 805, 151 }, { "extOn", 730, 181 },
-        { "noiseLvl", 805, 275 }, { "noiseOn", 730, 305 }, { "noisePink", 873, 297 },
+        { "extLvl", 810, 151 }, { "extOn", 730, 181 },
+        { "noiseLvl", 810, 275 }, { "noiseOn", 730, 305 }, { "noisePink", 873, 297 },
         { "cutoff", modifierLeftX, 91 }, { "res", modifierCentreX, 91 }, { "envAmt", modifierRightX, 91 },
         { "fA", modifierLeftX, 216 }, { "fD", modifierCentreX, 216 }, { "fS", modifierRightX, 216 },
         { "keyTrk1", modifierDivider, 177 }, { "keyTrk2", modifierDivider, 235 },
@@ -1222,12 +1316,23 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
 {
     const auto id = b.getComponentID();
     const bool vertical = id == "noisePink";
-    const bool blue = id == "noisePink" || mixerOnSwitch (id);
+    const bool mixer = mixerOnSwitch (id);
     const bool silver = id == "comp" || id == "decaySw";
     const bool on = b.getToggleState();
-    const auto& sprite = switchPhoto (on, vertical, blue, silver);
-    const auto r = b.getLocalBounds().toFloat().withSizeKeepingCentre (vertical ? 19.0f : 51.0f,
-                                                                     vertical ? 43.0f : 22.0f);
+    const auto& sprite = switchPhoto (on, vertical, mixer, silver);
+    auto area = b.getLocalBounds().toFloat();
+    if (mixer)
+    {
+        const auto rocker = area.removeFromTop ((float) mixerRockerHeight);
+        const float width = rocker.getHeight() * (float) sprite.getWidth() / (float) sprite.getHeight();
+        g.setColour (juce::Colours::white);
+        g.drawImage (sprite, rocker.withSizeKeepingCentre (width, rocker.getHeight()));
+        g.setColour (colour (panelInk).withAlpha (on || highlighted || b.hasKeyboardFocus (false) ? 1.0f : 0.75f));
+        g.setFont (panelFont (13.0f));
+        g.drawText (on ? "ON" : "OFF", area.withTrimmedRight (2.0f), juce::Justification::centredRight);
+        return;
+    }
+    const auto r = area.withSizeKeepingCentre (vertical ? 19.0f : 51.0f, vertical ? 43.0f : 22.0f);
     const bool flipX = silver && on;
     const bool flipY = vertical && on;
     const float scaleX = r.getWidth() / (float) sprite.getWidth();
@@ -1309,11 +1414,18 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
         presetBox.addItem (proc.getProgramName (i), i + 1);
     presetBox.setSelectedId (proc.getCurrentProgram() + 1, juce::dontSendNotification);
     presetBox.onChange = [this] { proc.setCurrentProgram (presetBox.getSelectedId() - 1); };
-    addAndMakeVisible (presetBox);
+    addAndMakeVisible (panel);
+    panel.addAndMakeVisible (presetBox);
 
     presetBox.setTitle ("Preset");
     const int extraRows = juce::jmax (0, (auxiliaryCount - 1) / auxiliaryColumns);
-    setSize (editorW, editorH + extraRows * auxiliaryRowHeight);
+    const int designHeight = editorH + extraRows * auxiliaryRowHeight;
+    panel.setSize (editorW, designHeight);
+    layoutPanel();
+    setSize (editorW, designHeight);
+    setResizeLimits (editorW * 3 / 5, designHeight * 3 / 5, editorW * 3 / 2, designHeight * 3 / 2);
+    getConstrainer()->setFixedAspectRatio ((double) editorW / designHeight);
+    setResizable (true, true);
     startTimerHz (30);
 }
 
@@ -1336,7 +1448,7 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
         k.button->setTitle (utf8 (d.name));
         k.button->setTooltip (tipFor (d.id));
         k.buttonAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (proc.apvts, d.id, *k.button);
-        addAndMakeVisible (*k.button);
+        panel.addAndMakeVisible (*k.button);
     }
     else
     {
@@ -1360,18 +1472,29 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
         if (auto* prm = proc.apvts.getParameter (d.id))
             k.slider->setDoubleClickReturnValue (true, (double) prm->convertFrom0to1 (prm->getDefaultValue()));
         k.slider->setTooltip (tipFor (d.id));
-        addAndMakeVisible (*k.slider);
+        panel.addAndMakeVisible (*k.slider);
     }
     controls.push_back (std::move (k));
 }
 
 void BassSynthEditor::resized()
 {
-    panelArea = { cheekW, panelTop, getWidth() - 2 * cheekW, panelHeight };
+    if (getLocalBounds().isEmpty() || panel.getLocalBounds().isEmpty())
+        return;
+
+    const float scale = juce::jmin ((float) getWidth() / panel.getWidth(), (float) getHeight() / panel.getHeight());
+    panel.setTransform (juce::AffineTransform::scale (scale)
+                            .translated ((getWidth() - panel.getWidth() * scale) * 0.5f,
+                                         (getHeight() - panel.getHeight() * scale) * 0.5f));
+}
+
+void BassSynthEditor::layoutPanel()
+{
+    panelArea = { cheekW, panelTop, panel.getWidth() - 2 * cheekW, panelHeight };
     displayArea = mainPanelBounds ({ (cheekW + controllerDivider - 174) / 2, 104, 174, 130 });
     overloadArea = mainPanelBounds ({ 786, 97, 100, 44 });
     const int setupTop = panelArea.getBottom() + setupGap;
-    setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), setupHeight };
+    setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), panel.getHeight() - setupTop - setupGap };
     badgeArea = { panelX (1140), setupTop + 15, 202, 78 };
     presetBox.setBounds (124, 10, 215, 25);
 
@@ -1398,15 +1521,15 @@ void BassSynthEditor::resized()
 
         if (bridgesDivider (k.id))
             k.labelArea = { x - 80, positionY (-2, 23), 74, 23 };
-        else if (mixerOnSwitch (k.id))
-            k.labelArea = { x - 24, positionY (38, 15), 48, 15 };
 
         if (k.id == "noisePink")
             k.button->setBounds (x - 13, positionY (17, 45), 26, 45);
         else if (k.id == "decaySw")
             k.button->setBounds (x - 38, positionY (19, 28), 76, 28);
+        else if (mixerOnSwitch (k.id))
+            k.button->setBounds (x - 28, positionY (16, mixerRockerHeight), 56, mixerRockerHeight + 13);
         else
-            k.button->setBounds (x - 27, positionY (mixerOnSwitch (k.id) ? 16 : 19, 28), 54, 28);
+            k.button->setBounds (x - 27, positionY (19, 28), 54, 28);
     };
 
     const int step = setupArea.getWidth() / auxiliaryColumns;
@@ -1424,14 +1547,40 @@ void BassSynthEditor::resized()
             ++auxiliaryIndex;
         }
     }
+
+    const auto findControl = [this] (const char* id)
+    {
+        return std::find_if (controls.begin(), controls.end(), [id] (const auto& k) { return k.id == id; });
+    };
+    for (const auto& channel : mixerChannels)
+    {
+        const auto knob = findControl (channel.level);
+        const auto toggle = findControl (channel.toggle);
+        if (knob == controls.end() || knob->slider == nullptr
+            || toggle == controls.end() || toggle->button == nullptr)
+            continue;
+
+        const auto centre = lnf.getSliderLayout (*knob->slider).sliderBounds.getCentre() + knob->slider->getPosition();
+        auto& button = *toggle->button;
+        button.setTopLeftPosition (button.getX(), centre.y - mixerRockerHeight / 2);
+        const float direction = centre.x < button.getBounds().getCentreX() ? 1.0f : -1.0f;
+        const float y = (float) centre.y - 2.0f;
+        mixerLinks.emplace_back ((float) centre.x + direction * 47.0f, y,
+                                 (float) button.getBounds().getCentreX() - direction * 26.0f, y);
+    }
 }
 
 void BassSynthEditor::paint (juce::Graphics& g)
 {
+    g.fillAll (juce::Colour (0xff252526));
+}
+
+void BassSynthEditor::paintPanel (juce::Graphics& g)
+{
     const auto ink = colour (panelInk);
     const auto rule = colour (panelRule);
     const auto& textures = finishes();
-    auto rail = getLocalBounds();
+    auto rail = panel.getLocalBounds();
     const auto left = rail.removeFromLeft (cheekW), right = rail.removeFromRight (cheekW);
     g.setColour (juce::Colours::white);
     g.drawImage (textures.leftWood, left.toFloat());
@@ -1450,7 +1599,7 @@ void BassSynthEditor::paint (juce::Graphics& g)
         const float y = header.getY() + header.getHeight() * 59.0f / 88.0f;
         g.drawImage (bolts[i], { x - boltSize * 0.5f, y - boltSize * 0.5f, boltSize, boltSize });
     }
-    drawLowerWood (g, rail.withY (panelArea.getBottom()).withBottom (getHeight()), textures.lowerWood);
+    drawLowerWood (g, rail.withY (panelArea.getBottom()).withBottom (panel.getHeight()), textures.lowerWood);
 
     drawSurface (g, panelArea);
     drawMainBezel (g, panelArea);
@@ -1508,8 +1657,14 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.setFont (panelFont (10.0f, true, 0.19f));
     g.drawText ("DI TO SYNTH", badgeArea.withTrimmedTop (53).withHeight (14), juce::Justification::centred);
 
+    g.setColour (ink.withAlpha (0.75f));
+    for (const auto& link : mixerLinks)
+        g.drawLine (link, 1.2f);
+
     for (const auto& k : controls)
     {
+        if (mixerOnSwitch (k.id))
+            continue;
         g.setColour (ink);
         const float labelSize = k.small || k.button != nullptr ? 13.0f : 16.0f;
         g.setFont (panelFont (labelSize));
@@ -1584,8 +1739,8 @@ void BassSynthEditor::timerCallback()
     ampEnv = proc.displayAmpEnv.load();
     const bool wasOverloaded = overloadHold > 0;
     if (input > 0.9f) overloadHold = 8; else if (overloadHold > 0) --overloadHold;
-    if (wasOverloaded != (overloadHold > 0)) repaint (overloadArea);
-    repaint (displayArea);
+    if (wasOverloaded != (overloadHold > 0)) panel.repaint (overloadArea);
+    panel.repaint (displayArea);
 }
 
 /*

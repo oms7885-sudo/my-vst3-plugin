@@ -31,6 +31,15 @@ public:
 
 private:
     void timerCallback() override;
+    void layoutPanel();
+    void paintPanel (juce::Graphics&);
+
+    struct Panel : juce::Component
+    {
+        explicit Panel (BassSynthEditor& editor) : owner (editor) {}
+        void paint (juce::Graphics& g) override { owner.paintPanel (g); }
+        BassSynthEditor& owner;
+    };
 
     // one panel control: a knob (Float / Choice) or a switch (Bool)
     struct Control
@@ -50,7 +59,9 @@ private:
     PanelLookAndFeel lnf;
     juce::TooltipWindow tooltipWindow { this, 1000 };   // descriptions appear after 1 s of hovering
 
+    Panel panel { *this };
     std::vector<Control> controls;
+    std::vector<juce::Line<float>> mixerLinks;
 
     juce::ComboBox presetBox;
 
