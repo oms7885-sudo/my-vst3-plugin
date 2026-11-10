@@ -43,6 +43,16 @@ Every parameter is one row in `bsyn::spec::params`:
   `Bool` (switch).
 - `min`, `max`, `def`, `centre`, `unit`: engine values. The host parameter already has the right
   range and display text, so a slider attached by id shows correct values without extra code.
+- `dial0`, `dial1`: the numbers the Model D prints round the dial where it shows a scale, not a real
+  unit (Cutoff -5..+5; Emphasis, Amount of Contour, Sustain, mixer volumes 0..10). `dial0` sits at the
+  knob's minimum, `dial1` at its maximum, evenly spread over the travel. **When they differ, draw these
+  numbers round the knob, not `min`/`max`/`unit`** (so no Hz marks on Cutoff). Both 0 = draw real units.
+- `timeDial`: Attack/Decay. The host range already puts 10 ms, 200 ms, 600 ms, 1 s, 5 s, 10 s at 0, 2,
+  4, 6, 8, 10 tenths of the travel, as on the Model D; place marks with the slider's own
+  `valueToProportionOfLength`, never with your own curve.
+- Value box: show the host parameter's text as it comes (`slider.getTextFromValue` / the attachment's
+  default). It is already the dial number, and for Cutoff the frequency after it ("-2.8 · 160 Hz").
+  Do not format values in the editor.
 - `section`, `label`: where it sits on the panel and its short name. The order of rows inside a
   section is the Model D panel order.
 - `tip`: Korean hover help, `"TITLE\n설명"`. UTF-8; build with `/utf-8` (already set in CMake).

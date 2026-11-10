@@ -1231,6 +1231,49 @@ namespace
         return compact ? small : (selector ? choice : (frequency ? tuning : main));
     }
 
+    class AnimatedRocker final : public juce::ToggleButton, private juce::Timer
+    {
+    public:
+        float getPosition() const noexcept
+        {
+            const auto elapsed = juce::Time::getMillisecondCounterHiRes() - startedAt;
+            const float t = (float) juce::jlimit (0.0, 1.0, elapsed / durationMs);
+            return start + (target - start) * (t * t * (3.0f - 2.0f * t));
+        }
+
+    private:
+        static constexpr double durationMs = 125.0;
+
+        void buttonStateChanged() override
+        {
+            const float next = getToggleState() ? 1.0f : 0.0f;
+            if (next == target)
+                return;
+
+            start = getPosition();
+            target = next;
+            if (! isVisible())
+            {
+                start = target;
+                stopTimer();
+                return;
+            }
+
+            startedAt = juce::Time::getMillisecondCounterHiRes();
+            startTimerHz (60);
+        }
+
+        void timerCallback() override
+        {
+            if (juce::Time::getMillisecondCounterHiRes() - startedAt >= durationMs)
+                stopTimer();
+            repaint();
+        }
+
+        double startedAt = 0.0;
+        float start = 0.0f, target = 0.0f;
+    };
+
     const juce::Image& switchPhoto (bool on, bool vertical, bool blue, bool silver)
     {
         static const auto blueOnPhoto = decodeImage (blueOn);
@@ -1464,11 +1507,33 @@ namespace
 
         const auto min = dial.getMinimum(), max = dial.getMaximum();
         const auto unit = spec != nullptr ? juce::String (spec->unit) : juce::String();
-        if (min == 0.0 && max == 1.0)
+        if (spec != nullptr && spec->dial0 != spec->dial1)
         {
-            if (compact)
-                return { { 0.0f, "0" }, { 0.5f, "5" }, { 1.0f, "10" } };
-            return { { 0.0f, "0" }, { 0.2f, "2" }, { 0.4f, "4" }, { 0.6f, "6" }, { 0.8f, "8" }, { 1.0f, "10" } };
+            const bool signedScale = spec->dial0 < 0.0f && spec->dial1 > 0.0f;
+            const int steps = compact ? 2 : (signedScale ? 10 : 5);
+            std::vector<DialMark> marks;
+            for (int i = 0; i <= steps; ++i)
+            {
+                const float position = (float) i / (float) steps;
+                const auto number = juce::jmap (position, spec->dial0, spec->dial1);
+                const auto sign = number < 0.0f ? juce::String::charToString (0x2212)
+                                               : (signedScale && number > 0.0f ? juce::String ("+") : juce::String());
+                marks.push_back ({ position, sign + dialNumber (std::abs (number)) });
+            }
+            return marks;
+        }
+
+        if (spec != nullptr && spec->timeDial)
+        {
+            const DialMark times[] {
+                { 10.0f, "10ms" }, { 200.0f, "200" }, { 600.0f, "600" },
+                { 1000.0f, "1s" }, { 5000.0f, "5s" }, { 10000.0f, "10s" }
+            };
+            std::vector<DialMark> marks;
+            for (const auto& time : times)
+                if (time.position >= min && time.position <= max)
+                    marks.push_back ({ (float) dial.valueToProportionOfLength (time.position), time.label });
+            return marks;
         }
 
         std::vector<double> candidates;
@@ -1892,44 +1957,78 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     g.fillEllipse (dot);
 }
 
-void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool)
+void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool pressed)
 {
     const auto id = b.getComponentID();
     const bool vertical = id == "noisePink";
     const bool mixer = mixerOnSwitch (id);
-    const bool silver = id == "comp" || id == "decaySw";
+    const bool compressor = id == "comp";
+    const bool silver = compressor || id == "decaySw";
     const bool on = b.getToggleState();
-    const auto& sprite = switchPhoto (on, vertical, mixer, silver);
+    const auto* rocker = dynamic_cast<const AnimatedRocker*> (&b);
+    const float position = rocker != nullptr ? rocker->getPosition() : (on ? 1.0f : 0.0f);
+
     auto area = b.getLocalBounds().toFloat();
-    if (mixer)
+    const auto body = mixer || compressor ? area.removeFromTop ((float) mixerRockerHeight) : area;
+    const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (mixer ? 54.0f : 51.0f),
+                                                   vertical ? 43.0f : 22.0f);
+    const float travel = (position * 2.0f - 1.0f) * 1.5f;
+    const float compression = std::sin (position * juce::MathConstants<float>::pi) * 4.0f + (pressed ? 1.5f : 0.0f);
+    const auto face = frame.withSizeKeepingCentre (frame.getWidth(), frame.getHeight() - compression)
+                           .translated (0.0f, travel);
+
+    const auto drawState = [&] (bool state, float opacity)
     {
-        const auto rocker = area.removeFromTop ((float) mixerRockerHeight);
-        g.setColour (juce::Colours::white);
-        g.drawImage (sprite, rocker, juce::RectanglePlacement::centred);
+        const auto& sprite = switchPhoto (state, vertical, mixer, silver);
+        const bool flipX = silver && state;
+        const bool flipY = vertical && state;
+        const float scaleX = face.getWidth() / (float) sprite.getWidth();
+        const float scaleY = face.getHeight() / (float) sprite.getHeight();
+        const auto transform = juce::AffineTransform::scale (flipX ? -scaleX : scaleX, flipY ? -scaleY : scaleY)
+                                   .translated (flipX ? face.getRight() : face.getX(), flipY ? face.getBottom() : face.getY());
+        g.setColour (juce::Colours::white.withAlpha (opacity));
+        g.drawImageTransformed (sprite, transform);
+    };
+    if (position < 1.0f)
+        drawState (false, 1.0f);
+    if (position > 0.0f)
+        drawState (true, position);
+
+    if (silver || vertical)
+    {
+        g.setColour (juce::Colours::black.withAlpha ((1.0f - position) * 0.22f));
+        g.fillRect (face);
+    }
+
+    if (mixer || compressor)
+    {
         g.setColour (colour (panelInk).withAlpha (on || highlighted || b.hasKeyboardFocus (false) ? 1.0f : 0.75f));
         g.setFont (panelFont (13.0f));
-        g.drawText (on ? "ON" : "OFF", area.withTrimmedRight (2.0f), juce::Justification::centredRight);
+        g.drawText (on ? "ON" : "OFF", area.withTrimmedRight (2.0f),
+                    mixer ? juce::Justification::centredRight : juce::Justification::centred);
         return;
     }
-    const auto r = area.withSizeKeepingCentre (vertical ? 19.0f : 51.0f, vertical ? 43.0f : 22.0f);
-    const bool flipX = silver && on;
-    const bool flipY = vertical && on;
-    const float scaleX = r.getWidth() / (float) sprite.getWidth();
-    const float scaleY = r.getHeight() / (float) sprite.getHeight();
-    const auto transform = juce::AffineTransform::scale (flipX ? -scaleX : scaleX, flipY ? -scaleY : scaleY)
-                               .translated (flipX ? r.getRight() : r.getX(), flipY ? r.getBottom() : r.getY());
-    g.setColour (juce::Colours::white);
-    g.drawImageTransformed (sprite, transform);
-    if (id == "decaySw")
+
+    if (vertical)
     {
-        const juce::Rectangle<float> indicator (r.getRight() + 5.0f, r.getCentreY() - 2.5f, 5.0f, 5.0f);
+        g.setFont (panelFont (11.0f));
+        g.setColour (on ? C::silkDim : colour (panelInk));
+        g.drawText ("WHITE", area.withBottom (frame.getY() - 1.0f), juce::Justification::centred);
+        g.setColour (on ? colour (panelInk) : C::silkDim);
+        g.drawText ("PINK", area.withY (frame.getBottom() + 1.0f).withBottom (body.getBottom()),
+                    juce::Justification::centred);
+    }
+    else if (id == "decaySw")
+    {
+        const juce::Rectangle<float> indicator (frame.getRight() + 5.0f, frame.getCentreY() - 2.5f, 5.0f, 5.0f);
         g.setColour (on ? C::amber : C::pilotOff);
         g.fillEllipse (indicator);
     }
+
     if (highlighted || b.hasKeyboardFocus (false))
     {
         g.setColour (colour (panelInk).withAlpha (0.40f));
-        g.drawRect (r.expanded (1.0f), 0.8f);
+        g.drawRect (frame.expanded (1.0f), 0.8f);
     }
 }
 
@@ -1956,8 +2055,9 @@ juce::Slider::SliderLayout PanelLookAndFeel::getSliderLayout (juce::Slider& slid
 {
     auto layout = juce::LookAndFeel_V4::getSliderLayout (slider);
     const auto valueBox = layout.textBoxBounds;
-    layout.textBoxBounds = valueBox.withSizeKeepingCentre (valueBox.getWidth() - 16, valueBox.getHeight() - 2);
     const auto id = slider.getComponentID();
+    const int horizontalInset = id == "cutoff" ? 0 : 16;
+    layout.textBoxBounds = valueBox.withSizeKeepingCentre (valueBox.getWidth() - horizontalInset, valueBox.getHeight() - 2);
     const bool oscillator = id.startsWith ("osc") && (id.endsWith ("Range") || id.endsWith ("Freq") || id.endsWith ("Wave"));
     const bool loudness = id == "aA" || id == "aD" || id == "aS";
     if (id == "osc2Freq" || id == "osc3Freq")
@@ -2121,11 +2221,10 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
 {
     Control k;
     k.id = d.id; k.label = utf8 (d.label); k.small = small;
-    if (k.id == "noisePink") k.label = "White / Pink";
     if (k.id == "osc3Ctl") k.label = "Osc. 3 Control";
     if (d.kind == bsyn::spec::Kind::Bool)
     {
-        k.button = std::make_unique<juce::ToggleButton>();
+        k.button = std::make_unique<AnimatedRocker>();
         k.button->setComponentID (d.id);
         k.button->setTitle (utf8 (d.name));
         k.button->setTooltip (tipFor (d.id));
@@ -2146,7 +2245,8 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
         }
         else
             k.slider->setRotaryParameters (pi * 1.25f, pi * 2.75f, true);
-        k.slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, small ? 74 : 84, 15);
+        const int valueWidth = k.id == "cutoff" ? 96 : (small ? 74 : 84);
+        k.slider->setTextBoxStyle (juce::Slider::TextBoxBelow, false, valueWidth, 15);
         k.slider->setMouseDragSensitivity (small ? 160 : 200);
         // hold Ctrl (Cmd on Mac) while dragging for fine adjustment (detuning Frequency by cents)
         k.slider->setVelocityModeParameters (0.4, 1, 0.02, true, juce::ModifierKeys::ctrlAltCommandModifiers);
@@ -2212,7 +2312,9 @@ void BassSynthEditor::layoutPanel()
             k.labelArea = { x - 80, positionY (-2, 23), 74, 23 };
 
         if (k.id == "noisePink")
-            k.button->setBounds (x - 13, positionY (17, 45), 26, 45);
+            k.button->setBounds (x - 17, positionY (17, 45) - 12, 34, 69);
+        else if (k.id == "comp")
+            k.button->setBounds (x - 27, positionY (19, mixerRockerHeight), 54, mixerRockerHeight + 13);
         else if (k.id == "decaySw")
             k.button->setBounds (x - 38, positionY (19, 28), 76, 28);
         else if (mixerOnSwitch (k.id))
@@ -2361,7 +2463,7 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
 
     for (const auto& k : controls)
     {
-        if (mixerOnSwitch (k.id))
+        if (mixerOnSwitch (k.id) || k.id == "noisePink")
             continue;
         const auto text = k.label.toUpperCase();
         const auto key = k.id == "fD" || k.id == "aD" ? juce::String ("decayTime") : (k.id == "outGain" ? k.id : text);
