@@ -671,9 +671,9 @@ namespace
         { "modAmt", controllerLeftX, controllerRowY }, { "modMix", controllerRightX, controllerRowY },
         { "filterMod", modifierDivider, 115 },
         { "osc1Range", oscillatorRangeX, oscillatorRow (0) }, { "osc1Wave", oscillatorWaveformX, oscillatorRow (0) },
-        { "osc2Range", oscillatorRangeX, oscillatorRow (1) }, { "osc2Freq", oscillatorFrequencyX, oscillatorRow (1) },
+        { "osc2Range", oscillatorRangeX, oscillatorRow (1) }, { "osc2Freq", oscillatorFrequencyX, oscillatorRow (1) - 7 },
         { "osc2Wave", oscillatorWaveformX, oscillatorRow (1) },
-        { "osc3Range", oscillatorRangeX, oscillatorRow (2) }, { "osc3Freq", oscillatorFrequencyX, oscillatorRow (2) },
+        { "osc3Range", oscillatorRangeX, oscillatorRow (2) }, { "osc3Freq", oscillatorFrequencyX, oscillatorRow (2) - 7 },
         { "osc3Wave", oscillatorWaveformX, oscillatorRow (2) },
         { "osc3Ctl", oscillatorCentreX, oscillatorRow (2) + 111 },
         { "osc1Lvl", 649, oscillatorRow (0) }, { "osc1On", 730, oscillatorRow (0) + 31 },
@@ -1324,6 +1324,8 @@ void BassSynthEditor::resized()
     {
         const int labelWidth = compact ? 94 : 98;
         k.labelArea = { x - labelWidth / 2, y, labelWidth, 18 };
+        if (k.id == "osc2Freq" || k.id == "osc3Freq")
+            k.labelArea.translate (0, 3);
         if (k.slider)
         {
             const int width = compact ? 74 : 98;
