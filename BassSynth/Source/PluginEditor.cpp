@@ -1972,20 +1972,30 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const auto body = mixer || compressor ? area.removeFromTop ((float) mixerRockerHeight) : area;
     const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (mixer ? 54.0f : 51.0f),
                                                    vertical ? 43.0f : 22.0f);
-    const float travel = (position * 2.0f - 1.0f) * 1.5f;
-    const float compression = std::sin (position * juce::MathConstants<float>::pi) * 4.0f + (pressed ? 1.5f : 0.0f);
-    const auto face = frame.withSizeKeepingCentre (frame.getWidth(), frame.getHeight() - compression)
-                           .translated (0.0f, travel);
+    // The rocker pivots at its centre. The two ends move in opposite directions.
+    const float tilt = 2.0f * position - 1.0f;
+    const float foreshortening = std::abs (tilt) * 2.0f;
+    const auto face = frame.reduced (vertical ? 0.0f : foreshortening * 0.5f,
+                                     vertical ? foreshortening * 0.5f : 0.0f);
+    const auto centre = frame.getCentre();
+    const auto pivot = juce::AffineTransform::translation (-centre.x, -centre.y)
+                           .sheared (vertical ? tilt * 4.0f / frame.getHeight() : 0.0f,
+                                     vertical ? 0.0f : tilt * 4.0f / frame.getWidth())
+                           .translated (centre.x, centre.y);
 
+    g.setColour (juce::Colour (0xff121214));
+    g.fillRoundedRectangle (frame, 1.0f);
     const auto drawState = [&] (bool state, float opacity)
     {
         const auto& sprite = switchPhoto (state, vertical, mixer, silver);
         const bool flipX = silver && state;
-        const bool flipY = vertical && state;
+        // The dim horizontal sprites are stored vertically mirrored.
+        const bool flipY = vertical ? state : ! silver && ! state;
         const float scaleX = face.getWidth() / (float) sprite.getWidth();
         const float scaleY = face.getHeight() / (float) sprite.getHeight();
         const auto transform = juce::AffineTransform::scale (flipX ? -scaleX : scaleX, flipY ? -scaleY : scaleY)
-                                   .translated (flipX ? face.getRight() : face.getX(), flipY ? face.getBottom() : face.getY());
+                                   .translated (flipX ? face.getRight() : face.getX(), flipY ? face.getBottom() : face.getY())
+                                   .followedBy (pivot);
         g.setColour (juce::Colours::white.withAlpha (opacity));
         g.drawImageTransformed (sprite, transform);
     };
@@ -1994,11 +2004,27 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     if (position > 0.0f)
         drawState (true, position);
 
-    if (silver || vertical)
+    juce::Path surface;
+    surface.addRectangle (face);
+    surface.applyTransform (pivot);
+    const float dim = (silver || vertical ? (1.0f - position) * 0.22f : 0.0f) + (pressed ? 0.06f : 0.0f);
+    if (dim > 0.0f)
     {
-        g.setColour (juce::Colours::black.withAlpha ((1.0f - position) * 0.22f));
-        g.fillRect (face);
+        g.setColour (juce::Colours::black.withAlpha (dim));
+        g.fillPath (surface);
     }
+
+    const auto start = vertical ? juce::Point<float> (centre.x, frame.getY())
+                                : juce::Point<float> (frame.getX(), centre.y);
+    const auto end = vertical ? juce::Point<float> (centre.x, frame.getBottom())
+                              : juce::Point<float> (frame.getRight(), centre.y);
+    const auto shadow = juce::Colours::black.withAlpha (std::abs (tilt) * 0.33f);
+    const auto highlight = juce::Colours::white.withAlpha (std::abs (tilt) * 0.12f);
+    juce::ColourGradient depth (tilt < 0.0f ? shadow : highlight, start,
+                               tilt < 0.0f ? highlight : shadow, end, false);
+    depth.addColour (0.5, juce::Colours::transparentBlack);
+    g.setGradientFill (depth);
+    g.fillPath (surface);
 
     if (mixer || compressor)
     {
