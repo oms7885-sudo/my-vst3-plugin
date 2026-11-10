@@ -1728,11 +1728,12 @@ namespace
         if (! image.isValid())
             return;
 
-        const int width = 154;
-        const int x = area.getCentreX() - width / 2;
-        const int y = area.getY();
-        g.drawImage (image, x, y, width, 35, 0, 0, 367, 85, true);
-        g.drawImage (image, x + 118, y + 35, 36, 10, 281, 85, 86, 23, true);
+        const int width = area.getWidth();
+        const int faceHeight = juce::roundToInt (area.getHeight() * 85.0f / 108.0f);
+        const int tailOffset = juce::roundToInt (width * 281.0f / 367.0f);
+        g.drawImage (image, area.getX(), area.getY(), width, faceHeight, 0, 0, 367, 85, true);
+        g.drawImage (image, area.getX() + tailOffset, area.getY() + faceHeight,
+                     width - tailOffset, area.getHeight() - faceHeight, 281, 85, 86, 23, true);
     }
 
     // hover help (Korean) comes from Parameters.h: "TITLE\ndescription"
@@ -2245,9 +2246,11 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
     drawScrew (g, (float) badgeArea.getX() + 10.0f, (float) badgeArea.getCentreY());
     drawScrew (g, (float) badgeArea.getRight() - 10.0f, (float) badgeArea.getCentreY());
     g.setColour (ink);
-    drawWordmark (g, badgeArea.withTrimmedTop (8));
+    const auto wordmark = badgeArea.withSizeKeepingCentre (132, 39).withY (badgeArea.getCentreY() - 23);
+    drawWordmark (g, wordmark);
     g.setFont (panelFont (10.0f, true, 0.19f));
-    g.drawText ("DI TO SYNTH", badgeArea.withTrimmedTop (53).withHeight (14), juce::Justification::centred);
+    g.drawText ("DI TO SYNTH", badgeArea.withY (wordmark.getBottom() - 3).withHeight (14),
+                juce::Justification::centred);
 
     g.setColour (ink.withAlpha (0.75f));
     for (const auto& link : mixerLinks)
