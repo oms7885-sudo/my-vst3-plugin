@@ -680,7 +680,7 @@ namespace
         { "osc2Lvl", 649, oscillatorRow (1) }, { "osc2On", 730, oscillatorRow (1) + 31 },
         { "osc3Lvl", 649, oscillatorRow (2) }, { "osc3On", 730, oscillatorRow (2) + 31 },
         { "extLvl", 805, 151 }, { "extOn", 730, 181 },
-        { "noiseLvl", 805, 275 }, { "noiseOn", 730, 305 }, { "noisePink", 873, 391 },
+        { "noiseLvl", 805, 275 }, { "noiseOn", 730, 305 }, { "noisePink", 873, 297 },
         { "cutoff", modifierLeftX, 91 }, { "res", modifierCentreX, 91 }, { "envAmt", modifierRightX, 91 },
         { "fA", modifierLeftX, 216 }, { "fD", modifierCentreX, 216 }, { "fS", modifierRightX, 216 },
         { "keyTrk1", modifierDivider, 177 }, { "keyTrk2", modifierDivider, 235 },
@@ -1217,6 +1217,8 @@ void PanelLookAndFeel::drawTooltip (juce::Graphics& g, const juce::String& text,
 juce::Slider::SliderLayout PanelLookAndFeel::getSliderLayout (juce::Slider& slider)
 {
     auto layout = juce::LookAndFeel_V4::getSliderLayout (slider);
+    const auto valueBox = layout.textBoxBounds;
+    layout.textBoxBounds = valueBox.withSizeKeepingCentre (valueBox.getWidth() - 16, valueBox.getHeight() - 2);
     const auto id = slider.getComponentID();
     const bool oscillator = id.startsWith ("osc") && (id.endsWith ("Range") || id.endsWith ("Freq") || id.endsWith ("Wave"));
     const bool loudness = id == "aA" || id == "aD" || id == "aS";
