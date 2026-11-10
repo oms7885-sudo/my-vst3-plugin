@@ -1186,7 +1186,7 @@ namespace
         return edge;
     }
 
-    void drawMainBezel (juce::Graphics& g, juce::Rectangle<int> bounds)
+    void drawMainBezel (juce::Graphics& g, juce::Rectangle<int> bounds, float sideWidth)
     {
         static const auto top = fadeEdge (topEdge, false);
         static const auto bottom = fadeEdge (bottomEdge, false);
@@ -1194,8 +1194,8 @@ namespace
         static const auto right = fadeEdge (rightEdge, true);
         auto area = bounds.toFloat();
         g.setColour (juce::Colours::white);
-        g.drawImage (left, area.removeFromLeft (15.0f));
-        g.drawImage (right, area.removeFromRight (15.0f));
+        g.drawImage (left, area.removeFromLeft (sideWidth));
+        g.drawImage (right, area.removeFromRight (sideWidth));
         g.drawImage (top, area.removeFromTop (14.0f).expanded (4.0f, 0.0f).translated (0.0f, -5.0f));
         g.drawImage (bottom, area.removeFromBottom (15.0f).expanded (4.0f, 0.0f));
     }
@@ -1338,7 +1338,9 @@ namespace
     constexpr int modifierCentreX = (modifierDivider + outputDivider) / 2;
     constexpr int modifierLeftX = modifierCentreX - 96, modifierRightX = modifierCentreX + 96;
     constexpr int loudnessRowY = 350;
-    constexpr int controllerCentreX = (cheekW + controllerDivider) / 2;
+    constexpr int mainBezelSideInset = 14;
+    constexpr int controllerPanelLeft = cheekW + mainBezelSideInset;
+    constexpr int controllerCentreX = (controllerPanelLeft + controllerDivider) / 2;
     constexpr int controllerLeftX = controllerCentreX - 51, controllerRightX = controllerCentreX + 51;
     constexpr int controllerRowY = 265;
     constexpr int oscillatorRow (int index) { return 90 + 119 * index; }
@@ -2185,7 +2187,7 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
     drawLowerWood (g, rail.withY (panelArea.getBottom()).withBottom (panel.getHeight()), textures.lowerWood);
 
     drawSurface (g, panelArea);
-    drawMainBezel (g, panelArea);
+    drawMainBezel (g, panelArea, (float) (panelX (controllerPanelLeft) - panelArea.getX()));
 
     g.setColour (colour (0xffe2e0dc));
     constexpr int dividerWidth = 2;
@@ -2200,7 +2202,7 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
 
     struct Caption { const char* text; juce::Rectangle<int> area; };
     const Caption captions[] {
-        { "CONTROLLERS", { cheekW, 481, controllerDivider - cheekW, 33 } },
+        { "CONTROLLERS", { controllerPanelLeft, 481, controllerDivider - controllerPanelLeft, 33 } },
         { "OSCILLATOR BANK", { controllerDivider, 481, oscillatorDivider - controllerDivider, 33 } },
         { "MIXER", { 594, 481, 330, 33 } }, { "FILTER CONTOUR", { 924, 66, 334, 22 } },
         { "LOUDNESS CONTOUR", { 924, 322, 334, 26 } }, { "OUTPUT", { 1258, 481, 112, 33 } }
