@@ -598,12 +598,28 @@ namespace
         float pointerAngle, capRatio, diameter, skirtRatio;
     };
 
+    juce::Image softenedKnobPhoto (const char* data)
+    {
+        auto image = decodeImage (data);
+        juce::Image::BitmapData pixels (image, juce::Image::BitmapData::readWrite);
+        const auto soften = [] (float value) { return 0.018f + 0.942f * std::pow (value, 0.82f); };
+        for (int y = 0; y < pixels.height; ++y)
+            for (int x = 0; x < pixels.width; ++x)
+            {
+                const auto source = pixels.getPixelColour (x, y);
+                pixels.setPixelColour (x, y, juce::Colour::fromFloatRGBA (
+                    soften (source.getFloatRed()), soften (source.getFloatGreen()),
+                    soften (source.getFloatBlue()), source.getFloatAlpha()));
+            }
+        return image;
+    }
+
     const KnobPhoto& knobPhoto (bool compact, bool selector, bool frequency)
     {
-        static const KnobPhoto main { decodeImage (ashKnobMain), 2.65f, 0.59f, 56.0f, 0.90f };
-        static const KnobPhoto choice { decodeImage (ashKnobSelector), -0.33f, 0.46f, 58.0f, 0.96f };
-        static const KnobPhoto tuning { decodeImage (ashKnobFrequency), 0.0f, 0.67f, 64.0f, 0.91f };
-        static const KnobPhoto small { decodeImage (ashKnobSmall), -2.45f, 0.58f, 40.0f, 0.91f };
+        static const KnobPhoto main { softenedKnobPhoto (ashKnobMain), 2.65f, 0.59f, 56.0f, 0.90f };
+        static const KnobPhoto choice { softenedKnobPhoto (ashKnobSelector), -0.33f, 0.46f, 58.0f, 0.96f };
+        static const KnobPhoto tuning { softenedKnobPhoto (ashKnobFrequency), 0.0f, 0.67f, 64.0f, 0.91f };
+        static const KnobPhoto small { softenedKnobPhoto (ashKnobSmall), -2.45f, 0.58f, 40.0f, 0.91f };
         return compact ? small : (selector ? choice : (frequency ? tuning : main));
     }
 
@@ -640,7 +656,20 @@ namespace
         return juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain));
     }
 
-    constexpr int editorW = 1400, editorH = 682, cheekW = 26, auxiliaryColumns = 11, auxiliaryRowHeight = 112;
+    constexpr int referenceWidth = 1400, editorW = 1480, editorH = 634, cheekW = 26;
+    constexpr int panelTop = 40, panelHeight = 461, panelTopTrim = 24, setupGap = 10;
+    constexpr int auxiliaryColumns = 11, auxiliaryRowHeight = 112;
+
+    int panelX (int x)
+    {
+        return cheekW + juce::roundToInt ((x - cheekW) * (editorW - 2.0f * cheekW) / (referenceWidth - 2.0f * cheekW));
+    }
+
+    juce::Rectangle<int> mainPanelBounds (juce::Rectangle<int> reference)
+    {
+        const int left = panelX (reference.getX());
+        return { left, reference.getY() - panelTopTrim, panelX (reference.getRight()) - left, reference.getHeight() };
+    }
     constexpr juce::uint32 panelInk = 0xfff3eee3, panelRule = 0xff9c9891, badgeColour = 0xff252526;
 
     juce::Colour colour (juce::uint32 argb) { return juce::Colour (argb); }
@@ -1163,11 +1192,22 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     }
 
     // The stationary photograph of the metal cap keeps its light direction as the skirt turns.
-    juce::Graphics::ScopedSaveState saved (g);
-    juce::Path metal;
-    metal.addEllipse (body.withSizeKeepingCentre (diameter * photo.capRatio, diameter * photo.capRatio));
-    g.reduceClipRegion (metal);
-    g.drawImage (bitmap, artwork);
+    {
+        juce::Graphics::ScopedSaveState saved (g);
+        juce::Path metal;
+        metal.addEllipse (body.withSizeKeepingCentre (diameter * photo.capRatio, diameter * photo.capRatio));
+        g.reduceClipRegion (metal);
+        g.drawImage (bitmap, artwork);
+    }
+
+    const auto marker = point (angle, skirt * 0.82f);
+    const float markerSize = compact ? 3.7f : 4.8f;
+    const juce::Rectangle<float> dot (marker.x - markerSize * 0.5f, marker.y - markerSize * 0.5f,
+                                      markerSize, markerSize);
+    g.setColour (juce::Colour (0xff171410));
+    g.fillEllipse (dot.expanded (0.85f));
+    g.setColour (juce::Colour (0xffffeed0));
+    g.fillEllipse (dot);
 }
 
 void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool)
@@ -1313,11 +1353,12 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
 
 void BassSynthEditor::resized()
 {
-    panelArea = { cheekW, 64, getWidth() - 2 * cheekW, 465 };
-    displayArea = { (controllerLeftX + controllerRightX - 174) / 2, 104, 174, 130 };
-    overloadArea = { 786, 97, 100, 44 };
-    setupArea = { 47, 550, 1060, getHeight() - 570 };
-    badgeArea = { 1140, 565, 202, 78 };
+    panelArea = { cheekW, panelTop, getWidth() - 2 * cheekW, panelHeight };
+    displayArea = mainPanelBounds ({ (controllerLeftX + controllerRightX - 174) / 2, 104, 174, 130 });
+    overloadArea = mainPanelBounds ({ 786, 97, 100, 44 });
+    const int setupTop = panelArea.getBottom() + setupGap;
+    setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), getHeight() - setupTop - 11 };
+    badgeArea = { panelX (1140), setupTop + 15, 202, 78 };
     presetBox.setBounds (96, 10, 215, 25);
 
     const auto place = [] (Control& k, int x, int y, bool compact)
@@ -1351,7 +1392,7 @@ void BassSynthEditor::resized()
     for (auto& k : controls)
     {
         if (const auto* slot = findPlacement (k.id))
-            place (k, slot->x, slot->y, false);
+            place (k, panelX (slot->x), slot->y - panelTopTrim, false);
         else
         {
             const int row = auxiliaryIndex / auxiliaryColumns;
@@ -1381,8 +1422,8 @@ void BassSynthEditor::paint (juce::Graphics& g)
 
     g.setColour (rule);
     for (const int x : { controllerDivider, oscillatorDivider, modifierDivider, outputDivider })
-        g.drawVerticalLine (x, (float) panelArea.getY() + 5.0f, (float) panelArea.getBottom() - 9.0f);
-    g.drawHorizontalLine (envelopeDivider, (float) modifierDivider, (float) outputDivider);
+        g.drawVerticalLine (panelX (x), (float) panelArea.getY() + 5.0f, (float) panelArea.getBottom() - 9.0f);
+    g.drawHorizontalLine (envelopeDivider - panelTopTrim, (float) panelX (modifierDivider), (float) panelX (outputDivider));
 
     g.setColour (colour (0xff322c26));
     g.setFont (panelFont (11.0f));
@@ -1397,11 +1438,11 @@ void BassSynthEditor::paint (juce::Graphics& g)
     g.setColour (ink);
     g.setFont (panelFont (28.0f));
     for (const auto& caption : captions)
-        g.drawFittedText (caption.text, caption.area.reduced (4, 0), juce::Justification::centred, 1);
+        g.drawFittedText (caption.text, mainPanelBounds (caption.area).reduced (4, 0), juce::Justification::centred, 1);
     g.setFont (panelFont (17.0f));
     for (int i = 0; i < 3; ++i)
         g.drawText ("OSCILLATOR " + juce::String (i + 1),
-                    juce::Rectangle<int> { oscillatorFrequencyX - 100, oscillatorRow (i) - 16, 200, 19 },
+                    mainPanelBounds ({ oscillatorFrequencyX - 100, oscillatorRow (i) - 16, 200, 19 }),
                     juce::Justification::centred);
 
     {
@@ -1418,8 +1459,8 @@ void BassSynthEditor::paint (juce::Graphics& g)
     }
     g.setColour (rule);
     g.drawRoundedRectangle (setupArea.toFloat(), 4.0f, 1.0f);
-    drawScrew (g, 54.0f, 559.0f);
-    drawScrew (g, 1100.0f, (float) setupArea.getBottom() - 7.0f);
+    drawScrew (g, (float) setupArea.getX() + 7.0f, (float) setupArea.getY() + 9.0f);
+    drawScrew (g, (float) setupArea.getRight() - 7.0f, (float) setupArea.getBottom() - 7.0f);
 
     g.setColour (colour (badgeColour));
     g.fillRoundedRectangle (badgeArea.toFloat(), 5.0f);
