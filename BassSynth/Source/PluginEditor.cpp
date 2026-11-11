@@ -2339,9 +2339,9 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
     g.setFont (panelFont (9.0f));
     g.drawText ("Hz", unit, juce::Justification::centredRight);
 
-    constexpr int cells = 7;
     const auto meter = [&g] (juce::Rectangle<float> lane, const char* label, float level)
     {
+        constexpr int cells = 7;
         const auto caption = lane.removeFromBottom (13.0f);
         const float step = lane.getHeight() / (float) cells;
         const int litCount = juce::roundToInt (juce::jlimit (0.0f, 1.0f, level) * (float) cells);
