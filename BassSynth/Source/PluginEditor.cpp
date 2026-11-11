@@ -1286,9 +1286,72 @@ namespace
         return juce::Font (options).withExtraKerningFactor (kerning * 0.35f);
     }
 
-    juce::Font monoFont (float size)
+    void drawSegmentDisplay (juce::Graphics& g, const juce::String& text, juce::Rectangle<float> bounds)
     {
-        return juce::Font (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), size, juce::Font::plain));
+        // Segments are ordered top, upper right, lower right, bottom, lower left, upper left, middle.
+        constexpr std::array<unsigned, 10> digits { 0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f };
+        static const juce::Rectangle<float> segments[] {
+            { 3, 0, 10, 2.5f }, { 13, 2.5f, 2.5f, 9 }, { 13, 13.5f, 2.5f, 9 },
+            { 3, 22.5f, 10, 2.5f }, { 0.5f, 13.5f, 2.5f, 9 }, { 0.5f, 2.5f, 2.5f, 9 }, { 3, 11.25f, 10, 2.5f }
+        };
+        const auto red = juce::Colour (0xffff6538);
+        const auto advance = [] (juce::juce_wchar glyph) { return glyph == '.' ? 6.0f : (glyph == '#' ? 11.0f : 19.0f); };
+        float width = -3.0f;
+        for (const auto glyph : text)
+            width += advance (glyph);
+        const float scale = juce::jmin (bounds.getHeight() / 25.0f, bounds.getWidth() / width);
+        float x = bounds.getCentreX() - 0.5f * scale * width;
+        const float y = bounds.getCentreY() - 12.5f * scale;
+        for (const auto glyph : text)
+        {
+            unsigned mask = 0;
+            if (glyph >= '0' && glyph <= '9')
+                mask = digits[(size_t) (glyph - '0')];
+            else
+            {
+                switch (glyph)
+                {
+                    case 'A': mask = 0x77; break;
+                    case 'B': mask = 0x7c; break;
+                    case 'C': mask = 0x39; break;
+                    case 'D': mask = 0x5e; break;
+                    case 'E': mask = 0x79; break;
+                    case 'F': mask = 0x71; break;
+                    case 'G': mask = 0x3d; break;
+                    case '-': mask = 0x40; break;
+                    default: break;
+                }
+            }
+
+            if (glyph == '#' || glyph == '.')
+            {
+                g.setColour (red);
+                if (glyph == '.')
+                    g.fillEllipse (x + 1.5f * scale, y + 22.5f * scale, 2.5f * scale, 2.5f * scale);
+                else
+                {
+                    g.setFont (panelFont (13.0f * scale));
+                    g.drawText ("#", juce::Rectangle<float> (x, y, 11.0f * scale, 16.0f * scale),
+                                juce::Justification::centred);
+                }
+                x += advance (glyph) * scale;
+                continue;
+            }
+
+            for (size_t i = 0; i < std::size (segments); ++i)
+            {
+                const auto segment = segments[i] * scale + juce::Point<float> (x, y);
+                const bool lit = (mask & (1u << i)) != 0;
+                if (lit)
+                {
+                    g.setColour (red.withAlpha (0.12f));
+                    g.fillRoundedRectangle (segment.expanded (scale), scale);
+                }
+                g.setColour (lit ? red : juce::Colour (0xff2b150e));
+                g.fillRoundedRectangle (segment, 0.75f * scale);
+            }
+            x += advance (glyph) * scale;
+        }
     }
 
     constexpr int referenceWidth = 1400, editorW = 1480, editorH = 634, cheekW = 26;
@@ -1604,8 +1667,11 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     const bool waveKnob = s.getComponentID().endsWith ("Wave");
     const bool compact = w < 80;
     const auto& photo = knobPhoto (compact, rangeKnob || waveKnob, s.getComponentID().endsWith ("Freq"));
-    const float diameter = juce::jmin (photo.diameter, radius * 1.52f);
-    const float skirt = diameter * 0.5f;
+    const auto& id = s.getComponentID();
+    const bool controllerKnob = id == "modAmt" || id == "modMix" || id == "gate" || id == "pickSens";
+    const float standardDiameter = juce::jmin (photo.diameter, radius * 1.52f);
+    const float diameter = standardDiameter * (controllerKnob ? 0.93f : 1.0f);
+    const float tickRadius = standardDiameter * 0.5f;
     const auto angleAt = [startAngle, endAngle] (float p) { return startAngle + p * (endAngle - startAngle); };
 
     const auto drawTick = [&] (float angle, float distance, float length)
@@ -1643,7 +1709,7 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
             if (std::any_of (marks.begin(), marks.end(), [p] (const auto& mark) { return std::abs (p - mark.position) < 0.032f; }))
                 continue;
             const auto a = angleAt (p);
-            drawTick (a, skirt + 3.0f, 2.5f);
+            drawTick (a, tickRadius + 3.0f, 2.5f);
         }
 
         for (const auto& mark : marks)
@@ -1651,7 +1717,7 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
             const auto a = angleAt (mark.position);
             auto at = point (a, radius + (compact ? 0.0f : 1.0f));
             at.y = juce::jmax (at.y, (float) y + 5.5f);
-            drawTick (a, skirt + 2.0f, compact ? 2.5f : 4.5f);
+            drawTick (a, tickRadius + 2.0f, compact ? 2.5f : 4.5f);
             g.setColour (colour (panelInk));
             g.drawFittedText (mark.label, juce::Rectangle<float> (at.x - 10.0f, at.y - 5.5f, 20.0f, 11.0f)
                                              .getSmallestIntegerContainer(), juce::Justification::centred, 1, 0.8f);
@@ -1687,7 +1753,7 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
         g.drawImage (bitmap, artwork);
     }
 
-    const auto marker = point (angle, skirt * 0.82f);
+    const auto marker = point (angle, diameter * 0.41f);
     const float markerSize = compact ? 3.7f : 4.8f;
     const juce::Rectangle<float> dot (marker.x - markerSize * 0.5f, marker.y - markerSize * 0.5f,
                                       markerSize, markerSize);
@@ -2221,63 +2287,87 @@ void BassSynthEditor::paintPanel (juce::Graphics& g)
         g.drawFittedText (text, k.labelArea, juce::Justification::centred, 2, 0.78f);
     }
 
-    const auto led = [&g] (int x, int y, bool on)
+    auto window = displayArea.toFloat();
+    const auto lamps = window.removeFromTop (23.0f);
+    window.removeFromBottom (4.0f);
+
+    const auto status = [&g, lamps] (const char* label, float centreX, bool active, juce::Colour lit)
     {
-        const juce::Rectangle<float> lens ((float) x - 4.0f, (float) y - 4.0f, 8.0f, 8.0f);
-        g.setColour (juce::Colour (0xff17110e));
-        g.fillEllipse (lens.expanded (2.0f));
-        if (on)
+        const juce::Rectangle<float> lens (centreX - 16.0f, lamps.getCentreY() - 3.0f, 6.0f, 6.0f);
+        g.setColour (juce::Colour (0xff13100e));
+        g.fillEllipse (lens.expanded (1.3f));
+        if (active)
         {
-            g.setColour (C::amber.withAlpha (0.26f));
-            g.fillEllipse (lens.expanded (3.0f));
+            g.setColour (lit.withAlpha (0.21f));
+            g.fillEllipse (lens.expanded (2.0f));
         }
-        g.setColour (on ? C::amber : C::pilotOff);
+        g.setColour (active ? lit : C::pilotOff);
         g.fillEllipse (lens);
-    };
-    g.setColour (C::screen);
-    g.fillRoundedRectangle (displayArea.toFloat(), 4.0f);
-    g.setColour (rule);
-    g.drawRoundedRectangle (displayArea.toFloat(), 4.0f, 1.0f);
-    const int displayX = displayArea.getX(), displayY = displayArea.getY();
-    const int displayMid = displayArea.getCentreX();
-
-    const auto status = [&] (const char* label, int centreX, bool active)
-    {
-        led (centreX - 9, displayY + 18, active);
         g.setColour (C::silk);
-        g.setFont (panelFont (9.0f));
-        g.drawText (label, juce::Rectangle<int> { centreX + 2, displayY + 10, 24, 16 }, juce::Justification::centredLeft);
+        g.setFont (panelFont (10.5f, true, 0.3f));
+        g.drawText (label, juce::Rectangle<float> { centreX - 5.0f, lamps.getY(), 37.0f, lamps.getHeight() },
+                    juce::Justification::centredLeft);
     };
-    const int statusSpacing = displayArea.getWidth() / 4;
-    status ("TRIG", displayMid - statusSpacing, trigFlash > 0);
-    status ("GATE", displayMid + statusSpacing, gateLed);
+    status ("TRIG", lamps.getX() + lamps.getWidth() * 0.30f, trigFlash > 0, C::amber);
+    status ("GATE", lamps.getX() + lamps.getWidth() * 0.70f, gateLed, juce::Colour (0xffff593d));
 
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xff100c09), window.getTopLeft(),
+                                             juce::Colour (0xff22120b), window.getBottomLeft(), false));
+    g.fillRoundedRectangle (window, 2.5f);
+    g.setColour (juce::Colour (0xff100d0a));
+    g.drawRoundedRectangle (window, 2.5f, 1.0f);
+    g.setColour (juce::Colour (0xff504032).withAlpha (0.6f));
+    g.drawHorizontalLine (juce::roundToInt (window.getBottom()), window.getX() + 2.0f, window.getRight() - 2.0f);
+
+    auto content = window.reduced (10.0f, 9.0f);
+    const auto pitch = content.removeFromLeft (content.getWidth() * 0.49f).reduced (4.0f, 0.0f);
     juce::String note = "--";
-    if (freq > 0.0f)
+    juce::String hertz = "--.-";
+    if (std::isfinite (freq) && freq > 0.0f)
     {
         static const char* names[] { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-        const int midi = (int) std::lround (69.0 + 12.0 * std::log2 (freq / 440.0));
-        note = juce::String (names[((midi % 12) + 12) % 12]) + juce::String (midi / 12 - 1)
-             + "   " + juce::String (freq, 1) + " Hz";
+        const int midi = (int) std::lround (69.0 + 12.0 * std::log2 ((double) freq / 440.0));
+        const int pitchClass = ((midi % 12) + 12) % 12;
+        note = juce::String (names[pitchClass]) + juce::String ((midi - pitchClass) / 12 - 1);
+        hertz = juce::String (freq, 1);
     }
-    g.setColour (C::amber);
-    g.setFont (monoFont (16.0f));
-    g.drawFittedText (note, displayArea.reduced (8, 0).withY (displayY + 35).withHeight (26),
-                      juce::Justification::centred, 1, 0.65f);
-    const auto meter = [&] (const char* label, int y, float value)
+    drawSegmentDisplay (g, note, pitch.withY (pitch.getY() + 9.0f).withHeight (36.0f));
+    auto frequency = pitch.withY (pitch.getY() + 54.0f).withHeight (15.0f);
+    const auto unit = frequency.removeFromRight (15.0f);
+    drawSegmentDisplay (g, hertz, frequency);
+    g.setColour (C::silkDim);
+    g.setFont (panelFont (9.0f));
+    g.drawText ("Hz", unit, juce::Justification::centredRight);
+
+    constexpr int cells = 7;
+    const auto meter = [&g] (juce::Rectangle<float> lane, const char* label, float level)
     {
-        g.setFont (panelFont (8.5f));
+        const auto caption = lane.removeFromBottom (13.0f);
+        const float step = lane.getHeight() / (float) cells;
+        const int litCount = juce::roundToInt (juce::jlimit (0.0f, 1.0f, level) * (float) cells);
+        for (int i = 0; i < cells; ++i)
+        {
+            const float y = lane.getBottom() - (float) (i + 1) * step + 1.0f;
+            const juce::Rectangle<float> cell (lane.getCentreX() - 6.0f, y, 12.0f, step - 2.6f);
+            if (i < litCount)
+            {
+                const auto lit = i >= cells - 2 ? juce::Colour (0xffff8a39) : juce::Colour (0xffefac42);
+                g.setColour (lit.withAlpha (0.16f));
+                g.fillRect (cell.expanded (0.9f));
+                g.setColour (lit);
+            }
+            else
+                g.setColour (juce::Colour (0xff382116));
+            g.fillRoundedRectangle (cell, 0.6f);
+        }
         g.setColour (C::silk);
-        g.drawText (label, juce::Rectangle<int> { displayX + 10, displayY + y, 40, 13 }, juce::Justification::centredLeft);
-        g.setColour (juce::Colour (0xff4a3b25));
-        const int meterWidth = displayArea.getWidth() - 64;
-        g.fillRect (displayX + 52, displayY + y + 5, meterWidth, 3);
-        g.setColour (C::amber);
-        g.fillRect (displayX + 52, displayY + y + 5, juce::roundToInt ((float) meterWidth * juce::jlimit (0.0f, 1.0f, value)), 3);
+        g.setFont (panelFont (9.0f));
+        g.drawFittedText (label, caption.toNearestInt(), juce::Justification::centred, 1, 0.8f);
     };
-    meter ("INPUT", 65, input);
-    meter ("FILTER", 84, filterEnv);
-    meter ("AMP", 103, ampEnv);
+    const auto laneWidth = content.getWidth() / 3.0f;
+    meter (content.removeFromLeft (laneWidth), "INPUT", input);
+    meter (content.removeFromLeft (laneWidth), "FILTER", filterEnv);
+    meter (content, "AMP", ampEnv);
 }
 
 void BassSynthEditor::timerCallback()
