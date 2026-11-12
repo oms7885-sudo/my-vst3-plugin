@@ -1,4 +1,4 @@
-name: Build Bass Ladder Synth (Windows VST3)
+name: Build Bass Ladder Synth (Windows VST3 + Standalone)
 
 on:
   push:
@@ -29,4 +29,11 @@ jobs:
         with:
           name: BassLadderSynth-VST3-Windows
           path: build/BassLadderSynth_artefacts/Release/VST3/
+          if-no-files-found: error
+
+      - name: Upload Standalone
+        uses: actions/upload-artifact@v4
+        with:
+          name: mOog-Standalone-Windows
+          path: build/BassLadderSynth_artefacts/Release/Standalone/
           if-no-files-found: error

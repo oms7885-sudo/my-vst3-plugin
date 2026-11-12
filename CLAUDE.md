@@ -1,4 +1,4 @@
-﻿# mOog — 베이스 DI를 Model D 신스 베이스로 바꾸는 VST3 (Cubase, Windows)
+# mOog — 베이스 DI를 Model D 신스 베이스로 바꾸는 VST3 (Cubase, Windows)
 
 이 파일은 새 대화가 이전 작업을 이어받기 위한 인수인계 문서다. 작업 전에 끝까지 읽을 것.
 상세 기록은 `notes/HISTORY.md`, UI 분담 규칙은 `BassSynth/docs/UI_HANDOFF.md`.
@@ -32,7 +32,8 @@
 - GitHub `oms7885-sudo/my-vst3-plugin`. 브랜치: `bass-synth`(빌드), `ui/model-d-themes`(ChatGPT UI),
   `proto/*`(시제품), `trigger-eval`(실제 녹음 평가 실행), `eval-data`(평가 결과), `main`(옛 Bass-To-MIDI 프로젝트).
 - 빌드: `.github/workflows/bass-synth.yml` — `bass-synth`, `ui/**`에 `BassSynth/**`가 푸시되면 windows-latest에서
-  JUCE 8.0.4로 빌드, 산출물 이름 `BassLadderSynth-VST3-Windows` (안의 폴더는 `mOog.vst3`).
+  JUCE 8.0.4로 빌드, 산출물 `BassLadderSynth-VST3-Windows` (안의 폴더는 `mOog.vst3`)와
+  `mOog-Standalone-Windows` (독립 실행 `mOog.exe`, Windows 오디오(WASAPI)만, ASIO 없음. 입력은 첫 번째로 켠 채널 하나).
 - 평가: `.github/workflows/eval-trigger.yml` — `trigger-eval`에 푸시하면 IDMT-SMT-BASS-SINGLE-TRACKS(주석 달린 17곡,
   948음)를 CI에서만 내려받아 `tests/eval_trigger.cpp`를 돌리고 `eval-data` 브랜치에 `report.txt`, `notes.csv`를 올린다.
   데이터셋 오디오는 저장소에 넣지 않는다 (CC BY-NC-ND).
@@ -87,7 +88,7 @@ polyBLEP) → Model D 믹서(On 스위치, 노이즈 White/Pink, External = DI �
   파형별 음량, 톱니 모양, 다이얼 눈금, 컨투어 시간, Emphasis의 저음 감소, 드리프트는 측정값을 따른다.
   우리 엔진 쪽은 깨끗한 사인파를 넣어 비교한다(줄의 흔들림을 빼기 위해). 실제 연주 비교에는 사용자의 DI 녹음을 쓴다.
 - 보류 중: 출력 직전 Drive(세럼 FX 디스토션이 좋았다고 함, 모드 미확인), Oscillator Modulation 스위치, Glide,
-  독립 실행 앱(가능, ASIO SDK 필요), IDMT의 "낮게 102음" 원인.
+  ASIO 지원 독립 실행 앱(ASIO SDK 필요), IDMT의 "낮게 102음" 원인.
 - 확인 못 한 것: 실기 파형별 음량(지금은 진폭 동일 → 사각파가 약 5 dB 큼), 믹서 단의 비대칭 여부(자료 없음;
   래더의 tanh는 논문 근거 있음), Osc Frequency 패널 숫자.
 
