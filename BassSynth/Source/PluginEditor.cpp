@@ -802,7 +802,7 @@ namespace
 
     RockerFrames makeRockerFrames (juce::Colour material)
     {
-        constexpr int width = 152, height = 60;
+        static constexpr int width = 152, height = 60;
         static const auto off = decodeImage (panelArtwork::rockerOff);
         static const auto on = decodeImage (panelArtwork::rockerOn);
         const juce::Image::BitmapData onPixels (on, juce::Image::BitmapData::readOnly);
