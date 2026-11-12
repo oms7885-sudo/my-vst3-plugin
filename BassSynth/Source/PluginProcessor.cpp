@@ -119,6 +119,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
                     return pts[i - 1].x + (pts[i].x - pts[i - 1].x) * std::log (v / pts[i - 1].ms) / std::log (pts[i].ms / pts[i - 1].ms);
                 });
         }
+        else if (d.dialBreak > d.dial0 && d.dialBreak < d.dial1)
+        {
+            // a dial with an add-on range past its printed scale: straight from min to valueBreak up to the
+            // break, straight from there to max over the rest of the travel
+            const float lo = d.min, hi = d.max, vb = d.valueBreak, xb = (d.dialBreak - d.dial0) / (d.dial1 - d.dial0);
+            range = NormalisableRange<float> (lo, hi,
+                [lo, hi, vb, xb] (float, float, float x)
+                {
+                    x = jlimit (0.0f, 1.0f, x);
+                    return x <= xb ? lo + (vb - lo) * x / xb : vb + (hi - vb) * (x - xb) / (1.0f - xb);
+                },
+                [lo, hi, vb, xb] (float, float, float v)
+                {
+                    v = jlimit (lo, hi, v);
+                    return v <= vb ? xb * (v - lo) / (vb - lo) : xb + (1.0f - xb) * (v - vb) / (hi - vb);
+                });
+        }
         else if (d.centre > 0.0f && d.min > 0.0f && d.centre > d.min && d.centre < d.max)
         {
             // logarithmic knob: value = min * (max/min)^(x^g), with g chosen so the centre value sits at
@@ -186,6 +203,9 @@ bsyn::Params BassSynthProcessor::readParams() const
     p.fA = f ("fA"); p.fD = f ("fD"); p.fS = f ("fS");
     p.aA = f ("aA"); p.aD = f ("aD"); p.aS = f ("aS"); p.decaySw = b ("decaySw"); p.dyn = f ("dyn");
     p.outGainDb = f ("outGain"); p.dry = f ("dry");
+    // Real-Synth mode: everything that sounds runs 50 ms behind the DI, so a note starts with its pitch
+    // already found. Real-Time: no delay.
+    p.lookMs = c ("mode") == 1 ? 50.0f : 0.0f;
     return p;
 }
 
@@ -193,6 +213,7 @@ void BassSynthProcessor::prepareToPlay (double sampleRate, int)
 {
     engine.prepare (sampleRate);
     engine.setParams (readParams());
+    setLatencySamples (engine.latencySamples());
 }
 
 bool BassSynthProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -212,6 +233,8 @@ void BassSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
     const int n = buffer.getNumSamples();
 
     engine.setParams (readParams());
+    // the host lines the track up by this much (playback and export; not what is played live)
+    if (getLatencySamples() != engine.latencySamples()) setLatencySamples (engine.latencySamples());
 
     // the bass DI is mono: use channel 1, or the average of a stereo input
     auto* l = buffer.getWritePointer (0);
@@ -244,7 +267,10 @@ void BassSynthProcessor::setCurrentProgram (int index)
     if (! juce::isPositiveAndBelow (index, getNumPrograms())) return;
     currentProgram = index;
     for (const auto& d : bsyn::spec::params)
+    {
+        if (juce::String (d.id) == "mode") continue;      // a preset is a sound; the working mode stays as chosen
         if (auto* prm = apvts.getParameter (d.id)) prm->setValueNotifyingHost (prm->convertTo0to1 (d.def));
+    }
     for (const auto& [id, v] : presets()[(size_t) index].values)
         if (auto* prm = apvts.getParameter (id)) prm->setValueNotifyingHost (prm->convertTo0to1 (v));
 }

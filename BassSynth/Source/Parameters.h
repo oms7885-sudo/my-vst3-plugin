@@ -37,6 +37,11 @@ struct Param
     // Float, "ms": the Model D's time dial. Its marks 10 m-sec, 200, 600, 1 sec, 5, 10 sit at 0, 2, 4, 6, 8
     // and 10 tenths of the travel (`centre` is not used). Attack reaches below 10 ms in the first twentieth.
     bool timeDial = false;
+    // A dial whose printed scale ends before the knob does (Amount of Contour): the numbers run dial0..dial1 over
+    // the travel as usual, but only up to `dialBreak` are they the Model D's (print numbers up to there); the
+    // rest of the travel is an add-on range (draw it as such: no numbers, a different mark). The value runs in a
+    // straight line from min to `valueBreak` up to the break, and from there to max. 0 = no break.
+    float dialBreak = 0.0f, valueBreak = 0.0f;
 };
 
 // Panel sections in Model D order (left to right), then the plugin-only setup strip.
@@ -106,9 +111,9 @@ inline constexpr Param params[] = {
     { "cutoff", "Cutoff Frequency", "Cutoff", "Filter", Kind::Float, 40.0f, 20000.0f, 160.0f, 894.4f, "Hz", nullptr,
       "CUTOFF\n필터가 열리는 기준점입니다. 눈금은 실제 무그와 같은 -5~+5이고, 값 칸에 주파수가 함께 나옵니다. -5가 40Hz, 0이 약 900Hz, +5가 20kHz이며 한 눈금이 약 0.9옥타브입니다. 낮을수록 어둡고 두꺼운 소리가 납니다.", -5.0f, 5.0f },
     { "res", "Emphasis", "Emphasis", "Filter", Kind::Float, 0.0f, 1.0f, 0.24f, 0.0f, "", nullptr,
-      "EMPHASIS\n레조넌스입니다(0~10). 올리면 컷오프 근처가 강조되어 \"와우\" 소리가 납니다. 눈금은 실제 무그에 맞췄습니다: 7.5~8 부근부터 필터가 스스로 발진해 사인파를 냅니다. 무그처럼 컷오프가 낮을수록 효과가 약해져서(약 200Hz 아래에서는 발진하지 않음) 저음이 꽉 차게 남습니다.", 0.0f, 10.0f },
-    { "envAmt", "Amount of Contour", "Contour Amt", "Filter", Kind::Float, 0.0f, 4.0f, 3.2f, 0.0f, "oct", nullptr,
-      "AMOUNT OF CONTOUR\n필터 엔벨로프가 컷오프를 얼마나 더 여는지 정합니다. 눈금은 실제 무그와 같은 0~10이고 10이 4옥타브입니다(서비스 매뉴얼 사양). 피킹 직후에는 컨투어가 잠깐 더 높이 튀어서 실제로는 그보다 더 열립니다(한 번 치면 약 4.9옥타브, 빠르게 연타하면 최대 약 6.4옥타브). 올릴수록 \"뿌왕\" 하는 폭이 커집니다.", 0.0f, 10.0f },
+      "EMPHASIS\n레조넌스입니다(0~10). 올리면 컷오프 근처가 강조되어 \"와우\" 소리가 납니다. 눈금은 Monark를 재서 맞췄습니다: 4까지는 거의 걸리지 않다가 5부터 빠르게 강해지고, 7~7.5 사이에서 필터가 스스로 발진해 사인파를 냅니다. 올릴수록 저음이 그만큼 줄어듭니다(7에서 약 -12dB). 컷오프가 낮을수록 효과가 약해집니다(약 100Hz 아래에서는 발진하지 않음).", 0.0f, 10.0f },
+    { "envAmt", "Amount of Contour", "Contour Amt", "Filter", Kind::Float, 0.0f, 8.75f, 3.2f, 0.0f, "oct", nullptr,
+      "AMOUNT OF CONTOUR\n필터 엔벨로프가 컷오프를 얼마나 더 여는지 정합니다. 눈금 0~10은 실제 무그 기준으로 10이 6.3옥타브입니다. 10을 넘는 구간은 덧붙인 영역으로, 끝까지 돌리면 Monark의 최대값(8.75옥타브)이 됩니다. 피킹 직후에는 컨투어가 잠깐 더 높이(1.18배) 튀었다 내려옵니다. 올릴수록 \"뿌왕\" 하는 폭이 커집니다.", 0.0f, 13.0f, false, 10.0f, 6.3f },
     { "keyTrk1", "Keyboard Control 1", "Kbd Ctrl 1", "Filter", Kind::Bool, 0.0f, 1.0f, 0.0f, 0.0f, "", nullptr,
       "KEYBOARD CONTROL 1\n높은 음일수록 필터를 조금(1/3) 더 엽니다. 2번과 같이 켜면 완전히 따라갑니다(1옥타브 올라가면 필터도 1옥타브)." },
     { "keyTrk2", "Keyboard Control 2", "Kbd Ctrl 2", "Filter", Kind::Bool, 0.0f, 1.0f, 1.0f, 0.0f, "", nullptr,
@@ -155,6 +160,8 @@ inline constexpr Param params[] = {
       "OUTPUT\n최종 출력 크기입니다(dB)." },
     { "dry", "Dry DI", "Dry DI", "Setup", Kind::Float, 0.0f, 1.0f, 0.0f, 0.0f, "", nullptr,
       "DRY DI\n원래 DI 소리를 필터를 거치지 않고 신스와 섞는 양입니다. 0이면 신스 소리만 납니다." },
+    { "mode", "Mode", "Mode", "Setup", Kind::Choice, 0.0f, 1.0f, 0.0f, 0.0f, "", "Real-Time|Real-Synth",
+      "MODE\nReal-Time: 지연이 없습니다. 들으면서 연주하고 녹음할 때 씁니다. 대신 음이 시작되는 약 0.04초 동안은 음정을 아직 몰라서 신스 톤이 조금 흐트러집니다.\nReal-Synth: 소리가 0.05초 늦게 나오는 대신 음의 첫 순간부터 깨끗한 신스 소리가 납니다. 녹음된 DI를 재생해 음원을 뽑을 때 씁니다. 재생과 내보내기에서는 큐베이스가 이 지연을 자동으로 맞춰 주므로 박자가 밀리지 않습니다. 실시간으로 치면서 들을 때만 늦게 들립니다." },
 };
 
 inline constexpr int numParams = (int) (sizeof (params) / sizeof (params[0]));
