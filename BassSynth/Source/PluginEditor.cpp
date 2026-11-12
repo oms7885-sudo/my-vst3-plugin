@@ -157,8 +157,7 @@ namespace
         "AAUABAAEAAAAAAAAAAAABAALAAAAAwAAAAAAAAAJAAAAAAAAAAAAAAAAAAUAAAABAAAACgAsAC4AA0RGTFQAFGdyZWsAHmxhdG4AHgAE"
         "AAAAAP//AAAAAAAAAAAAAAABAAEACAACAAAAFAABAAAAJAACd2dodAEAAABpdGFsARwAAQACAAMAAQACAR0AAAAAAAEAAAAA";
 
-    // UI photo cutouts from the supplied Model D reference.
-    // The two physical rocker positions, cropped from the supplied switch close-up.
+    // Decode the embedded artwork at its native resolution.
     juce::Image decodeImage (const char* data)
     {
         juce::MemoryOutputStream bytes;
@@ -744,43 +743,16 @@ namespace
 
     struct KnobPhoto
     {
-        KnobPhoto (const char* data, float angle, float cap, float size, float skirt)
-            : image (decodeImage (data)), matteSkirt (image.createCopy()),
-              pointerAngle (angle), capRatio (cap), diameter (size), skirtRatio (skirt)
-        {
-            // Compress the baked reflections into the dark range of matte plastic.
-            juce::Image::BitmapData pixels (matteSkirt, juce::Image::BitmapData::readWrite);
-            for (int y = 0; y < pixels.height; ++y)
-                for (int x = 0; x < pixels.width; ++x)
-                {
-                    const auto source = pixels.getPixelColour (x, y);
-                    const auto texture = juce::jmin (1.0f, source.getPerceivedBrightness() / 0.32f);
-                    const auto grey = (juce::uint8) juce::roundToInt (14.0f + texture * 12.0f);
-                    pixels.setPixelColour (x, y, juce::Colour (grey, grey, grey, source.getAlpha()));
-                }
-        }
-
-        juce::Image image, matteSkirt;
-        float pointerAngle, capRatio, diameter, skirtRatio;
+        juce::Image image;
+        float capRatio, pointerRadius;
     };
 
-    const KnobPhoto& knobPhoto (bool ivory, bool compact, bool selector, bool frequency)
+    const KnobPhoto& knobPhoto (bool ivory)
     {
         using namespace panelArtwork;
-        static const KnobPhoto graphite[] {
-            { graphiteKnobMain, 1.57f, 0.67f, 56.0f, 0.92f },
-            { graphiteKnobChoice, -0.30f, 0.53f, 58.0f, 0.89f },
-            { graphiteKnobFrequency, 0.0f, 0.68f, 64.0f, 0.91f },
-            { graphiteKnobSmall, -0.8f, 0.69f, 40.0f, 0.90f },
-        };
-        static const KnobPhoto light[] {
-            { ivoryKnobMain, 1.57f, 0.72f, 56.0f, 0.925f },
-            { ivoryKnobChoice, -0.34f, 0.71f, 58.0f, 0.89f },
-            { ivoryKnobFrequency, 0.0f, 0.72f, 64.0f, 0.89f },
-            { ivoryKnobSmall, -1.9f, 0.73f, 40.0f, 0.89f },
-        };
-        const int index = compact ? 3 : (selector ? 1 : (frequency ? 2 : 0));
-        return ivory ? light[index] : graphite[index];
+        static const KnobPhoto graphite { decodeImage (graphiteKnob), 0.68f, 0.435f };
+        static const KnobPhoto light { decodeImage (ivoryKnob), 0.67f, 0.44f };
+        return ivory ? light : graphite;
     }
 
     class AnimatedRocker final : public juce::ToggleButton, private juce::Timer
@@ -828,46 +800,61 @@ namespace
 
     using RockerFrames = std::array<juce::Image, 11>;
 
-    RockerFrames makeRockerFrames (const char* onPhoto, const char* offPhoto = nullptr)
+    RockerFrames makeRockerFrames (juce::Colour material)
     {
-        constexpr int width = 96, height = 38;
-        const auto on = decodeImage (onPhoto).rescaled (width, height);
-        const auto off = offPhoto != nullptr ? decodeImage (offPhoto).rescaled (width, height) : on;
+        constexpr int width = 152, height = 60;
+        static const auto off = decodeImage (panelArtwork::rockerOff);
+        static const auto on = decodeImage (panelArtwork::rockerOn);
         const juce::Image::BitmapData onPixels (on, juce::Image::BitmapData::readOnly);
         const juce::Image::BitmapData offPixels (off, juce::Image::BitmapData::readOnly);
-        const auto sample = [] (const juce::Image::BitmapData& image, float x, int y)
+        const auto outline = [] (const juce::Image::BitmapData& image)
         {
-            const int left = (int) x;
-            return image.getPixelColour (left, y).interpolatedWith (image.getPixelColour (juce::jmin (left + 1, image.width - 1), y),
-                                                                   x - (float) left);
+            std::array<juce::Range<int>, width> columns;
+            for (int x = 0; x < width; ++x)
+            {
+                int top = 0, bottom = height - 1;
+                while (top < bottom && image.getPixelColour (x, top).getAlpha() < 128)
+                    ++top;
+                while (bottom > top && image.getPixelColour (x, bottom).getAlpha() < 128)
+                    --bottom;
+                columns[(size_t) x] = { top, bottom + 1 };
+            }
+            return columns;
         };
-        const auto remap = [] (float x, float ridge, float sourceRidge)
+        const auto offOutline = outline (offPixels), onOutline = outline (onPixels);
+        const auto sample = [] (const juce::Image::BitmapData& image, int x, float y)
         {
-            return x < ridge ? juce::jmap (x, 0.0f, ridge, 0.0f, sourceRidge)
-                             : juce::jmap (x, ridge, 1.0f, sourceRidge, 1.0f);
+            const int above = (int) std::floor (y);
+            const auto at = [&image, x] (int row)
+            {
+                return juce::isPositiveAndBelow (row, height) ? image.getPixelColour (x, row)
+                                                             : juce::Colours::transparentBlack;
+            };
+            return at (above).interpolatedWith (at (above + 1), y - (float) above);
         };
 
         RockerFrames frames;
         for (size_t i = 0; i < frames.size(); ++i)
         {
             const float position = (float) i / (float) (frames.size() - 1);
-            const float ridge = juce::jmap (position, 0.70f, 0.30f);
-            frames[i] = juce::Image (juce::Image::RGB, width, height, false);
+            const float shade = juce::jmap (position, 0.88f, 1.0f);
+            frames[i] = juce::Image (juce::Image::ARGB, width, height, false);
             juce::Image::BitmapData pixels (frames[i], juce::Image::BitmapData::writeOnly);
             for (int x = 0; x < width; ++x)
             {
-                const float u = (float) x / (float) (width - 1);
-                const float onX = remap (u, ridge, 0.58f) * (float) (width - 1);
-                const float offX = (1.0f - remap (u, ridge, 0.42f)) * (float) (width - 1);
-                const float shade = juce::jmap (position, 0.91f, 1.0f)
-                                  * (1.0f + (2.0f * position - 1.0f) * (0.5f - u) * 0.24f);
+                // Interpolate the cap's silhouette and align both textures to the moving surface.
+                const auto a = offOutline[(size_t) x], b = onOutline[(size_t) x];
+                const float top = juce::jmap (position, (float) a.getStart(), (float) b.getStart());
+                const float length = juce::jmap (position, (float) a.getLength(), (float) b.getLength());
                 for (int y = 0; y < height; ++y)
                 {
-                    const auto pixel = sample (offPixels, offX, y).interpolatedWith (sample (onPixels, onX, y), position);
-                    pixels.setPixelColour (x, y, juce::Colour::fromFloatRGBA (
-                        juce::jmin (1.0f, pixel.getFloatRed() * shade),
-                        juce::jmin (1.0f, pixel.getFloatGreen() * shade),
-                        juce::jmin (1.0f, pixel.getFloatBlue() * shade), 1.0f));
+                    const float relative = ((float) y - top) / length;
+                    const auto offSample = sample (offPixels, x, (float) a.getStart() + relative * (float) a.getLength());
+                    const auto onSample = sample (onPixels, x, (float) b.getStart() + relative * (float) b.getLength());
+                    const auto pixel = offSample.interpolatedWith (onSample, position);
+                    const float brightness = (material.getBrightness() + (pixel.getFloatGreen() - 0.42f) * 1.35f) * shade;
+                    pixels.setPixelColour (x, y, material.withBrightness (juce::jlimit (0.0f, 1.0f, brightness))
+                                                          .withAlpha (pixel.getAlpha()));
                 }
             }
         }
@@ -876,14 +863,13 @@ namespace
 
     const juce::Image& switchPhoto (bool ivory, float position, bool blue, bool silver, bool white)
     {
-        using namespace panelArtwork;
         static const RockerFrames graphite[] {
-            makeRockerFrames (graphiteBlueOn, graphiteBlueOff), makeRockerFrames (graphiteOrange),
-            makeRockerFrames (graphiteSilver), makeRockerFrames (graphiteWhite)
+            makeRockerFrames (juce::Colour (0xff6f8ba0)), makeRockerFrames (juce::Colour (0xffb45e2f)),
+            makeRockerFrames (juce::Colour (0xff9d9996)), makeRockerFrames (juce::Colour (0xffeeeae2))
         };
         static const RockerFrames light[] {
-            makeRockerFrames (ivoryBlueOn, ivoryBlueOff), makeRockerFrames (ivoryOrange),
-            makeRockerFrames (ivorySilver), makeRockerFrames (ivoryWhite)
+            makeRockerFrames (juce::Colour (0xff2a5588)), makeRockerFrames (juce::Colour (0xffe77d33)),
+            makeRockerFrames (juce::Colour (0xffdcd3ce)), makeRockerFrames (juce::Colour (0xffeeeae2))
         };
         const int type = white ? 3 : (silver ? 2 : (blue ? 0 : 1));
         const auto& frames = ivory ? light[type] : graphite[type];
@@ -1373,10 +1359,11 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     const bool rangeKnob = s.getComponentID().endsWith ("Range");
     const bool waveKnob = s.getComponentID().endsWith ("Wave");
     const bool compact = w < 80;
-    const auto& photo = knobPhoto (ivory, compact, rangeKnob || waveKnob, s.getComponentID().endsWith ("Freq"));
+    const auto& photo = knobPhoto (ivory);
     const auto& id = s.getComponentID();
     const bool controllerKnob = id == "modAmt" || id == "modMix" || id == "gate" || id == "pickSens";
-    const float standardDiameter = juce::jmin (photo.diameter, radius * 1.52f);
+    const float fullDiameter = compact ? 40.0f : (rangeKnob || waveKnob ? 58.0f : (id.endsWith ("Freq") ? 64.0f : 56.0f));
+    const float standardDiameter = juce::jmin (fullDiameter, radius * 1.52f);
     const float diameter = standardDiameter * (controllerKnob ? 0.86f : 1.0f);
     const float tickRadius = standardDiameter * 0.5f;
     const auto angleAt = [startAngle, endAngle] (float p) { return startAngle + p * (endAngle - startAngle); };
@@ -1449,18 +1436,11 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
 
     const float angle = startAngle + pos * (endAngle - startAngle);
     const auto& bitmap = photo.image;
-    const auto artwork = body.withSizeKeepingCentre (diameter / photo.skirtRatio, diameter / photo.skirtRatio);
-    const float scale = artwork.getWidth() / (float) bitmap.getWidth();
-    const auto transform = juce::AffineTransform::scale (scale).translated (artwork.getX(), artwork.getY())
-                               .rotated (angle - photo.pointerAngle, cx, cy);
+    const float scale = diameter / (float) bitmap.getWidth();
+    const auto transform = juce::AffineTransform::scale (scale).translated (body.getX(), body.getY())
+                               .rotated (angle, cx, cy);
     g.setColour (juce::Colours::white);
-    {
-        juce::Graphics::ScopedSaveState saved (g);
-        juce::Path skirt;
-        skirt.addEllipse (body);
-        g.reduceClipRegion (skirt);
-        g.drawImageTransformed (photo.matteSkirt, transform);
-    }
+    g.drawImageTransformed (bitmap, transform);
 
     // The stationary photograph of the cap keeps its light direction as the skirt turns.
     {
@@ -1468,10 +1448,10 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
         juce::Path metal;
         metal.addEllipse (body.withSizeKeepingCentre (diameter * photo.capRatio, diameter * photo.capRatio));
         g.reduceClipRegion (metal);
-        g.drawImage (bitmap, artwork);
+        g.drawImage (bitmap, body);
     }
 
-    const auto marker = point (angle, diameter * 0.41f);
+    const auto marker = point (angle, diameter * photo.pointerRadius);
     const float markerSize = compact ? 3.7f : 4.8f;
     const juce::Rectangle<float> dot (marker.x - markerSize * 0.5f, marker.y - markerSize * 0.5f,
                                       markerSize, markerSize);
@@ -1509,24 +1489,11 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
         else
             g.addTransform (juce::AffineTransform::translation (frame.getX(), frame.getY()));
 
-        const juce::Rectangle<float> well (0.0f, 0.0f, vertical ? frame.getHeight() : frame.getWidth(),
-                                                             vertical ? frame.getWidth() : frame.getHeight());
-        g.setColour (juce::Colours::black.withAlpha (ivory ? 0.22f : 0.42f));
-        g.fillPath (softRectangle (well.translated (0.0f, 1.7f).expanded (0.45f), 3.4f));
-        g.setColour (juce::Colour (0xff151413));
-        g.fillPath (softRectangle (well, 3.0f));
-        const auto cap = well.reduced (1.7f, 1.9f);
-        // Only the cap tilts. The surrounding recess stays stationary.
-        const float tilt = (2.0f * position - 1.0f) * 1.75f;
-        const juce::AffineTransform capTilt (1.0f, 0.0f, 0.0f,
-                                             tilt / cap.getWidth(), 1.0f, -tilt * 0.5f);
-        g.reduceClipRegion (softRectangle (well.reduced (0.7f), 2.5f));
-        g.addTransform (capTilt);
-        g.reduceClipRegion (softRectangle (cap, 2.0f));
-        g.setColour (juce::Colours::white.withAlpha (pressed ? 0.90f : 1.0f));
+        const juce::Rectangle<float> slot (0.0f, 0.0f, vertical ? frame.getHeight() : frame.getWidth(),
+                                                              vertical ? frame.getWidth() : frame.getHeight());
+        const auto cap = slot.reduced (1.7f, 1.0f);
+        g.setOpacity (pressed ? 0.90f : 1.0f);
         g.drawImage (sprite, cap);
-        g.setColour (juce::Colours::white.withAlpha (0.18f));
-        g.drawHorizontalLine (juce::roundToInt (cap.getY() + 1.0f), cap.getX() + 2.0f, cap.getRight() - 2.0f);
     }
 
     if (mixer || compressor)
