@@ -119,7 +119,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
                     return pts[i - 1].x + (pts[i].x - pts[i - 1].x) * std::log (v / pts[i - 1].ms) / std::log (pts[i].ms / pts[i - 1].ms);
                 });
         }
-        else if (d.dialBreak > d.dial0 && d.dialBreak < d.dial1)
+        else if (d.valueBreak > d.min && d.valueBreak < d.max && d.dialBreak > d.dial0 && d.dialBreak < d.dial1)
         {
             // a dial with an add-on range past its printed scale: straight from min to valueBreak up to the
             // break, straight from there to max over the rest of the travel
