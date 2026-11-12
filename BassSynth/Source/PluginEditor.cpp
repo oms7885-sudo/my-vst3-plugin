@@ -744,7 +744,23 @@ namespace
 
     struct KnobPhoto
     {
-        juce::Image image;
+        KnobPhoto (const char* data, float angle, float cap, float size, float skirt)
+            : image (decodeImage (data)), matteSkirt (image.createCopy()),
+              pointerAngle (angle), capRatio (cap), diameter (size), skirtRatio (skirt)
+        {
+            // Compress the baked reflections into the dark range of matte plastic.
+            juce::Image::BitmapData pixels (matteSkirt, juce::Image::BitmapData::readWrite);
+            for (int y = 0; y < pixels.height; ++y)
+                for (int x = 0; x < pixels.width; ++x)
+                {
+                    const auto source = pixels.getPixelColour (x, y);
+                    const auto texture = juce::jmin (1.0f, source.getPerceivedBrightness() / 0.32f);
+                    const auto grey = (juce::uint8) juce::roundToInt (14.0f + texture * 12.0f);
+                    pixels.setPixelColour (x, y, juce::Colour (grey, grey, grey, source.getAlpha()));
+                }
+        }
+
+        juce::Image image, matteSkirt;
         float pointerAngle, capRatio, diameter, skirtRatio;
     };
 
@@ -752,16 +768,16 @@ namespace
     {
         using namespace panelArtwork;
         static const KnobPhoto graphite[] {
-            { decodeImage (graphiteKnobMain), 1.57f, 0.67f, 56.0f, 0.92f },
-            { decodeImage (graphiteKnobChoice), -0.30f, 0.53f, 58.0f, 0.89f },
-            { decodeImage (graphiteKnobFrequency), 0.0f, 0.68f, 64.0f, 0.91f },
-            { decodeImage (graphiteKnobSmall), -0.8f, 0.69f, 40.0f, 0.90f },
+            { graphiteKnobMain, 1.57f, 0.67f, 56.0f, 0.92f },
+            { graphiteKnobChoice, -0.30f, 0.53f, 58.0f, 0.89f },
+            { graphiteKnobFrequency, 0.0f, 0.68f, 64.0f, 0.91f },
+            { graphiteKnobSmall, -0.8f, 0.69f, 40.0f, 0.90f },
         };
         static const KnobPhoto light[] {
-            { decodeImage (ivoryKnobMain), 1.57f, 0.72f, 56.0f, 0.925f },
-            { decodeImage (ivoryKnobChoice), -0.34f, 0.71f, 58.0f, 0.89f },
-            { decodeImage (ivoryKnobFrequency), 0.0f, 0.72f, 64.0f, 0.89f },
-            { decodeImage (ivoryKnobSmall), -1.9f, 0.73f, 40.0f, 0.89f },
+            { ivoryKnobMain, 1.57f, 0.72f, 56.0f, 0.925f },
+            { ivoryKnobChoice, -0.34f, 0.71f, 58.0f, 0.89f },
+            { ivoryKnobFrequency, 0.0f, 0.72f, 64.0f, 0.89f },
+            { ivoryKnobSmall, -1.9f, 0.73f, 40.0f, 0.89f },
         };
         const int index = compact ? 3 : (selector ? 1 : (frequency ? 2 : 0));
         return ivory ? light[index] : graphite[index];
@@ -1443,10 +1459,10 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
         juce::Path skirt;
         skirt.addEllipse (body);
         g.reduceClipRegion (skirt);
-        g.drawImageTransformed (bitmap, transform);
+        g.drawImageTransformed (photo.matteSkirt, transform);
     }
 
-    // The stationary photograph of the metal cap keeps its light direction as the skirt turns.
+    // The stationary photograph of the cap keeps its light direction as the skirt turns.
     {
         juce::Graphics::ScopedSaveState saved (g);
         juce::Path metal;
