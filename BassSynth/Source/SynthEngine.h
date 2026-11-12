@@ -61,12 +61,13 @@ struct Params
     float snapB = 12.0f;      // proto: Hz, the loop closes to this at once when the period is found (0 = the old slow closing)
     float settleMs = 45.0f;   // proto: ms the oscillators run free right after the period is found
     int   missTol = 20;       // proto: ms the period finder may fail before the loop lets go
-    int   atkCoast = 1;       // proto: after a pick keep running at the last note's pitch until the new period is found
+    int   atkCoast = 0;       // proto: after a pick keep running at the last note's pitch until the new period is found (off: it played the last note for 30-80 ms)
     float atkDI = 0.0f;       // proto: 0..1, how much of the unlocked stretch is the DI itself (user: off)
     float atkWide = 0.0f;     // proto: 0 = the DI below 250 Hz, 1 = the whole DI with its pick (brighter, more bite)
     float atkGain = 1.0f;     // proto: level of that DI stretch against the oscillators
     float atkDrive = 8.0f;    // proto: how hard that DI stretch is pushed into the curve (more = brighter)
     float lookMs = 0.0f;      // proto: ms of look-ahead (Real-Synth mode); the plug-in must report it as latency
+    float beatGate = 0.0f;    // proto: fundamental below this x its recent peak = a beat null (0 = off; 0.3 tried: open strings better, more octave errors)
     float resK = -1.0f;       // proto, for calibration: feedback amount given directly (>= 0)
     float resTop = 5.5f;      // proto: feedback amount at Emphasis 10
     float inertia = 1.48f;   // proto: 0.25 Hz (1.0 = 2 Hz)              // 0..1: how much the oscillators run on their own (0: the DI's phase as it is).
@@ -136,10 +137,11 @@ public:
         inPkR = std::exp (-1.0 / (0.3 * sr)); drA = k (0.8);
         ktA = k (0.03);
         fcA = k (0.004); fuA = k (0.008); flyUp = k (0.002); flyDn = k (0.025);
-        decD = std::max (1, (int) std::lround (sr / 2000.0)); pfWin = -1;
+        decD = std::max (1, (int) std::lround (sr / 4000.0)); pfWin = -1;   // high frets: 2 -> 4 kHz
         lpCoef (250.0, cs);
         dcA = std::exp (-TAU * 4.0 / sr);          // proto: 15 -> 4 Hz
         preA = std::exp (-TAU * 2.0 / sr);
+        fEnvR = std::exp (-1.0 / (0.15 * sr));
         { const double tt = std::tan (PI * 11.0 / sr); apC = (1.0 - tt) / (1.0 + tt); }
         reset();
         haveCoefs = false;
@@ -163,7 +165,7 @@ public:
         seed = 777; drT = 0; dw[0] = dw[1] = dwT[0] = dwT[1] = 0;
         y1 = y2 = y3 = y4 = 0; l1 = l2 = l3 = l4 = 0;
         fe = ae = 0; fs = as = 0; stF = stA = 0;
-        pf.reset(); decS = 0; decI = 0; fcT = fcN = 250.0; fundHz = fundUse = fundS = 0; lagP = 0; ph2P = 0; hD2 = 0; cyc2 = 0;
+        pf.reset(); decS = 0; decI = 0; fcT = fcN = 250.0; fcSearch = true; fundHz = fundUse = fundS = 0; lagP = 0; ph2P = 0; hD2 = 0; cyc2 = 0;
         flyOn = false; flyTh = flyW = unP = 0; flyB = 150; flyHold = 0;
         fCand = ownF = prevOwn = ringF = 0; fRun = 0; miss = 0; rawI = 0; std::fill (std::begin (rawW), std::end (rawW), 0.0);
         std::fill (std::begin (sv), std::end (sv), 0.0);
@@ -325,7 +327,7 @@ public:
             // where the fundamental is: the period of the low band, looked at once a millisecond
             if (onset)
             {
-                pf.pick(); fcT = 250.0; fRun = 0; miss = 0;
+                pf.pick(); fcT = 250.0; fRun = 0; miss = 0; fcSearch = true;
                 prevOwn = ownF; ownF = 0;
                 // the pitch of what was sounding before the pick (5-15 ms back: this note's attack is not in it yet)
                 ringF = 0;
@@ -335,10 +337,10 @@ public:
             if (++decI >= decD)
             {
                 pf.push (decS / decD, (double) cyc + ph); decS = 0; decI = 0;
-                if (pf.n & 1)
+                if ((pf.n & 3) == 3)          // once a millisecond
                 {
                     double f1 = 0, fw = 0, f = 0;
-                    const bool got = pf.find (p.ftThr, p.ftDelta, 8, f1, fw);
+                    const bool got = pf.find (p.ftThr, p.ftDelta, 16, f1, fw);
                     dbgF1 = f1; dbgFw = fw; dbgWind = 0;
                     rawW[rawI & 15] = fw; ++rawI;
                     if (got)
@@ -371,12 +373,12 @@ public:
                     if (fRun >= p.ftHold)                    // it has held for a few milliseconds: take it
                     {
                         fundHz = f; fundUse = f; miss = 0;
-                        fcT = std::min (250.0, std::max (36.0, (double) p.ftMul * f));
+                        fcT = std::min (1.1 * 520.0, std::max (36.0, (double) p.ftMul * f)); fcSearch = false;
                     }
                     else
                     {
                         fundHz = 0;
-                        if (++miss > 25) fcT = 250.0;        // nothing to go by for a while: back to the whole low band
+                        if (++miss > 25) { fcT = 250.0; fcSearch = true; }        // nothing to go by for a while: back to the whole low band
                     }
                 }
             }
@@ -397,6 +399,8 @@ public:
             }
             double nI, nQ; hilbert (v, hs2, hD2, nI, nQ);
             dbgN = std::sqrt (nI * nI + nQ * nQ);
+            fEnvPk = dbgN > fEnvPk ? dbgN : fEnvPk * fEnvR;
+            const bool weakF = p.beatGate > 0 && dbgN < p.beatGate * fEnvPk;
             const double ph2 = std::atan2 (-nQ, nI) / TAU + 0.5;
             double d2 = ph2 - ph2P; if (d2 < -0.5) d2 += 1; else if (d2 > 0.5) d2 -= 1;
             if (ph2 - ph2P < -0.5) ++cyc2;
@@ -427,7 +431,7 @@ public:
                 // copying the DI's attack, until the period finder has the new note
                 const double bLock = 150.0 * std::pow (2.0 / 150.0, (double) p.inertia);     // 150 Hz .. 2 Hz
                 // the finder dropping out for a moment is not the note being lost (it flickers in the first tenth of a second)
-                const bool have = fundUse > 0 && miss <= p.missTol && fcT < 249.0;
+                const bool have = fundUse > 0 && miss <= p.missTol && ! fcSearch;
                 if (onsetU && lkL > 0 && have)          // Real-Synth: the pick arrives with its pitch already found
                 {
                     if (! flyOn) { flyTh = un; flyOn = true; }
@@ -453,7 +457,8 @@ public:
                 {
                     const double err = un - flyOff - flyTh;
                     // the note the loop is holding is not what the DI is doing any more
-                    if (std::abs (err) > 0.35 || (have && std::abs (flyW * sr / fundUse - 1.0) > 0.04 && flyB < 20.0)) flyHold = (int) (0.03 * sr);
+                    const bool rideOut = weakF && have && flyB < 20.0;     // locked, and the fundamental is in a beat null
+                    if ((std::abs (err) > 0.35 && ! rideOut) || (have && std::abs (flyW * sr / fundUse - 1.0) > 0.04 && flyB < 20.0)) flyHold = (int) (0.03 * sr);
                     if (flyHold > 0) --flyHold;
                     const double bT = have && flyHold == 0 ? bLock : (double) p.flyOpen;
                     if (bT < flyB && flyB > p.flyOpen - 1.0)                                    // closing: start from the pitch that was found
@@ -461,7 +466,7 @@ public:
                         if (p.snapB > 0) { flyW = fundUse / sr; settle = (int) (p.settleMs * 0.001 * sr); }
                         else flyW = fundS / sr;
                     }
-                    if (settle > 0) flyTh += flyW;          // just snapped onto the pitch that was found: no pull this sample
+                    if (settle > 0 || rideOut) flyTh += flyW;   // just snapped on, or riding out a beat null: no pull
                     else
                     {
                         flyB += (bT - flyB) * (bT > flyB ? flyUp : flyDn);
@@ -713,15 +718,15 @@ private:
     // of periods; that holds whichever harmonic is the loudest, which is what the phase alone cannot tell.
     struct PeriodFinder
     {
-        static constexpr int N = 256, LMAX = 84, PRE = 96;
+        static constexpr int N = 512, LMAX = 170, PRE = 192;
         double ring[N] {}, uw[N] {}, pre[PRE] {}, d[LMAX + 1] {}, fs = 2000.0;
         int64_t n = 0, on = 0;
         int W = 28, lmin = 6, lmax = 74, ref = 1;
         void prepare (double fsDec, double winMs)
         {
             fs = fsDec;
-            W = std::min (64, std::max (8, (int) std::lround (winMs * 0.001 * fs)));
-            lmin = std::max (2, (int) (fs / 320.0)); lmax = std::min (LMAX - 1, (int) std::ceil (fs / 27.0));
+            W = std::min (128, std::max (8, (int) std::lround (winMs * 0.001 * fs)));
+            lmin = std::max (2, (int) (fs / 520.0)); lmax = std::min (LMAX - 1, (int) std::ceil (fs / 27.0));
             reset();
         }
         void reset()
@@ -734,7 +739,7 @@ private:
         void pick()
         {
             on = n;
-            for (int j = 0; j < PRE; ++j) pre[j] = ring[(n - 8 - PRE + j) & (N - 1)];
+            for (int j = 0; j < PRE; ++j) pre[j] = ring[(n - 16 - PRE + j) & (N - 1)];
         }
         // x: the low band; phase: its running phase in cycles (not wrapped)
         void push (double x, double phase)
@@ -775,7 +780,7 @@ private:
         // pick and now (at least a period and a half of it, all of it after the pick).
         bool grew (double hz, double ratio) const
         {
-            const int len = (int) std::min ((int64_t) PRE, n - on - 6);
+            const int len = (int) std::min ((int64_t) PRE, n - on - 12);
             if (len < (int) (1.5 * fs / hz)) return false;
             double now[PRE];
             for (int j = 0; j < len; ++j) now[j] = ring[(n - len + j) & (N - 1)];
@@ -932,6 +937,8 @@ private:
     static constexpr int LKM = 16383;
     std::vector<double> lkUn = std::vector<double> (LKM + 1, 0.0), lkFe = lkUn, lkAe = lkUn, lkG = lkUn, lkExt = lkUn, lkDry = lkUn;
     std::vector<char> lkOn = std::vector<char> (LKM + 1, 0); int64_t lkI = 0; int lkL = 0;
+    double fEnvPk = 0, fEnvR = 0;
+    bool fcSearch = true;   // the period finder is looking for a new note
     double fbL = 0, fbC = 0, goodW = 0, goodAt = -1e12, flyOff = 0; int coast = 0, settle = 0;   // proto
     double preA = 0, preX = 0, preY = 0, apC = 0, apX = 0, apY = 0;   // proto
     double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0, dbgOsc = 0;
