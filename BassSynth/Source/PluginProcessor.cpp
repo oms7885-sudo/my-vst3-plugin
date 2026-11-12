@@ -259,15 +259,26 @@ void BassSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     // the bass DI is mono: use channel 1, or the average of a stereo input
     auto* l = buffer.getWritePointer (0);
-    // the standalone app opens the interface's first two inputs, and a DI usually sits on one of them alone:
-    // averaging with the empty one would halve it, so the app takes the first enabled input as it is
-    const bool standalone = wrapperType == wrapperType_Standalone;
-    const float* r = numIn > 1 && ! standalone ? buffer.getReadPointer (1) : nullptr;
-    for (int i = 0; i < n; ++i)
+    const float* r = numIn > 1 ? buffer.getReadPointer (1) : nullptr;
+    // The standalone app opens an interface's inputs as a pair, and the bass sits on one of them alone (on many
+    // interfaces the instrument input is the second one). Averaging with the empty one would halve it, so the app
+    // follows whichever input is clearly the louder one and takes it as it is.
+    if (wrapperType == wrapperType_Standalone && r != nullptr)
     {
-        const float x = r != nullptr ? 0.5f * (l[i] + r[i]) : l[i];
-        l[i] = engine.process (x);
+        float pl = 0.0f, pr = 0.0f;
+        for (int i = 0; i < n; ++i) { pl = juce::jmax (pl, std::abs (l[i])); pr = juce::jmax (pr, std::abs (r[i])); }
+        const float fall = std::exp (-(float) n / (float) (0.5 * getSampleRate()));
+        inPkL = juce::jmax (pl, inPkL * fall); inPkR = juce::jmax (pr, inPkR * fall);
+        if (inPkR > 2.0f * inPkL + 1e-5f) inSide = 1; else if (inPkL > 2.0f * inPkR + 1e-5f) inSide = 0;
+        const float* src = inSide == 1 ? r : l;
+        for (int i = 0; i < n; ++i) l[i] = engine.process (src[i]);
     }
+    else
+        for (int i = 0; i < n; ++i)
+        {
+            const float x = r != nullptr ? 0.5f * (l[i] + r[i]) : l[i];
+            l[i] = engine.process (x);
+        }
     for (int ch = 1; ch < numOut; ++ch)
         buffer.copyFrom (ch, 0, buffer, 0, 0, n);
 
