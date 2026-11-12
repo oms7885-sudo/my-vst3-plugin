@@ -51,6 +51,8 @@ private:
 
     bsyn::Engine engine;
     int currentProgram = 0;
+    float inPkL = 0.0f, inPkR = 0.0f;   // standalone: recent peak of each input, to find the one the bass is on
+    int inSide = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BassSynthProcessor)
 };
