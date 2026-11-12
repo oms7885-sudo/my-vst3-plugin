@@ -75,7 +75,10 @@ polyBLEP) → Model D 믹서(On 스위치, 노이즈 White/Pink, External = DI �
 
 ## 지금 상태와 남은 일
 
-- 최신 빌드: `bass-synth` @ 085de40 (관성 고정, 입자 A). 플러그인 이름 "mOog", 플러그인 코드는 그대로.
+- 최신 빌드: `bass-synth`, Monark 측정 중간 반영 (2026-11-12, 사용자 시험용). 바뀐 것은 `notes/MONARK_2026-11-12.md`.
+  측정 기록과 시제품 생성기는 사용자 PC `Desktop\claude` (`analysis/STAGE*.md`, `tools/make_proto.py`).
+  남은 분석: 필터 보완(사인 입력에서도 조금 얇음), 6단계(노이즈·피드백·LFO·글라이드), 7단계(프리셋, 남은 눈금). 앰프 단계는 사용자 판단으로 생략.
+- 그 전 빌드: 085de40 (관성 고정, 입자 A). 플러그인 이름 "mOog", 플러그인 코드는 그대로.
 - ChatGPT가 아직 해야 할 UI 작업: 다이얼 눈금(dial0/dial1/timeDial), 값 칸은 호스트 텍스트 그대로,
   `extSrc` 셀렉터 배치, `gate`(Trig Thresh)·`pickSens`를 Controllers 칸으로, 프리셋 Save/Load, 로고 "mOog",
   Comp와 White/Pink 스위치가 눌러도 안 바뀌어 보이는 문제(그림 한 장을 뒤집어 그림).

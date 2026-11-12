@@ -5,6 +5,7 @@
 // This is a sample-by-sample port of the browser prototype ("Bass Ladder").
 #pragma once
 
+#include <vector>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -30,9 +31,9 @@ struct Params
     // Moog technicians: sustain "10" behaves like 8-8.5), so a single note peaks about 1.18-1.25 above
     // maximum sustain. Re-triggering before the contour has settled pushes each peak higher, levelling
     // off after three or four quick hits about 30 % above the normal peak (8 V -> 10.5 V on a clone).
-    float overshoot = 1.22f;           // peak of a single note, relative to maximum sustain
+    float overshoot = 1.18f;           // peak of a single note, relative to maximum sustain
     float overshootMax = 1.60f;        // highest peak quick re-triggering can build up to (1.22 x 1.31)
-    float resFade = 150.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
+    float resFade = 55.0f;            // Hz: Emphasis weakens as the cutoff falls towards this (full bass at low cutoff)
     // Fundamental tracking (internal; off = the oscillators follow the phase of everything under 250 Hz).
     // The low band of a bass note holds its 2nd and 3rd harmonics too, so its phase does not advance
     // evenly and, when a harmonic is louder than the fundamental, runs two or three cycles per period:
@@ -47,7 +48,28 @@ struct Params
     float ftThr = 0.25f, ftDelta = 0.05f;   // PeriodFinder: how periodic the band must be / how deep a dip must be
     float ftWin = 14.0f;               // ms: PeriodFinder's window
     int   grain = 0;
-    float inertia = 1.0f;              // 0..1: how much the oscillators run on their own (0: the DI's phase as it is).
+    float mixDrive = 0.90f, mixBias = 0.06f;   // proto: the output stage's curve (after the loudness contour)
+    float ladIn = 0.28f, mixBleed = 0.00076f;   // proto: level into the ladder; oscillator bleed
+    float triClip = 0.983f;   // proto: where the triangle's tips are cut flat
+    float resMakeup = 0.0f;   // proto: Monark does not make up the bass the Emphasis takes away (was 0.22)
+    float keyRef = 87.3f;     // proto: the note at which keyboard tracking leaves the cutoff alone (was 110)
+    float resPull = 1.1f;     // proto: how far the Emphasis pulls the resonance down
+    float fbHP = 25.0f;       // proto: Hz, high-pass in the resonance feedback path (0 = none)
+    float fAttTarget = 2.0f;  // proto: the filter contour's attack heads for this x the peak (was 1.3)
+    float susFast = 3.0f;     // proto: extra decay speed with the filter Sustain at the top (0 = none)
+    float flyOpen = 150.0f;   // proto: Hz, loop bandwidth while the note is not yet found
+    float snapB = 12.0f;      // proto: Hz, the loop closes to this at once when the period is found (0 = the old slow closing)
+    float settleMs = 45.0f;   // proto: ms the oscillators run free right after the period is found
+    int   missTol = 20;       // proto: ms the period finder may fail before the loop lets go
+    int   atkCoast = 1;       // proto: after a pick keep running at the last note's pitch until the new period is found
+    float atkDI = 0.0f;       // proto: 0..1, how much of the unlocked stretch is the DI itself (user: off)
+    float atkWide = 0.0f;     // proto: 0 = the DI below 250 Hz, 1 = the whole DI with its pick (brighter, more bite)
+    float atkGain = 1.0f;     // proto: level of that DI stretch against the oscillators
+    float atkDrive = 8.0f;    // proto: how hard that DI stretch is pushed into the curve (more = brighter)
+    float lookMs = 0.0f;      // proto: ms of look-ahead (Real-Synth mode); the plug-in must report it as latency
+    float resK = -1.0f;       // proto, for calibration: feedback amount given directly (>= 0)
+    float resTop = 5.5f;      // proto: feedback amount at Emphasis 10
+    float inertia = 1.48f;   // proto: 0.25 Hz (1.0 = 2 Hz)              // 0..1: how much the oscillators run on their own (0: the DI's phase as it is).
                                        // Internal, fixed at full: cycle length steady to about 0.1 % on a held note
                                        // (0.6 % without; the Model D's oscillators are specified at 0.25 %).
     bool  ftComp = true;               // take the low-pass's own phase lag back out
@@ -116,7 +138,9 @@ public:
         fcA = k (0.004); fuA = k (0.008); flyUp = k (0.002); flyDn = k (0.025);
         decD = std::max (1, (int) std::lround (sr / 2000.0)); pfWin = -1;
         lpCoef (250.0, cs);
-        dcA = std::exp (-TAU * 15.0 / sr);
+        dcA = std::exp (-TAU * 4.0 / sr);          // proto: 15 -> 4 Hz
+        preA = std::exp (-TAU * 2.0 / sr);
+        { const double tt = std::tan (PI * 11.0 / sr); apC = (1.0 - tt) / (1.0 + tt); }
         reset();
         haveCoefs = false;
     }
@@ -144,7 +168,7 @@ public:
         fCand = ownF = prevOwn = ringF = 0; fRun = 0; miss = 0; rawI = 0; std::fill (std::begin (rawW), std::end (rawW), 0.0);
         std::fill (std::begin (sv), std::end (sv), 0.0);
         std::fill (std::begin (hs2), std::end (hs2), 0.0);
-        dcX = dcY = 0; fbZ = 0;
+        dcX = dcY = 0; fbZ = 0; preX = preY = apX = apY = 0; fbL = 0;
         n = 0;
     }
 
@@ -161,8 +185,10 @@ public:
         // Emphasis scale: the service manual wants self-oscillation to begin between 7.5 and 8 on the dial
         // and to carry on down to a cutoff under 300 Hz. With 5.2 it begins at 0.78 and (with resFade)
         // holds down to about 200 Hz.
-        kRes = 5.2 * p.res;
-        cfA = k (p.fA / 3000.0); cfD = k (p.fD / 3000.0);
+        lkL = p.lookMs > 0 ? std::min (LKM, (int) (p.lookMs * 0.001 * sr)) : 0;
+        fbC = p.fbHP > 0 ? 1.0 - std::exp (-TAU * (double) p.fbHP / sr) : 0.0;
+        kRes = p.resK >= 0 ? (double) p.resK : resTaper (p.res, p.resTop);   // proto
+        cfA = k (p.fA / 1418.0); cfD = k (p.fD / 3000.0);   // time to the peak = 0.49 x fA, as it was
         caA = k (p.aA / 3000.0); caD = k (p.aD / 3000.0);
         keyAmt = (p.keyTrk1 ? 1.0 / 3.0 : 0.0) + (p.keyTrk2 ? 2.0 / 3.0 : 0.0);
         inGain = std::pow (10.0, p.inGainDb / 20.0);
@@ -386,6 +412,8 @@ public:
                 lag = (std::atan2 (r * KQ[0], q) + std::atan2 (r * KQ[1], q)) / TAU;
             }
             double un = (double) cyc2 + ph2 + lag;
+            bool onsetU = onset;
+            if (lkL > 0) { lkUn[lkI & LKM] = un; lkOn[lkI & LKM] = onset; un = lkUn[(lkI - lkL) & LKM]; onsetU = lkOn[(lkI - lkL) & LKM]; }
             lagP = lag;
 
             // Inertia: the oscillators do not copy the DI's phase cycle by cycle but run on their own and are
@@ -395,20 +423,57 @@ public:
             // without a pick) or the finder loses the note. At 0 the DI's phase is used as it is.
             if (p.inertia > 0.0f)
             {
-                if (onset || ! flyOn) { flyTh = un; flyW = std::min (std::max (d2, 0.0), 0.05); flyOn = true; flyB = 150.0; flyHold = 0; }
+                // proto: a pick while the loop still knows the last note - run on at that pitch (a clean wave) instead of
+                // copying the DI's attack, until the period finder has the new note
                 const double bLock = 150.0 * std::pow (2.0 / 150.0, (double) p.inertia);     // 150 Hz .. 2 Hz
-                const bool have = fundUse > 0 && miss == 0 && fcT < 249.0;
-                const double err = un - flyTh;
-                // the note the loop is holding is not what the DI is doing any more
-                if (std::abs (err) > 0.35 || (have && std::abs (flyW * sr / fundUse - 1.0) > 0.04 && flyB < 20.0)) flyHold = (int) (0.03 * sr);
-                if (flyHold > 0) --flyHold;
-                const double bT = have && flyHold == 0 ? bLock : 150.0;
-                if (bT < flyB && flyB > 149.0) flyW = fundS / sr;                              // closing: start from the pitch that was found
-                flyB += (bT - flyB) * (bT > flyB ? flyUp : flyDn);
-                const double wn = TAU * flyB / sr;
-                flyW += wn * wn * err;
-                flyW = std::min (std::max (flyW, 0.0), 0.05);
-                flyTh += flyW + 2.0 * wn * err;
+                // the finder dropping out for a moment is not the note being lost (it flickers in the first tenth of a second)
+                const bool have = fundUse > 0 && miss <= p.missTol && fcT < 249.0;
+                if (onsetU && lkL > 0 && have)          // Real-Synth: the pick arrives with its pitch already found
+                {
+                    if (! flyOn) { flyTh = un; flyOn = true; }
+                    flyW = fundUse / sr; coast = 0; flyHold = 0; settle = (int) ((p.settleMs + p.lookMs) * 0.001 * sr);   // until the delayed DI phase has settled too
+                }
+                else if (onsetU && p.atkCoast && flyOn && goodW > 0 && (double) i - goodAt < 3.0 * sr) { coast = (int) (0.08 * sr); flyW = goodW; flyHold = 0; settle = 0; }
+                else if (onsetU || ! flyOn) { flyTh = un; flyW = std::min (std::max (d2, 0.0), 0.05); flyOn = true; flyB = p.flyOpen; flyHold = 0; coast = 0; settle = 0; flyOff = 0; }
+                if (coast > 0)
+                {
+                    if (have) { flyW = fundUse / sr; coast = 0; settle = (int) (p.settleMs * 0.001 * sr); }   // found: take the new pitch now
+                    else if (--coast == 0) { flyOff = 0; flyTh = un; flyB = p.flyOpen; }                    // nothing found: back to the DI's own phase
+                    flyTh += flyW;
+                }
+                else if (settle > 0)
+                {
+                    // the low-pass is still moving onto the new fundamental, and the DI's phase with it: run on
+                    // at the pitch that was found and, when that is over, take whatever phase offset there is as it is
+                    if (have) flyW += (fundUse / sr - flyW) * 0.002;      // keep to the finder's figure as it firms up
+                    flyTh += flyW;
+                    if (--settle == 0) { flyOff = un - flyTh; flyB = p.snapB; flyHold = 0; }
+                }
+                else
+                {
+                    const double err = un - flyOff - flyTh;
+                    // the note the loop is holding is not what the DI is doing any more
+                    if (std::abs (err) > 0.35 || (have && std::abs (flyW * sr / fundUse - 1.0) > 0.04 && flyB < 20.0)) flyHold = (int) (0.03 * sr);
+                    if (flyHold > 0) --flyHold;
+                    const double bT = have && flyHold == 0 ? bLock : (double) p.flyOpen;
+                    if (bT < flyB && flyB > p.flyOpen - 1.0)                                    // closing: start from the pitch that was found
+                    {
+                        if (p.snapB > 0) { flyW = fundUse / sr; settle = (int) (p.settleMs * 0.001 * sr); }
+                        else flyW = fundS / sr;
+                    }
+                    if (settle > 0) flyTh += flyW;          // just snapped onto the pitch that was found: no pull this sample
+                    else
+                    {
+                        flyB += (bT - flyB) * (bT > flyB ? flyUp : flyDn);
+                        const double wn = TAU * flyB / sr;
+                        flyW += wn * wn * err;
+                        flyW = std::min (std::max (flyW, 0.0), 0.05);
+                        flyTh += flyW + 2.0 * wn * err;
+                        if (std::abs (err) > 0.6) { flyOff += std::round (err); }
+                    }
+                    if (have && flyB < 20.0) { goodW = flyW; goodAt = (double) i; }
+                }
+                garb = coast == 0 && settle == 0 && ! (have && flyB < 40.0);
                 un = flyTh;
             }
             else flyOn = false;
@@ -426,18 +491,23 @@ public:
             for (int q = 0; q < 2; ++q) { dwT[q] += (rnd() * 0.7 - dwT[q]) * 0.08; }
         }
         for (int q = 0; q < 2; ++q) dw[q] += (dwT[q] - dw[q]) * drA;
-        const double cents2 = p.vintage * (4.0 * dw[0] + 1.2), cents3 = p.vintage * (4.0 * dw[1] - 0.9);
+        const double cents2 = 2.6 + p.vintage * 4.0 * dw[0], cents3 = -1.9 + p.vintage * 4.0 * dw[1];   // proto
 
         // ---- oscillator bank: drawn from the DI's own phase (no pitch tracking) ----
         const double gAmp = std::min (1.0, agd * 40.0);
-        const double o1 = p.osc1On && p.osc1Lvl > 0 ? oscWave (p.osc1Wave, false, oscPhase (p.osc1Range, phO, dt, cycO, 0.0, acc[0])) : 0.0;
-        const double o2 = p.osc2On && p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, oscPhase (p.osc2Range, phO, dt, cycO, p.osc2Freq + cents2 / 100.0, acc[1])) : 0.0;
+        const OscPh q1 = oscPhase (p.osc1Range, phO, dt, cycO, 0.0, acc[0]);
+        const OscPh q2 = oscPhase (p.osc2Range, phO, dt, cycO, p.osc2Freq + cents2 / 100.0, acc[1]);
+        const double o1 = p.osc1On && p.osc1Lvl > 0 ? oscWave (p.osc1Wave, false, q1) : 0.0;
+        const double o2 = p.osc2On && p.osc2Lvl > 0 ? oscWave (p.osc2Wave, false, q2) : 0.0;
+        double bleed = oscWave (2, false, q1) + oscWave (2, false, q2);
+        OscPh q3 { 0.0, 1e-4 };
+        if (p.osc3Ctl) { q3 = oscPhase (p.osc3Range, phO, dt, cycO, p.osc3Freq + cents3 / 100.0, acc[2]); bleed += oscWave (2, false, q3); }
         const bool need3 = (p.osc3On && p.osc3Lvl > 0) || (p.filterMod && p.modAmt > 0 && p.modMix < 1);
         double o3 = 0;
         if (need3)
         {
             if (p.osc3Ctl)
-                o3 = oscWave (p.osc3Wave, true, oscPhase (p.osc3Range, phO, dt, cycO, p.osc3Freq + cents3 / 100.0, acc[2]));
+                o3 = oscWave (p.osc3Wave, true, q3);
             else
             {
                 // Osc 3 Control off: a fixed pitch set by Range, Frequency sweeps about 6 octaves
@@ -452,7 +522,9 @@ public:
         if (gateOn && dphO > 0) ktf += (std::min (std::max (sr * dphO, 30.0), 600.0) - ktf) * ktA;
         // External: the DI itself, or the output patched back in (taken after the loudness contour, so it
         // is there only while a note sounds; one sample late, as any loop must be)
-        const double ext = p.extFb ? fbZ * fbGain : th (yn * 0.9);
+        double extDi = th (yn * 0.9), dryIn = input;
+        if (lkL > 0) { lkExt[lkI & LKM] = extDi; lkDry[lkI & LKM] = dryIn; extDi = lkExt[(lkI - lkL) & LKM]; dryIn = lkDry[(lkI - lkL) & LKM]; }
+        const double ext = p.extFb ? fbZ * fbGain : extDi;
         // noise source: white, or pink (Kellet's economy filter)
         const double wht = rnd();
         pk3[0] = 0.99765 * pk3[0] + wht * 0.0990460;
@@ -461,52 +533,67 @@ public:
         const double pnk = (pk3[0] + pk3[1] + pk3[2] + wht * 0.1848) * 0.22;
         const double nzS = p.noisePink ? pnk : wht * 0.6;
 
-        double m = ((p.osc1On ? p.osc1Lvl * o1 : 0.0) + (p.osc2On ? p.osc2Lvl * o2 : 0.0)
-                    + (p.osc3On ? p.osc3Lvl * o3 : 0.0) + (p.noiseOn ? p.noiseLvl * nzS : 0.0)) * gAmp
-                   + (p.extOn ? p.extLvl * ext : 0.0);
+        const auto tp = [] (float l) { return 0.825 * l * (1.0 + 0.4 * l); };   // proto: Monark's volume dial
+        double mo = ((p.osc1On ? tp (p.osc1Lvl) * o1 : 0.0) + (p.osc2On ? tp (p.osc2Lvl) * o2 : 0.0)
+                     + (p.osc3On ? tp (p.osc3Lvl) * o3 : 0.0) + (p.noiseOn ? p.noiseLvl * nzS : 0.0)
+                     + p.mixBleed * bleed) * gAmp;
+        if (p.atkDI > 0 && p.fundTrack && p.inertia > 0.0f)
+        {
+            atkX += ((garb ? 1.0 : 0.0) - atkX) * (garb ? k (0.0015) : k (0.008));
+            const double lv = std::min (1.2, (p.osc1On ? tp (p.osc1Lvl) : 0.0) + (p.osc2On ? tp (p.osc2Lvl) : 0.0) + (p.osc3On ? tp (p.osc3Lvl) : 0.0));
+            mo = mo * (1.0 - p.atkDI * atkX) + p.atkDI * atkX * th ((yn + p.atkWide * (hp / (agc + 1e-4) - yn)) * p.atkDrive) * lv * p.atkGain * gAmp;
+        }
+        {   // proto: AC coupling ahead of the mixer stage - DC out, and the lows lead in phase
+            const double h = preA * (preY + mo - preX); preX = mo; preY = h;
+            const double a = apC * h - apX + apC * apY; apX = h; apY = a; mo = a;
+        }
+        double m = mo + (p.extOn ? p.extLvl * ext : 0.0);
         // The mixer feeds the ladder directly, like the Model D: one oscillator at a moderate volume stays
         // fairly clean and lets the resonance speak, three at full overload the filter and flatten it.
         // (This level is 1/3.4 of the engine's earlier one: Moog cut the filter's input drive by that
         // much during production, R2 47k -> 160k, to reduce intermodulation distortion.)
-        {
-            // how the mixer bends when it is pushed (prototype): 0 the even, soft curve; 1 lopsided (one side
-            // gives way sooner: even harmonics as well); 2 lopsided with a hard top
-            const double x = m * mixIn;
-            if (p.grain == 1)      { const double b = 0.3, tb = std::tanh (b); m = (std::tanh (x + b) - tb) / (1.0 - tb * tb); }
-            else if (p.grain == 2) m = x > 0 ? x / std::sqrt (std::sqrt (1.0 + x * x * x * x)) : 1.5 * std::tanh (x / 1.5);
-            else                   m = th (x);
-            m *= 0.832;
-        }
+        m *= p.ladIn;   // proto: the mixer itself stays clean (Monark at Load 15)
 
         // filter modulation: osc 3 and noise, mixed, scaled by the "wheel"
         const double modSrc = (1.0 - p.modMix) * o3 + p.modMix * pnk * 2.5;
         const double fMod = p.filterMod ? std::pow (2.0, p.modAmt * 3.0 * modSrc) : 1.0;
 
         // nonlinear 4-pole ladder, 2x oversampled
-        double fc = p.cutoff * std::pow (2.0, p.envAmt * fe) * fMod
-                  * std::pow (std::min (8.0, std::max (0.125, ktf / 110.0)), keyAmt);
-        fc = std::min (fc, sr * 0.45);
+        double feU = fe;
+        if (lkL > 0) { lkFe[lkI & LKM] = fe; feU = lkFe[(lkI - lkL) & LKM]; }
+        double fc = p.cutoff * std::pow (2.0, p.envAmt * feU) * fMod
+                  * std::pow (std::min (8.0, std::max (0.125, ktf / (double) p.keyRef)), keyAmt);
+        fc = std::min (fc, sr * 0.98);   // proto: Monark's filter is wide open at the top of the dial
         // zero-delay-feedback ladder: the resonance feedback is solved within the same sample,
         // so the peak stays as strong at 5 kHz as at 150 Hz, like the analog ladder; tanh at the input and each stage
-        const double gz = std::tan (PI * fc / (2 * sr)), Gz = gz / (1 + gz), G2 = Gz * Gz, G4 = G2 * G2;
         // like the Minimoog, the resonance fades as the cutoff comes down, so low notes keep their body
         const double rf = p.resFade > 0 ? fc / std::sqrt (fc * fc + (double) p.resFade * p.resFade) : 1.0;
-        const double kR = kRes * rf;
+        double kR = kRes * rf;
+        if (p.resPull > 0)
+            fc *= std::max (0.5, 1.0 - p.resPull * kR * (0.0164 + 0.0029 * std::log2 (std::max (20.0, fc) / 1306.0)));
+        // no self-oscillation above the audio band (it would fold back down as a whistle) - but the Emphasis below
+        // that point stays, and with it the bass it takes away: a contour that throws the filter wide open must
+        // not make the note louder (Monark keeps its resonance up there)
+        if (fc > 17000.0 && kR > 3.5) kR = 3.5 + (kR - 3.5) * std::max (0.0, 1.0 - (fc - 17000.0) / 4000.0);
+        const double gz = std::tan (PI * fc / (2 * sr)), Gz = gz / (1 + gz), G2 = Gz * Gz, G4 = G2 * G2;
         for (int o = 0; o < 2; ++o)
         {
-            const double est = (G4 * m + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kR * G4);
-            double a = th (m - kR * est), v, yy;
+            const double mf = m + kR * fbL;     // proto: feedback = y4 minus its slow (low-passed) part
+            const double est = (G4 * mf + (Gz * G2 * l1 + G2 * l2 + Gz * l3 + l4) / (1 + gz)) / (1 + kR * G4);
+            double a = th (mf - kR * est), v, yy;
             v = (th (a) - l1) * Gz; yy = v + l1; l1 = yy + v; a = yy;
             v = (th (a) - l2) * Gz; yy = v + l2; l2 = yy + v; a = yy;
             v = (th (a) - l3) * Gz; yy = v + l3; l3 = yy + v; a = yy;
             v = (th (a) - l4) * Gz; yy = v + l4; l4 = yy + v; y4 = yy;
         }
 
+        fbL += (y4 - fbL) * fbC;
+
         // RC envelopes
         // the attack runs past "maximum" to the overshoot peak, then the decay brings it back
         const double ov = std::max (1.0, (double) p.overshoot), ovF = ov + stF, ovA = ov + stA;
-        if (fs == 1) { fe += (1.3 * ovF - fe) * cfA; if (fe >= ovF) { fe = ovF; fs = 2; } }
-        else if (fs == 2) fe += (p.fS - fe) * cfD;
+        if (fs == 1) { fe += (p.fAttTarget * ovF - fe) * cfA; if (fe >= ovF) { fe = ovF; fs = 2; } }
+        else if (fs == 2) fe += (p.fS - fe) * std::min (1.0, cfD * (1.0 + p.susFast * std::pow (std::max (0.0, (p.fS - 0.75) / 0.25), 0.8)));
         else if (fs == 3) fe += (0 - fe) * (p.decaySw ? cfD : relFast);
         if (as == 1) { ae += (1.3 * ovA - ae) * caA; if (ae >= ovA) { ae = ovA; as = 2; } }
         else if (as == 2) ae += (p.aS - ae) * caD;
@@ -520,17 +607,26 @@ public:
         if (gateOn && i - lastOn < 30 * BL)
             vel = std::min (1.0, std::max (0.2, notePkP / (0.4 * refOn + 1e-9)));
         velS += (vel - velS) * velA;
-        const double yv = y4 * ladderOut * (1 + 0.22 * kR) * ae * velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        double aeU = ae, gU = velS * dynF * (p.tail > 0 ? tfS * tfS : 1.0);
+        if (lkL > 0) { lkAe[lkI & LKM] = aeU; lkG[lkI & LKM] = gU; aeU = lkAe[(lkI - lkL) & LKM]; gU = lkG[(lkI - lkL) & LKM]; }
+        ++lkI;
+        double po = y4 / p.ladIn * (1 + p.resMakeup * kR) * aeU;
+        {   // proto: the output stage's lopsided curve; the gain for small signals is 1
+            const double x = po * p.mixDrive, b = p.mixBias, tb = th (b);
+            po = (th (x + b) - tb) / ((1.0 - tb * tb) * p.mixDrive);
+        }
+        const double yv = po * ladderOut * 0.832 * mixIn * gU;
         const double dc = yv - dcX + dcA * dcY; dcX = yv; dcY = dc;
         fbZ = dc;
 
         lastFreq = (gateOn && zf > 0 && i - lastEdge < sr / 25.0) ? zf : 0.0;
         if (onset) trigCount++;
-        return (float) (softLimit (dc * outGain) + p.dry * input);
+        return (float) (softLimit (dc * outGain) + p.dry * dryIn);
     }
 
     // for the editor display
     double currentFreq() const { return lastFreq; }
+    int latencySamples() const { return lkL; }
     double inputPeak() const   { return inPk; }          // input level after Input Gain (1.0 = full scale)
     double filterContour() const { return fe; }
     // probes for offline analysis (tests/eval_trigger.cpp)
@@ -553,6 +649,18 @@ private:
     static constexpr int EHM = 4095;
 
 
+    // proto: Monark's Emphasis dial -> feedback amount, measured every 0.05 of the dial up to 0.70
+    // (self-oscillation starts between 0.70 and 0.75); above that it runs on to `top` at 1.0
+    static double resTaper (double r, double top)
+    {
+        // 0.75 and up: set so the self-oscillation is as loud as Monark's (and the bass loss agrees within 0.8 dB)
+        static const double T[21] = { 0.0, 0.01, 0.03, 0.06, 0.09, 0.13, 0.21, 0.31, 0.47, 0.73, 1.09, 1.52, 2.18, 2.98, 3.75,
+                                      4.63, 5.2, 5.45, 5.55, 5.7, 5.87 };
+        r = std::min (1.0, std::max (0.0, r));
+        const double x = r * 20.0; const int i = std::min (19, (int) x);
+        (void) top;
+        return T[i] + (T[i + 1] - T[i]) * (x - i);
+    }
     static double th (double q) { return q > 3 ? 1 : q < -3 ? -1 : q * (27 + q * q) / (27 + 9 * q * q); }
     // output stage: untouched up to 0.8 of full scale (a synth's output does not squash its own
     // attacks), then a soft knee that never passes full scale
@@ -723,24 +831,33 @@ private:
         return { accum, std::min (d * ratio, 0.1) };
     }
 
-    static double oscWave (int w, bool osc3, OscPh q)
+    double oscWave (int w, bool osc3, OscPh q) const
     {
+        // proto (Monark 측정): falling saw, pulse widths 48.2/28.5/17 %, tri-saw shape, levels per waveform
         const double t = q.t, dt = std::max (q.dt, 1e-5);
-        auto saw   = [&] { return 2 * t - 1 - polyblep (t, dt); };
-        auto tri   = [&] { return 1 - 4 * std::abs (t - 0.5); };
+        auto saw   = [&] { return -(2 * t - 1 - polyblep (t, dt)); };      // jumps up at t = 0, then runs down
+        auto triRaw = [&] { return 1 - 4 * std::abs (t - 0.5); };          // trough at t = 0
+        // Monark's triangle has its tips cut flat (about 2 % at either end): the odd harmonics dip around the 46th
+        auto tri   = [&] { const double c = P.triClip; return std::min (c, std::max (-c, triRaw())); };
         auto pulse = [&] (double pw)
         {
             double tp = t + (1 - pw); tp -= std::floor (tp);
             return (t < pw ? 1.0 : -1.0) + polyblep (t, dt) - polyblep (tp, dt);
         };
+        auto triSaw = [&]
+        {
+            double u = t + 0.5; u -= std::floor (u);
+            const double fallSaw = -(2 * u - 1 - polyblep (u, dt));         // jumps up where the triangle peaks
+            return 0.585 * (0.83 * triRaw() + 0.25 * fallSaw);
+        };
         switch (w)
         {
-            case 0:  return tri();
-            case 1:  return osc3 ? -saw() : 0.5 * (tri() + saw());
+            case 0:  return 0.912 * (tri() + 0.0104 * saw());               // the small step at the trough
+            case 1:  return osc3 ? -saw() : triSaw();
             case 2:  return saw();
-            case 3:  return pulse (0.5);
-            case 4:  return pulse (0.3);
-            default: return pulse (0.15);
+            case 3:  return 0.958 * pulse (0.482);
+            case 4:  return 0.883 * pulse (0.285);
+            default: return 0.862 * pulse (0.17);
         }
     }
 
@@ -811,6 +928,12 @@ private:
     int64_t cyc2 = 0; int decD = 22, decI = 0, fRun = 0, miss = 0, rawI = 0;
     double stF = 0, stA = 0;       // extra peak height built up by quick re-triggering (filter, loudness)
     double dcX = 0, dcY = 0, fbZ = 0;
+    double atkX = 0; bool garb = false, garbP = false;
+    static constexpr int LKM = 16383;
+    std::vector<double> lkUn = std::vector<double> (LKM + 1, 0.0), lkFe = lkUn, lkAe = lkUn, lkG = lkUn, lkExt = lkUn, lkDry = lkUn;
+    std::vector<char> lkOn = std::vector<char> (LKM + 1, 0); int64_t lkI = 0; int lkL = 0;
+    double fbL = 0, fbC = 0, goodW = 0, goodAt = -1e12, flyOff = 0; int coast = 0, settle = 0;   // proto
+    double preA = 0, preX = 0, preY = 0, apC = 0, apX = 0, apY = 0;   // proto
     double lastFreq = 0, dbgI = 0, dbgQ = 0, dbgDph = 0, dbgOsc = 0;
     uint32_t trigCount = 0;
 };

@@ -1172,7 +1172,7 @@ namespace
 
     using RockerFrames = std::array<juce::Image, 11>;
 
-    RockerFrames makeRockerFrames (float red, float green, float blue)
+    RockerFrames makeRockerFrames (float red, float green, float blue, bool white = false)
     {
         const auto off = decodeImage (blueOff);
         const auto on = decodeImage (blueOn);
@@ -1214,6 +1214,13 @@ namespace
                 for (int y = 0; y < height; ++y)
                 {
                     const auto colour = sample (offPixels, offX, y).interpolatedWith (sample (onPixels, onX, y), position);
+                    if (white)
+                    {
+                        const auto grey = colour.getFloatBlue();
+                        const auto lightness = (1.0f - (1.0f - grey) * (1.0f - grey)) * brightness;
+                        pixels.setPixelColour (x, y, juce::Colour::fromFloatRGBA (lightness, lightness, lightness, 1.0f));
+                        continue;
+                    }
                     pixels.setPixelColour (x, y, juce::Colour::fromFloatRGBA (
                         juce::jlimit (0.0f, 1.0f, colour.getFloatRed() * red * brightness),
                         juce::jlimit (0.0f, 1.0f, colour.getFloatGreen() * green * brightness),
@@ -1224,12 +1231,13 @@ namespace
         return frames;
     }
 
-    const juce::Image& switchPhoto (float position, bool blue, bool silver)
+    const juce::Image& switchPhoto (float position, bool blue, bool silver, bool white)
     {
         static const auto blueFrames = makeRockerFrames (1.0f, 1.0f, 1.0f);
         static const auto amberFrames = makeRockerFrames (1.51f, 0.73f, 0.34f);
         static const auto silverFrames = makeRockerFrames (1.43f, 1.16f, 1.0f);
-        const auto& frames = silver ? silverFrames : (blue ? blueFrames : amberFrames);
+        static const auto whiteFrames = makeRockerFrames (1.0f, 1.0f, 1.0f, true);
+        const auto& frames = white ? whiteFrames : (silver ? silverFrames : (blue ? blueFrames : amberFrames));
         return frames[(size_t) juce::roundToInt (position * (float) (frames.size() - 1))];
     }
 
@@ -1432,7 +1440,7 @@ namespace
         { "fA", modifierLeftX, 216 }, { "fD", modifierCentreX, 216 }, { "fS", modifierRightX, 216 },
         { "keyTrk1", modifierDivider, 177 }, { "keyTrk2", modifierDivider, 235 },
         { "aA", modifierLeftX, loudnessRowY }, { "aD", modifierCentreX, loudnessRowY },
-        { "aS", modifierRightX, loudnessRowY }, { "decaySw", modifierRightX, loudnessRowY + 115 }, { "outGain", 1314, 91 }
+        { "aS", modifierRightX, loudnessRowY }, { "decaySw", modifierRightX, loudnessRowY + 115 }, { "outGain", 1314, 91 }, { "mode", 1314, 420 }
     };
 
     const Placement* findPlacement (const juce::String& id)
@@ -1499,6 +1507,13 @@ namespace
 
     struct DialMark { float position; juce::String label; };
 
+    float printedScaleEnd (const bsyn::spec::Param& spec)
+    {
+        return spec.dialBreak != 0.0f && spec.dialBreak > spec.dial0 && spec.dialBreak < spec.dial1
+             ? (spec.dialBreak - spec.dial0) / (spec.dial1 - spec.dial0)
+             : 1.0f;
+    }
+
     juce::String dialNumber (double value)
     {
         if (std::abs (value) >= 1000.0)
@@ -1515,13 +1530,14 @@ namespace
             const bool signedScale = spec->dial0 < 0.0f && spec->dial1 > 0.0f;
             const int steps = compact ? 2 : (signedScale ? 10 : 5);
             std::vector<DialMark> marks;
+            const float end = printedScaleEnd (*spec);
             for (int i = 0; i <= steps; ++i)
             {
                 const float position = (float) i / (float) steps;
-                const auto number = juce::jmap (position, spec->dial0, spec->dial1);
+                const auto number = juce::jmap (position, spec->dial0, end < 1.0f ? spec->dialBreak : spec->dial1);
                 const auto sign = number < 0.0f ? juce::String::charToString (0x2212)
                                                : (signedScale && number > 0.0f ? juce::String ("+") : juce::String());
-                marks.push_back ({ position, sign + dialNumber (std::abs (number)) });
+                marks.push_back ({ position * end, sign + dialNumber (std::abs (number)) });
             }
             return marks;
         }
@@ -1670,7 +1686,7 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     const auto& id = s.getComponentID();
     const bool controllerKnob = id == "modAmt" || id == "modMix" || id == "gate" || id == "pickSens";
     const float standardDiameter = juce::jmin (photo.diameter, radius * 1.52f);
-    const float diameter = standardDiameter * (controllerKnob ? 0.93f : 1.0f);
+    const float diameter = standardDiameter * (controllerKnob ? 0.86f : 1.0f);
     const float tickRadius = standardDiameter * 0.5f;
     const auto angleAt = [startAngle, endAngle] (float p) { return startAngle + p * (endAngle - startAngle); };
 
@@ -1703,13 +1719,24 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     else
     {
         const auto marks = dialMarks (s, spec, compact);
+        const float mainEnd = spec != nullptr ? printedScaleEnd (*spec) : 1.0f;
         for (int i = 0; i <= 10; ++i)
         {
-            const float p = (float) i / 10.0f;
+            const float p = mainEnd * (float) i / 10.0f;
             if (std::any_of (marks.begin(), marks.end(), [p] (const auto& mark) { return std::abs (p - mark.position) < 0.032f; }))
                 continue;
             const auto a = angleAt (p);
             drawTick (a, tickRadius + 3.0f, 2.5f);
+        }
+
+        if (mainEnd < 1.0f)
+        {
+            for (int i = 1; i <= 3; ++i)
+            {
+                const auto angle = angleAt (juce::jmap ((float) i / 3.0f, mainEnd, 1.0f));
+                g.setColour (C::amber);
+                g.drawLine ({ point (angle, tickRadius + 3.0f), point (angle, tickRadius + 9.0f) }, 1.6f);
+            }
         }
 
         for (const auto& mark : marks)
@@ -1769,6 +1796,8 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const bool vertical = id == "noisePink";
     const bool mixer = mixerOnSwitch (id);
     const bool externalSource = id == "extSrc";
+    const bool mode = id == "mode";
+    const bool labelledChoice = externalSource || mode;
     const bool blue = mixer || vertical || externalSource;
     const bool compressor = id == "comp";
     const bool silver = compressor || id == "decaySw";
@@ -1777,10 +1806,10 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const float position = rocker != nullptr ? rocker->getPosition() : (on ? 1.0f : 0.0f);
 
     auto area = b.getLocalBounds().toFloat();
-    const auto body = mixer || compressor || externalSource ? area.removeFromTop ((float) mixerRockerHeight) : area;
-    const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (blue ? 54.0f : 51.0f),
+    const auto body = mixer || compressor || labelledChoice ? area.removeFromTop ((float) mixerRockerHeight) : area;
+    const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (blue || mode ? 54.0f : 51.0f),
                                                    vertical ? 43.0f : 22.0f);
-    const auto& sprite = switchPhoto (position, blue, silver);
+    const auto& sprite = switchPhoto (position, blue, silver, mode);
     g.setColour (juce::Colours::white.withAlpha (pressed ? 0.92f : 1.0f));
     if (vertical)
     {
@@ -1802,13 +1831,16 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
         return;
     }
 
-    if (externalSource)
+    if (labelledChoice)
     {
-        static const auto choices = juce::StringArray::fromTokens (utf8 (bsyn::spec::find ("extSrc")->choices), "|", "");
+        const auto* spec = bsyn::spec::find (id.toRawUTF8());
+        const auto choices = juce::StringArray::fromTokens (utf8 (spec->choices), "|", "");
         g.setFont (panelFont (11.0f));
+        if (externalSource)
+            area.removeFromLeft (10.0f);
+        const auto left = area.removeFromLeft (mode ? area.getWidth() * 0.5f : 26.0f);
         g.setColour (on ? C::silkDim : colour (panelInk));
-        area.removeFromLeft (10.0f);
-        g.drawText (choices[0].toUpperCase(), area.removeFromLeft (26.0f), juce::Justification::centred);
+        g.drawText (choices[0].toUpperCase(), left, juce::Justification::centred);
         g.setColour (on ? colour (panelInk) : C::silkDim);
         g.drawText (choices[1].toUpperCase(), area, juce::Justification::centred);
     }
@@ -2027,9 +2059,9 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
     Control k;
     k.id = d.id; k.label = utf8 (d.label); k.small = small;
     if (k.id == "osc3Ctl") k.label = "Osc. 3 Control";
-    const bool externalSource = k.id == "extSrc" && d.kind == bsyn::spec::Kind::Choice
-                             && d.min == 0.0f && d.max == 1.0f;
-    if (d.kind == bsyn::spec::Kind::Bool || externalSource)
+    const bool rockerChoice = (k.id == "extSrc" || k.id == "mode") && d.kind == bsyn::spec::Kind::Choice
+                           && d.min == 0.0f && d.max == 1.0f;
+    if (d.kind == bsyn::spec::Kind::Bool || rockerChoice)
     {
         k.button = std::make_unique<AnimatedRocker>();
         k.button->setComponentID (d.id);
@@ -2049,6 +2081,12 @@ void BassSynthEditor::addControl (const bsyn::spec::Param& d, bool small)
             const bool withoutLo = k.id.endsWith ("Range") && d.choices != nullptr
                                 && ! juce::String (d.choices).startsWith ("LO|");
             k.slider->setRotaryParameters (pi * (withoutLo ? 1.7f : 1.5f), pi * 2.5f, true);
+        }
+        else if (const float mainEnd = printedScaleEnd (d); mainEnd < 1.0f)
+        {
+            const float start = pi * 4.0f / 3.0f;
+            const float fullArc = juce::jmin (pi * 4.0f / (3.0f * mainEnd), pi * 11.0f / 6.0f);
+            k.slider->setRotaryParameters (start, start + fullArc, true);
         }
         else
             k.slider->setRotaryParameters (pi * 1.25f, pi * 2.75f, true);
@@ -2121,6 +2159,8 @@ void BassSynthEditor::layoutPanel()
             k.button->setBounds (x - 17, positionY (17, 45) - 12, 34, 69);
         else if (k.id == "extSrc")
             k.button->setBounds (x - 43, positionY (16, mixerRockerHeight), 86, mixerRockerHeight + 13);
+        else if (k.id == "mode")
+            k.button->setBounds (x - 54, positionY (16, mixerRockerHeight), 108, mixerRockerHeight + 13);
         else if (k.id == "comp")
             k.button->setBounds (x - 27, positionY (19, mixerRockerHeight), 54, mixerRockerHeight + 13);
         else if (k.id == "decaySw")
