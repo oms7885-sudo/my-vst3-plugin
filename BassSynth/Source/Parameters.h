@@ -43,7 +43,16 @@ struct Param
     // straight line from min to `valueBreak` up to the break, and from there to max. Both 0 = no break
     // (a dial whose scale runs through 0, like Cutoff -5..+5, must not be read as having a break at 0).
     float dialBreak = 0.0f, valueBreak = 0.0f;
+    // A measured dial: the value (real units) at `curveN` evenly spaced points of the knob's travel, from min
+    // to max; in between it runs evenly in octaves. nullptr = not used.
+    const float* curve = nullptr;
+    int curveN = 0;
 };
+
+// Monark's Cutoff, measured every 5 % of its dial (Emphasis 0, small signal; analysis/STAGE3_flt.md). The top of
+// the dial is the filter wide open; 60 kHz stands for that (the engine stops at 0.98 x the sample rate anyway).
+inline constexpr float monarkCutoff[21] = { 25.5f, 33.3f, 49.7f, 73.5f, 118.4f, 170.0f, 259.0f, 395.6f, 590.3f, 889.5f, 1306.2f,
+                                            1897.5f, 2774.4f, 4138.6f, 6030.9f, 9177.0f, 14628.0f, 25878.0f, 51362.0f, 56000.0f, 60000.0f };
 
 // Panel sections in Model D order (left to right), then the plugin-only setup strip.
 inline constexpr const char* sections[] = { "Controllers", "Oscillators", "Mixer", "Filter", "Loudness", "Setup" };
@@ -109,8 +118,9 @@ inline constexpr Param params[] = {
       "WHITE / PINK\n끄면 화이트(밝은) 노이즈, 켜면 핑크(어두운) 노이즈입니다." },
 
     // ---------------------------------------------------------------- Filter
-    { "cutoff", "Cutoff Frequency", "Cutoff", "Filter", Kind::Float, 40.0f, 20000.0f, 160.0f, 894.4f, "Hz", nullptr,
-      "CUTOFF\n필터가 열리는 기준점입니다. 눈금은 실제 무그와 같은 -5~+5이고, 값 칸에 주파수가 함께 나옵니다. -5가 40Hz, 0이 약 900Hz, +5가 20kHz이며 한 눈금이 약 0.9옥타브입니다. 낮을수록 어둡고 두꺼운 소리가 납니다.", -5.0f, 5.0f },
+    { "cutoff", "Cutoff Frequency", "Cutoff", "Filter", Kind::Float, 25.5f, 60000.0f, 160.0f, 0.0f, "Hz", nullptr,
+      "CUTOFF\n필터가 열리는 기준점입니다. 눈금은 실제 무그와 같은 -5~+5이고, 값 칸에 주파수가 함께 나옵니다. 노브 위치별 주파수는 Monark를 재서 맞췄습니다: -5가 약 25Hz, 0이 약 1300Hz, +3이 약 9kHz이고, +4 위로는 필터가 거의 완전히 열립니다. 가운데 구간은 한 눈금이 약 1.15옥타브입니다. 낮을수록 어둡고 두꺼운 소리가 납니다.", -5.0f, 5.0f,
+      false, 0.0f, 0.0f, monarkCutoff, 21 },
     { "res", "Emphasis", "Emphasis", "Filter", Kind::Float, 0.0f, 1.0f, 0.24f, 0.0f, "", nullptr,
       "EMPHASIS\n레조넌스입니다(0~10). 올리면 컷오프 근처가 강조되어 \"와우\" 소리가 납니다. 눈금은 Monark를 재서 맞췄습니다: 4까지는 거의 걸리지 않다가 5부터 빠르게 강해지고, 7~7.5 사이에서 필터가 스스로 발진해 사인파를 냅니다. 올릴수록 저음이 그만큼 줄어듭니다(7에서 약 -12dB). 컷오프가 낮을수록 효과가 약해집니다(약 100Hz 아래에서는 발진하지 않음).", 0.0f, 10.0f },
     { "envAmt", "Amount of Contour", "Contour Amt", "Filter", Kind::Float, 0.0f, 8.75f, 3.2f, 0.0f, "oct", nullptr,

@@ -1,4 +1,4 @@
-# mOog — 베이스 DI를 Model D 신스 베이스로 바꾸는 VST3 (Cubase, Windows)
+﻿# mOog — 베이스 DI를 Model D 신스 베이스로 바꾸는 VST3 (Cubase, Windows)
 
 이 파일은 새 대화가 이전 작업을 이어받기 위한 인수인계 문서다. 작업 전에 끝까지 읽을 것.
 상세 기록은 `notes/HISTORY.md`, UI 분담 규칙은 `BassSynth/docs/UI_HANDOFF.md`.
@@ -58,7 +58,7 @@ polyBLEP) → Model D 믹서(On 스위치, 노이즈 White/Pink, External = DI �
 
 - Emphasis: 다이얼 7.5~8에서 자기발진, 약 200 Hz까지 유지 (서비스 매뉴얼). `kRes = 5.2 * res`.
 - 믹서→필터 드라이브: 매뉴얼의 R2 47k→160k 변경에 따라 약 1/3.4 (`mixIn = 0.6`). 저항값에서 계산한 값, 실측 아님.
-- Cutoff 40 Hz–20 kHz, 다이얼 −5..+5 (0 ≈ 894 Hz, 눈금당 약 0.9옥타브; 중간 눈금 균등은 추정).
+- Cutoff: 다이얼 −5..+5 (화면은 실기와 같음). 위치별 주파수는 Monark 측정표 (`monarkCutoff`): −5 ≈ 25 Hz, 0 ≈ 1306 Hz, +4 위로 거의 완전히 열림 (2026-11-12, 전에는 40 Hz–20 kHz, 0 ≈ 894 Hz).
 - Amount of Contour: 다이얼 0..10, 10 = 4옥타브 (사양표). 오버슈트가 얹혀 한 번 치면 약 4.9, 연타 최대 약 6.4옥타브
   (매뉴얼 테스트 절차의 약 6.3옥타브와 맞음).
 - Attack/Decay: 10 ms, 200 ms, 600 ms, 1 s, 5 s, 10 s가 다이얼의 0, 2, 4, 6, 8, 10 위치 (패널 표기는 기억에 의존, 미대조).
