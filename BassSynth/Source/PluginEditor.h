@@ -59,7 +59,7 @@ private:
 
     BassSynthProcessor& proc;
     PanelLookAndFeel lnf;
-    juce::TooltipWindow tooltipWindow { this, 1000 };   // descriptions appear after 1 s of hovering
+    juce::TooltipWindow tooltipWindow { this, 400 };    // descriptions appear after 0.4 s of hovering
 
     Panel panel { *this };
     std::vector<Control> controls;
