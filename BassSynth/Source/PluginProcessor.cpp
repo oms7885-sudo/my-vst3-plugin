@@ -119,6 +119,27 @@ juce::AudioProcessorValueTreeState::ParameterLayout BassSynthProcessor::createLa
                     return pts[i - 1].x + (pts[i].x - pts[i - 1].x) * std::log (v / pts[i - 1].ms) / std::log (pts[i].ms / pts[i - 1].ms);
                 });
         }
+        else if (d.curve != nullptr && d.curveN >= 2)
+        {
+            // a measured dial: the table's points sit evenly over the travel, evenly in octaves in between
+            std::vector<float> lv ((size_t) d.curveN);
+            for (int q = 0; q < d.curveN; ++q) lv[(size_t) q] = std::log (d.curve[q]);
+            const int segs = d.curveN - 1;
+            range = NormalisableRange<float> (d.min, d.max,
+                [lv, segs] (float, float, float x)
+                {
+                    const float u = jlimit (0.0f, 1.0f, x) * (float) segs;
+                    const int q = jmin (segs - 1, (int) u);
+                    return std::exp (lv[(size_t) q] + (lv[(size_t) q + 1] - lv[(size_t) q]) * (u - (float) q));
+                },
+                [lv, segs] (float, float, float v)
+                {
+                    const float l = std::log (jlimit (std::exp (lv.front()), std::exp (lv.back()), v));
+                    int q = 0; while (q < segs - 1 && l > lv[(size_t) q + 1]) ++q;
+                    const float den = lv[(size_t) q + 1] - lv[(size_t) q];
+                    return jlimit (0.0f, 1.0f, ((float) q + (den > 0.0f ? (l - lv[(size_t) q]) / den : 0.0f)) / (float) segs);
+                });
+        }
         else if (d.valueBreak > d.min && d.valueBreak < d.max && d.dialBreak > d.dial0 && d.dialBreak < d.dial1)
         {
             // a dial with an add-on range past its printed scale: straight from min to valueBreak up to the
