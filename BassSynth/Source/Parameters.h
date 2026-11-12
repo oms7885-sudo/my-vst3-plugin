@@ -40,7 +40,8 @@ struct Param
     // A dial whose printed scale ends before the knob does (Amount of Contour): the numbers run dial0..dial1 over
     // the travel as usual, but only up to `dialBreak` are they the Model D's (print numbers up to there); the
     // rest of the travel is an add-on range (draw it as such: no numbers, a different mark). The value runs in a
-    // straight line from min to `valueBreak` up to the break, and from there to max. 0 = no break.
+    // straight line from min to `valueBreak` up to the break, and from there to max. Both 0 = no break
+    // (a dial whose scale runs through 0, like Cutoff -5..+5, must not be read as having a break at 0).
     float dialBreak = 0.0f, valueBreak = 0.0f;
 };
 
