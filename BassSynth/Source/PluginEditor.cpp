@@ -1623,6 +1623,13 @@ namespace
     // hover help (Korean) comes from Parameters.h: "TITLE\ndescription"
     juce::String tipFor (const juce::String& id)
     {
+        if (id == "mode")
+            return juce::String::fromUTF8 (
+                "Real-Time 모드\n"
+                "추가 딜레이 없이 소리를 들을 수 있습니다. 신스 특유의 톤이 다소 약해질 수 있으며, 실시간 연주와 녹음에 적합합니다.\n\n"
+                "Real-Synth 모드\n"
+                "50ms의 지연이 생기지만, 무그 특유의 톤을 더 완벽하게 재현합니다. 이미 녹음된 DI 트랙을 재생하거나 음원으로 내보낼 때 적합합니다.");
+
         if (const auto* d = bsyn::spec::find (id.toRawUTF8()))
             return juce::String (juce::CharPointer_UTF8 (d->tip));
         return {};
@@ -2118,7 +2125,7 @@ void BassSynthEditor::resized()
 void BassSynthEditor::layoutPanel()
 {
     panelArea = { cheekW, panelTop, panel.getWidth() - 2 * cheekW, panelHeight };
-    displayArea = mainPanelBounds ({ controllerCentreX - 87, 104, 174, 130 });
+    displayArea = mainPanelBounds ({ controllerCentreX - 87, 104, 174, 130 }).translated (0, -6);
     displayArea.setCentre (panelX (controllerCentreX), displayArea.getCentreY());
     const int setupTop = panelArea.getBottom() + setupGap;
     setupArea = { panelX (47), setupTop, panelX (1107) - panelX (47), panel.getHeight() - setupTop - setupGap };
