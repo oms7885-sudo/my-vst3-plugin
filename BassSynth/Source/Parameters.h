@@ -171,7 +171,7 @@ inline constexpr Param params[] = {
       "OUTPUT\n최종 출력 크기입니다(dB)." },
     { "dry", "Dry DI", "Dry DI", "Setup", Kind::Float, 0.0f, 1.0f, 0.0f, 0.0f, "", nullptr,
       "DRY DI\n원래 DI 소리를 필터를 거치지 않고 신스와 섞는 양입니다. 0이면 신스 소리만 납니다." },
-    { "mode", "Mode", "Mode", "Setup", Kind::Choice, 0.0f, 1.0f, 0.0f, 0.0f, "", "Real-Time|Real-Synth",
+    { "mode", "Mode", "Mode", "Setup", Kind::Choice, 0.0f, 1.0f, 1.0f, 0.0f, "", "Real-Time|Real-Synth",
       "MODE\nReal-Time: 지연이 없습니다. 들으면서 연주하고 녹음할 때 씁니다. 대신 음이 시작되는 약 0.04초 동안은 음정을 아직 몰라서 신스 톤이 조금 흐트러집니다.\nReal-Synth: 소리가 0.05초 늦게 나오는 대신 음의 첫 순간부터 깨끗한 신스 소리가 납니다. 녹음된 DI를 재생해 음원을 뽑을 때 씁니다. 재생과 내보내기에서는 큐베이스가 이 지연을 자동으로 맞춰 주므로 박자가 밀리지 않습니다. 실시간으로 치면서 들을 때만 늦게 들립니다." },
 };
 
