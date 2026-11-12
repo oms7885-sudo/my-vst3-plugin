@@ -259,7 +259,10 @@ void BassSynthProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::M
 
     // the bass DI is mono: use channel 1, or the average of a stereo input
     auto* l = buffer.getWritePointer (0);
-    const float* r = numIn > 1 ? buffer.getReadPointer (1) : nullptr;
+    // the standalone app opens the interface's first two inputs, and a DI usually sits on one of them alone:
+    // averaging with the empty one would halve it, so the app takes the first enabled input as it is
+    const bool standalone = wrapperType == wrapperType_Standalone;
+    const float* r = numIn > 1 && ! standalone ? buffer.getReadPointer (1) : nullptr;
     for (int i = 0; i < n; ++i)
     {
         const float x = r != nullptr ? 0.5f * (l[i] + r[i]) : l[i];
