@@ -17,11 +17,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(JUCE)
 
+# Windows: VST3 + standalone app. macOS: also Audio Unit (Logic), universal (Apple silicon + Intel).
+if(APPLE)
+    set(MOOG_FORMATS VST3 AU Standalone)
+else()
+    set(MOOG_FORMATS VST3 Standalone)
+endif()
+
 juce_add_plugin(BassLadderSynth
     COMPANY_NAME              "OMS"
     PLUGIN_MANUFACTURER_CODE  Omsk
     PLUGIN_CODE               Blsy
-    FORMATS                   VST3 Standalone
+    FORMATS                   ${MOOG_FORMATS}
     PRODUCT_NAME              "mOog"
     IS_SYNTH                  FALSE
     NEEDS_MIDI_INPUT          FALSE
@@ -30,6 +37,9 @@ juce_add_plugin(BassLadderSynth
     EDITOR_WANTS_KEYBOARD_FOCUS FALSE
     COPY_PLUGIN_AFTER_BUILD   FALSE
     VST3_CATEGORIES           Fx
+    # the standalone app reads the audio interface's input (macOS asks once)
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "mOog reads your bass from the audio interface input."
 )
 
 target_sources(BassLadderSynth PRIVATE

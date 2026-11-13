@@ -1,0 +1,7 @@
+#!/bin/sh
+# After installing: let Logic see the new Audio Unit at once, and keep macOS from blocking the copied files.
+for p in "/Library/Audio/Plug-Ins/Components/mOog.component" "/Library/Audio/Plug-Ins/VST3/mOog.vst3" "/Applications/mOog.app"; do
+    [ -e "$p" ] && xattr -dr com.apple.quarantine "$p" 2>/dev/null
+done
+killall -9 AudioComponentRegistrar 2>/dev/null
+exit 0
