@@ -803,82 +803,42 @@ namespace
         float start = 0.0f, target = 0.0f;
     };
 
-    using RockerFrames = std::array<juce::Image, 11>;
-
-    RockerFrames makeRockerFrames (juce::Colour material)
+    juce::Image tintRocker (const juce::Image& photo, juce::Colour material)
     {
-        static constexpr int width = 152, height = 60;
-        static const auto off = decodeImage (panelArtwork::rockerOff);
-        static const auto on = decodeImage (panelArtwork::rockerOn);
-        const juce::Image::BitmapData onPixels (on, juce::Image::BitmapData::readOnly);
-        const juce::Image::BitmapData offPixels (off, juce::Image::BitmapData::readOnly);
-        const auto outline = [] (const juce::Image::BitmapData& image)
-        {
-            std::array<juce::Range<int>, width> columns;
-            for (int x = 0; x < width; ++x)
+        auto tinted = photo.createCopy();
+        juce::Image::BitmapData pixels (tinted, juce::Image::BitmapData::readWrite);
+        for (int y = 0; y < pixels.height; ++y)
+            for (int x = 0; x < pixels.width; ++x)
             {
-                int top = 0, bottom = height - 1;
-                while (top < bottom && image.getPixelColour (x, top).getAlpha() < 128)
-                    ++top;
-                while (bottom > top && image.getPixelColour (x, bottom).getAlpha() < 128)
-                    --bottom;
-                columns[(size_t) x] = { top, bottom + 1 };
+                const auto sample = pixels.getPixelColour (x, y);
+                const float light = sample.getFloatGreen();
+                const float brightness = light * material.getBrightness() / 0.51f;
+                pixels.setPixelColour (x, y, material.withBrightness (juce::jmin (1.0f, brightness)));
             }
-            return columns;
-        };
-        const auto offOutline = outline (offPixels), onOutline = outline (onPixels);
-        const auto sample = [] (const juce::Image::BitmapData& image, int x, float y)
-        {
-            const int above = (int) std::floor (y);
-            const auto at = [&image, x] (int row)
-            {
-                return juce::isPositiveAndBelow (row, height) ? image.getPixelColour (x, row)
-                                                             : juce::Colours::transparentBlack;
-            };
-            return at (above).interpolatedWith (at (above + 1), y - (float) above);
-        };
-
-        RockerFrames frames;
-        for (size_t i = 0; i < frames.size(); ++i)
-        {
-            const float position = (float) i / (float) (frames.size() - 1);
-            const float shade = juce::jmap (position, 0.88f, 1.0f);
-            frames[i] = juce::Image (juce::Image::ARGB, width, height, false);
-            juce::Image::BitmapData pixels (frames[i], juce::Image::BitmapData::writeOnly);
-            for (int x = 0; x < width; ++x)
-            {
-                // Interpolate the cap's silhouette and align both textures to the moving surface.
-                const auto a = offOutline[(size_t) x], b = onOutline[(size_t) x];
-                const float top = juce::jmap (position, (float) a.getStart(), (float) b.getStart());
-                const float length = juce::jmap (position, (float) a.getLength(), (float) b.getLength());
-                for (int y = 0; y < height; ++y)
-                {
-                    const float relative = ((float) y - top) / length;
-                    const auto offSample = sample (offPixels, x, (float) a.getStart() + relative * (float) a.getLength());
-                    const auto onSample = sample (onPixels, x, (float) b.getStart() + relative * (float) b.getLength());
-                    const auto pixel = offSample.interpolatedWith (onSample, position);
-                    const float brightness = (material.getBrightness() + (pixel.getFloatGreen() - 0.42f) * 1.35f) * shade;
-                    pixels.setPixelColour (x, y, material.withBrightness (juce::jlimit (0.0f, 1.0f, brightness))
-                                                          .withAlpha (pixel.getAlpha()));
-                }
-            }
-        }
-        return frames;
+        return tinted;
     }
 
-    const juce::Image& switchPhoto (bool ivory, float position, bool blue, bool silver, bool white)
+    const std::array<juce::Image, 2>& switchPhotos (bool ivory, bool blue, bool silver, bool white)
     {
-        static const RockerFrames graphite[] {
-            makeRockerFrames (juce::Colour (0xff6f8ba0)), makeRockerFrames (juce::Colour (0xffb45e2f)),
-            makeRockerFrames (juce::Colour (0xff9d9996)), makeRockerFrames (juce::Colour (0xffeeeae2))
+        using namespace panelArtwork;
+        // Top photo: right pressed (ON). Bottom photo: left pressed (OFF).
+        static const std::array<juce::Image, 2> orange { decodeImage (rockerOff), decodeImage (rockerOn) };
+        const auto tint = [] (juce::Colour colour)
+        {
+            return std::array<juce::Image, 2> { tintRocker (orange[0], colour), tintRocker (orange[1], colour) };
         };
-        static const RockerFrames light[] {
-            makeRockerFrames (juce::Colour (0xff2a5588)), makeRockerFrames (juce::Colour (0xffe77d33)),
-            makeRockerFrames (juce::Colour (0xffdcd3ce)), makeRockerFrames (juce::Colour (0xffeeeae2))
-        };
-        const int type = white ? 3 : (silver ? 2 : (blue ? 0 : 1));
-        const auto& frames = ivory ? light[type] : graphite[type];
-        return frames[(size_t) juce::roundToInt (position * (float) (frames.size() - 1))];
+        static const auto graphiteBlue = tint (juce::Colour (0xff6f8ba0));
+        static const auto ivoryBlue = tint (juce::Colour (0xff2a5588));
+        static const auto graphiteSilver = tint (juce::Colour (0xff9d9996));
+        static const auto ivorySilver = tint (juce::Colour (0xffdcd3ce));
+        static const auto modeWhite = tint (juce::Colour (0xffeeeae2));
+        if (white)
+            return modeWhite;
+        if (silver)
+            return ivory ? ivorySilver : graphiteSilver;
+        if (blue)
+            return ivory ? ivoryBlue : graphiteBlue;
+        return orange;
     }
 
     bool drawMockupLabel (juce::Graphics& g, const juce::String& key, juce::Rectangle<int> bounds, juce::Colour ink)
@@ -1497,7 +1457,7 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
     const auto body = mixer || compressor || labelledChoice ? area.removeFromTop ((float) mixerRockerHeight) : area;
     const auto frame = body.withSizeKeepingCentre (vertical ? 19.0f : (blue || mode ? 54.0f : 51.0f),
                                                    vertical ? 43.0f : 22.0f);
-    const auto& sprite = switchPhoto (ivory, position, blue, silver, mode);
+    const auto& sprites = switchPhotos (ivory, blue, silver, mode);
     {
         juce::Graphics::ScopedSaveState saved (g);
         if (vertical)
@@ -1509,8 +1469,22 @@ void PanelLookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& 
         const juce::Rectangle<float> slot (0.0f, 0.0f, vertical ? frame.getHeight() : frame.getWidth(),
                                                               vertical ? frame.getWidth() : frame.getHeight());
         const auto cap = slot.reduced (1.7f, 1.0f);
-        g.setOpacity (pressed ? 0.90f : 1.0f);
-        g.drawImage (sprite, cap);
+        g.setImageResamplingQuality (juce::Graphics::highResamplingQuality);
+        const float opacity = pressed ? 0.90f : 1.0f;
+        if (position > 0.0f && position < 1.0f)
+        {
+            g.beginTransparencyLayer (opacity);
+            g.setOpacity (1.0f);
+            g.drawImage (sprites[0], cap);
+            g.setOpacity (position);
+            g.drawImage (sprites[1], cap);
+            g.endTransparencyLayer();
+        }
+        else
+        {
+            g.setOpacity (opacity);
+            g.drawImage (sprites[position >= 1.0f ? 1 : 0], cap);
+        }
     }
 
     if (mixer || compressor)
