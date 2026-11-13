@@ -745,13 +745,18 @@ namespace
     {
         juce::Image image;
         float capRatio, pointerRadius;
+        float pointerAngle = 0.0f, skirtRatio = 1.0f;
     };
 
-    const KnobPhoto& knobPhoto (bool ivory)
+    const KnobPhoto& knobPhoto (bool ivory, bool selector)
     {
         using namespace panelArtwork;
         static const KnobPhoto graphite { decodeImage (graphiteKnob), 0.68f, 0.435f };
         static const KnobPhoto light { decodeImage (ivoryKnob), 0.67f, 0.44f };
+        static const KnobPhoto graphiteSelector { decodeImage (graphiteKnobChoice), 0.53f, 0.46f, -0.30f, 0.89f };
+        static const KnobPhoto lightSelector { decodeImage (ivoryKnobChoice), 0.71f, 0.46f, -0.34f, 0.89f };
+        if (selector)
+            return ivory ? lightSelector : graphiteSelector;
         return ivory ? light : graphite;
     }
 
@@ -1359,7 +1364,8 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
     const bool rangeKnob = s.getComponentID().endsWith ("Range");
     const bool waveKnob = s.getComponentID().endsWith ("Wave");
     const bool compact = w < 80;
-    const auto& photo = knobPhoto (ivory);
+    const bool selector = rangeKnob || waveKnob;
+    const auto& photo = knobPhoto (ivory, selector);
     const auto& id = s.getComponentID();
     const bool controllerKnob = id == "modAmt" || id == "modMix" || id == "gate" || id == "pickSens";
     const float fullDiameter = compact ? 40.0f : (rangeKnob || waveKnob ? 58.0f : (id.endsWith ("Freq") ? 64.0f : 56.0f));
@@ -1436,11 +1442,22 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
 
     const float angle = startAngle + pos * (endAngle - startAngle);
     const auto& bitmap = photo.image;
-    const float scale = diameter / (float) bitmap.getWidth();
-    const auto transform = juce::AffineTransform::scale (scale).translated (body.getX(), body.getY())
-                               .rotated (angle, cx, cy);
+    const auto artwork = body.withSizeKeepingCentre (diameter / photo.skirtRatio, diameter / photo.skirtRatio);
+    const float scale = artwork.getWidth() / (float) bitmap.getWidth();
+    const auto transform = juce::AffineTransform::scale (scale).translated (artwork.getX(), artwork.getY())
+                               .rotated (angle - photo.pointerAngle, cx, cy);
     g.setColour (juce::Colours::white);
-    g.drawImageTransformed (bitmap, transform);
+    {
+        juce::Graphics::ScopedSaveState saved (g);
+        if (selector)
+        {
+            // The selector photo includes the panel just outside the knob.
+            juce::Path skirt;
+            skirt.addEllipse (body);
+            g.reduceClipRegion (skirt);
+        }
+        g.drawImageTransformed (bitmap, transform);
+    }
 
     // The stationary photograph of the cap keeps its light direction as the skirt turns.
     {
@@ -1448,7 +1465,7 @@ void PanelLookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w,
         juce::Path metal;
         metal.addEllipse (body.withSizeKeepingCentre (diameter * photo.capRatio, diameter * photo.capRatio));
         g.reduceClipRegion (metal);
-        g.drawImage (bitmap, body);
+        g.drawImage (bitmap, artwork);
     }
 
     const auto marker = point (angle, diameter * photo.pointerRadius);
