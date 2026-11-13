@@ -2030,7 +2030,7 @@ void BassSynthEditor::handlePresetFile (const juce::File& file, bool save)
     juce::MemoryBlock state;
     if (save)
     {
-        proc.getStateInformation (state);
+        proc.getPresetState (state);          // the panel only (Oscillators, Mixer, Filter, Loudness)
         if (state.isEmpty() || ! file.replaceWithData (state.getData(), state.getSize()))
         {
             showError ("Could not save the preset.");
@@ -2055,7 +2055,7 @@ void BassSynthEditor::handlePresetFile (const juce::File& file, bool save)
             return;
         }
 
-        proc.setStateInformation (state.getData(), size);
+        proc.setPresetState (state.getData(), size);
     }
 
     presetBox.setText ("User: " + file.getFileNameWithoutExtension(), juce::dontSendNotification);
