@@ -1,0 +1,9 @@
+mOog - 베이스 DI를 Model D 신스 베이스로 바꾸는 플러그인
+
+설치되는 것
+  - Logic용 Audio Unit:  /Library/Audio/Plug-Ins/Components/mOog.component
+  - VST3:                /Library/Audio/Plug-Ins/VST3/mOog.vst3
+  - 단독 실행 앱:        /Applications/mOog.app
+
+설치가 끝나면 Logic을 다시 켜고, 오디오 트랙의 플러그인 슬롯에서
+Audio Units > OMS > mOog 를 고르세요.

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>mOog</title>
+    <welcome file="welcome.txt" mime-type="text/plain"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+    <domains enable_localSystem="true"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="com.oms.moog"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="com.oms.moog" visible="false">
+        <pkg-ref id="com.oms.moog"/>
+    </choice>
+    <pkg-ref id="com.oms.moog" onConclusion="none">mOog-component.pkg</pkg-ref>
+</installer-gui-script>

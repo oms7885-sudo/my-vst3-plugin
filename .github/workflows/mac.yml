@@ -1,0 +1,72 @@
+name: Build mOog (macOS AU + VST3 + Standalone, installer)
+
+# One universal build (Apple silicon + Intel) packed as a single .pkg that installs:
+#   Audio Unit (Logic)  -> /Library/Audio/Plug-Ins/Components/mOog.component
+#   VST3                -> /Library/Audio/Plug-Ins/VST3/mOog.vst3
+#   standalone app      -> /Applications/mOog.app
+# Not signed with an Apple Developer ID: macOS asks once to allow the installer (see the read-me in the zip).
+on:
+  push:
+    branches: [ bass-synth, 'ui/**' ]
+    paths: [ 'BassSynth/**', '.github/workflows/mac.yml', 'BassSynth/packaging/**' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S BassSynth -B build -G Xcode
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+
+      - name: Build
+        run: cmake --build build --config Release --target BassLadderSynth_AU BassLadderSynth_VST3 BassLadderSynth_Standalone -- -quiet
+
+      - name: Sign for local use (ad hoc) and check the Audio Unit
+        run: |
+          A=build/BassLadderSynth_artefacts/Release
+          for b in "$A/AU/mOog.component" "$A/VST3/mOog.vst3" "$A/Standalone/mOog.app"; do
+            codesign --force --deep --sign - "$b"
+            lipo -info "$(find "$b/Contents/MacOS" -type f | head -1)"
+          done
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "$A/AU/mOog.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar 2>/dev/null || true
+          sleep 3
+          auval -v aufx Blsy Omsk | tail -40 || echo "auval did not pass (see above)"
+
+      - name: Make the installer
+        run: |
+          A=build/BassLadderSynth_artefacts/Release
+          R=pkgroot
+          mkdir -p "$R/Library/Audio/Plug-Ins/Components" "$R/Library/Audio/Plug-Ins/VST3" "$R/Applications"
+          cp -R "$A/AU/mOog.component" "$R/Library/Audio/Plug-Ins/Components/"
+          cp -R "$A/VST3/mOog.vst3" "$R/Library/Audio/Plug-Ins/VST3/"
+          cp -R "$A/Standalone/mOog.app" "$R/Applications/"
+          # install exactly where stated, even if an older copy sits somewhere else
+          pkgbuild --analyze --root "$R" components.plist
+          i=0
+          while /usr/libexec/PlistBuddy -c "Print :$i" components.plist >/dev/null 2>&1; do
+            /usr/libexec/PlistBuddy -c "Set :$i:BundleIsRelocatable false" components.plist
+            i=$((i+1))
+          done
+          pkgbuild --root "$R" --component-plist components.plist --identifier com.oms.moog \
+                   --version "0.1.$GITHUB_RUN_NUMBER" --install-location / --scripts BassSynth/packaging/scripts mOog-component.pkg
+          productbuild --distribution BassSynth/packaging/distribution.xml --package-path . \
+                       --resources BassSynth/packaging/resources "mOog Installer.pkg"
+          mkdir -p dist
+          cp "mOog Installer.pkg" dist/
+          cp "BassSynth/packaging/README.txt" "dist/README (설치 방법).txt"
+          (cd dist && zip -r -q ../mOog-mac.zip .)
+          ls -la dist
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: mOog-mac-installer
+          path: mOog-mac.zip
+          if-no-files-found: error
