@@ -708,18 +708,14 @@ namespace
 
     struct Finishes { juce::Image header, lowerWood, sideWood, panel, panelAlt, bolt; };
 
-    const Finishes& finishes (bool ivory)
+    const Finishes& finishes (bool)
     {
         using namespace panelArtwork;
         static const Finishes graphite {
             decodeImage (graphiteHeader), decodeImage (graphiteLower), decodeImage (graphiteSide),
             decodeImage (graphitePanel), decodeImage (graphitePanelAlt), decodeImage (graphiteBolt)
         };
-        static const Finishes light {
-            decodeImage (ivoryHeader), decodeImage (ivoryLower), decodeImage (ivorySide),
-            decodeImage (ivoryPanel), decodeImage (ivoryPanelAlt), decodeImage (ivoryBolt)
-        };
-        return ivory ? light : graphite;
+        return graphite;
     }
 
     juce::Path softRectangle (juce::Rectangle<float> area, float radius)
@@ -748,16 +744,12 @@ namespace
         float pointerAngle = 0.0f, skirtRatio = 1.0f;
     };
 
-    const KnobPhoto& knobPhoto (bool ivory, bool selector)
+    const KnobPhoto& knobPhoto (bool, bool selector)
     {
         using namespace panelArtwork;
         static const KnobPhoto graphite { decodeImage (graphiteKnob), 0.68f, 0.435f };
-        static const KnobPhoto light { decodeImage (ivoryKnob), 0.67f, 0.44f };
         static const KnobPhoto graphiteSelector { decodeImage (graphiteKnobChoice), 0.53f, 0.46f, -0.30f, 0.89f };
-        static const KnobPhoto lightSelector { decodeImage (ivoryKnobChoice), 0.71f, 0.46f, -0.34f, 0.89f };
-        if (selector)
-            return ivory ? lightSelector : graphiteSelector;
-        return ivory ? light : graphite;
+        return selector ? graphiteSelector : graphite;
     }
 
     class AnimatedRocker final : public juce::ToggleButton, private juce::Timer
@@ -818,7 +810,7 @@ namespace
         return tinted;
     }
 
-    const std::array<juce::Image, 2>& switchPhotos (bool ivory, bool blue, bool silver, bool white)
+    const std::array<juce::Image, 2>& switchPhotos (bool, bool blue, bool silver, bool white)
     {
         using namespace panelArtwork;
         // Top photo: right pressed (ON). Bottom photo: left pressed (OFF).
@@ -828,16 +820,14 @@ namespace
             return std::array<juce::Image, 2> { tintRocker (orange[0], colour), tintRocker (orange[1], colour) };
         };
         static const auto graphiteBlue = tint (juce::Colour (0xff6f8ba0));
-        static const auto ivoryBlue = tint (juce::Colour (0xff2a5588));
         static const auto graphiteSilver = tint (juce::Colour (0xff9d9996));
-        static const auto ivorySilver = tint (juce::Colour (0xffdcd3ce));
         static const auto modeWhite = tint (juce::Colour (0xffeeeae2));
         if (white)
             return modeWhite;
         if (silver)
-            return ivory ? ivorySilver : graphiteSilver;
+            return graphiteSilver;
         if (blue)
-            return ivory ? ivoryBlue : graphiteBlue;
+            return graphiteBlue;
         return orange;
     }
 
@@ -1098,12 +1088,10 @@ namespace
         return tile;
     }
 
-    void drawSurface (juce::Graphics& g, juce::Rectangle<int> bounds, bool ivory)
+    void drawSurface (juce::Graphics& g, juce::Rectangle<int> bounds, bool)
     {
         static const auto graphite = makePanelSurface (finishes (false));
-        static const auto light = makePanelSurface (finishes (true));
-        const auto& tile = ivory ? light : graphite;
-        g.setTiledImageFill (tile, bounds.getX(), bounds.getY(), 1.0f);
+        g.setTiledImageFill (graphite, bounds.getX(), bounds.getY(), 1.0f);
         g.fillRect (bounds);
     }
 
@@ -1218,19 +1206,6 @@ namespace
         g.fillEllipse (r);
         g.setColour (juce::Colours::black.withAlpha (0.8f));
         g.drawLine (x - 2.0f, y + 1.0f, x + 2.0f, y - 1.0f, 1.0f);
-    }
-
-    juce::PropertiesFile& themeSettings()
-    {
-        static juce::PropertiesFile settings ([] {
-            juce::PropertiesFile::Options options;
-            options.applicationName = "mOog";
-            options.filenameSuffix = "ui";
-            options.folderName = "mOog";
-            options.osxLibrarySubFolder = "Application Support";
-            return options;
-        }());
-        return settings;
     }
 
     // Hover help comes from Parameters.h unless the editor has custom copy.
@@ -1584,7 +1559,7 @@ juce::Label* PanelLookAndFeel::createSliderTextBox (juce::Slider& s)
 BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
     : AudioProcessorEditor (&p), proc (p)
 {
-    lnf.setIvory (themeSettings().getBoolValue ("ivoryTheme", false));
+    lnf.setIvory (false);   // one theme: Basic
     setLookAndFeel (&lnf);
 
     int auxiliaryCount = 0;
@@ -1607,10 +1582,7 @@ BassSynthEditor::BassSynthEditor (BassSynthProcessor& p)
     loadPresetButton.setTooltip ("Load a saved user preset");
     savePresetButton.onClick = [this] { choosePresetFile (true); };
     loadPresetButton.onClick = [this] { choosePresetFile (false); };
-    themeButton.setTitle ("Theme");
-    themeButton.onClick = [this] { setIvoryTheme (! lnf.isIvory()); };
-    themeButton.setTooltip ("Switch between Basic and Ivory");
-    for (auto* button : { &savePresetButton, &loadPresetButton, &themeButton })
+    for (auto* button : { &savePresetButton, &loadPresetButton })
     {
         button->setColour (juce::TextButton::buttonColourId, lnf.findColour (juce::ComboBox::backgroundColourId));
         button->setColour (juce::TextButton::textColourOffId, C::silk);
@@ -1632,18 +1604,6 @@ BassSynthEditor::~BassSynthEditor()
     stopTimer();
     presetFileChooser.reset();
     setLookAndFeel (nullptr);
-}
-
-void BassSynthEditor::setIvoryTheme (bool ivory)
-{
-    lnf.setIvory (ivory);
-    themeSettings().setValue ("ivoryTheme", ivory);
-    for (auto& control : controls)
-        if (control.slider)
-            control.slider->setColour (juce::Slider::textBoxTextColourId, lnf.ink().withAlpha (0.92f));
-        else if (control.button)
-            control.button->repaint();
-    panel.repaint();
 }
 
 void BassSynthEditor::choosePresetFile (bool save)
@@ -1808,7 +1768,6 @@ void BassSynthEditor::layoutPanel()
     presetBox.setBounds (124, 10, 215, 25);
     savePresetButton.setBounds (presetBox.getRight() + 8, presetBox.getY(), 56, presetBox.getHeight());
     loadPresetButton.setBounds (savePresetButton.getRight() + 6, presetBox.getY(), 56, presetBox.getHeight());
-    themeButton.setBounds (editorW - 205, presetBox.getY(), 84, presetBox.getHeight());
 
     const auto place = [] (Control& k, int x, int y, bool compact)
     {
