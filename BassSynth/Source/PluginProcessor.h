@@ -35,6 +35,11 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    // user preset files: the four panel sections only (Oscillators, Mixer, Filter, Loudness)
+    void getPresetState (juce::MemoryBlock& destData);
+    bool setPresetState (const void* data, int sizeInBytes);
+    static bool isPanelParam (const bsyn::spec::Param& d);
+
     juce::AudioProcessorValueTreeState apvts;
 
     // ---- read by the editor (written once per audio block) ----
