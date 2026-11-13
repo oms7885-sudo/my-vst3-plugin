@@ -94,5 +94,6 @@ polyBLEP) → Model D 믹서(On 스위치, 노이즈 White/Pink, External = DI �
 
 ## 프리셋 (`PluginProcessor.cpp`)
 
-Model D Bass(기본), Punch Sub, Squelch, Fat Detune(피드백), Wobble, Growl(피드백), Heart Bass(사용자 곡에 맞춤),
-Classic Bass / Classic Bass Fat(MusicRadar 수치), Friends Bass(Reverb), Thriller Bass(근사).
+기본 프리셋 4개: Model D Bass(기본), Fat Detune(피드백), Baby Be Mine, Man in the Mirror(사용자가 만든 것, 2026-11-13).
+프리셋(기본·사용자 저장 파일 모두)은 패널 네 구역(Oscillators, Mixer, Filter, Loudness)만 다룬다. Controllers와 Setup은
+저장하지 않고, 불러올 때도 건드리지 않는다 (`isPanelParam`, `getPresetState`/`setPresetState`). 예전 전체 상태 파일도 패널 값만 읽는다.

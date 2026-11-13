@@ -9,59 +9,15 @@ namespace
     const std::vector<Preset>& presets()
     {
         static const std::vector<Preset> p = {
+            // Factory presets set the four panel sections only (Oscillators, Mixer, Filter, Loudness); the user's
+            // Controllers and Setup stay as they are.
             { "Model D Bass", {} },
-            { "Punch Sub",    { { "osc1Lvl", 0.4f }, { "osc3Lvl", 1.0f }, { "cutoff", 120.0f }, { "res", 0.12f },
-                                { "envAmt", 2.2f }, { "fD", 180.0f }, { "fS", 0.0f } } },
-            { "Squelch",      { { "cutoff", 90.0f }, { "res", 0.57f }, { "envAmt", 4.0f }, { "fD", 420.0f }, { "fS", 0.05f },
-                                { "osc1Lvl", 0.9f }, { "osc3Lvl", 0.3f } } },
             { "Fat Detune",   { { "osc1Lvl", 0.7f }, { "osc2Lvl", 0.7f }, { "osc2Freq", 0.06f }, { "osc3Lvl", 0.6f }, { "osc3Freq", -0.05f },
                                 { "cutoff", 260.0f }, { "envAmt", 2.4f }, { "res", 0.16f },
-                                { "extSrc", 1.0f }, { "extOn", 1.0f }, { "extLvl", 0.4f }, { "outGain", -2.5f } } },   // feedback: thicker lows
-            // osc 3 as a slow LFO on the filter (Osc 3 Control off, Range LO, not in the mixer)
-            { "Wobble",       { { "osc2Lvl", 0.6f }, { "osc2Range", 0.0f }, { "osc3Ctl", 0.0f }, { "osc3Range", 0.0f }, { "osc3Wave", 0.0f },
-                                { "osc3On", 0.0f }, { "filterMod", 1.0f }, { "modAmt", 0.55f }, { "cutoff", 220.0f }, { "res", 0.43f },
-                                { "envAmt", 1.0f }, { "fS", 0.6f } } },
-            // osc 3 an octave up modulating the filter at audio rate: the Moog growl
-            { "Growl",        { { "osc3Range", 3.0f }, { "osc3Wave", 0.0f }, { "osc3On", 0.0f }, { "osc2Lvl", 0.5f }, { "osc2Range", 0.0f },
-                                { "filterMod", 1.0f }, { "modAmt", 0.3f }, { "cutoff", 200.0f }, { "res", 0.32f },
-                                { "extSrc", 1.0f }, { "extOn", 1.0f }, { "extLvl", 0.4f }, { "outGain", -3.0f } } },   // feedback: body under the growl
-            // From published Model D patch sheets, moved onto this panel (dial numbers -> real units).
-            // Classic Bass: MusicRadar, "create a classic Minimoog bass sound". Cutoff -3, Emphasis 0, Contour 2-3,
-            // filter decay 400-600 ms to sustain 0, loudness decay 0.8-1 s, sustain 10, both Keyboard Controls on.
-            { "Classic Bass", { { "osc1Range", 0.0f }, { "osc1Wave", 3.0f }, { "osc1Lvl", 1.0f },
-                                { "osc2Range", 1.0f }, { "osc2Wave", 4.0f }, { "osc2Lvl", 0.65f }, { "osc2Freq", -0.07f },
-                                { "osc3Range", 2.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.65f }, { "osc3Freq", 0.07f },
-                                { "cutoff", 138.6f }, { "res", 0.0f }, { "envAmt", 1.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 1.0f },
-                                { "fA", 7.0f }, { "fD", 500.0f }, { "fS", 0.0f },
-                                { "aA", 0.5f }, { "aD", 900.0f }, { "aS", 1.0f }, { "decaySw", 1.0f } } },
-            // ... and its thick version: output patched back into External Input, External Volume 6-7
-            { "Classic Bass Fat", { { "osc1Range", 0.0f }, { "osc1Wave", 3.0f }, { "osc1Lvl", 1.0f },
-                                { "osc2Range", 1.0f }, { "osc2Wave", 4.0f }, { "osc2Lvl", 0.65f }, { "osc2Freq", -0.07f },
-                                { "osc3Range", 2.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.65f }, { "osc3Freq", 0.07f },
-                                { "cutoff", 138.6f }, { "res", 0.0f }, { "envAmt", 1.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 1.0f },
-                                { "fA", 7.0f }, { "fD", 500.0f }, { "fS", 0.0f },
-                                { "aA", 0.5f }, { "aD", 900.0f }, { "aS", 1.0f }, { "decaySw", 1.0f },
-                                { "extSrc", 1.0f }, { "extOn", 1.0f }, { "extLvl", 0.65f }, { "outGain", -1.5f } } },
-            // Gary Numan, "Are 'Friends' Electric?" bass (Reverb): three saws at 16', Cutoff 0, Emphasis 3, Contour 5,
-            // quick attack, 600 ms decay, sustain full, Decay on. Mixer levels and detune are not given: estimated.
-            { "Friends Bass", { { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc1Lvl", 0.8f },
-                                { "osc2Range", 1.0f }, { "osc2Wave", 2.0f }, { "osc2Lvl", 0.8f }, { "osc2Freq", 0.05f },
-                                { "osc3Range", 2.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.8f },
-                                { "cutoff", 894.4f }, { "res", 0.3f }, { "envAmt", 2.0f },
-                                { "fA", 1.0f }, { "fD", 600.0f }, { "fS", 1.0f },
-                                { "aA", 1.0f }, { "aD", 600.0f }, { "aS", 1.0f }, { "decaySw", 1.0f } } },
-            // Michael Jackson, "Thriller" bass (MusicRadar, on a software Minimoog): saw 16', square 16' at half
-            // volume a few cents off, saw 8' at 70 %. The filter is given as clock positions only (cutoff and
-            // emphasis about 9 o'clock, contour 40 %, decay 10 o'clock): read off this panel's dials, so approximate.
-            // Sustains and the loudness contour are not given: estimated.
-            { "Thriller Bass", { { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc1Lvl", 0.8f },
-                                { "osc2Range", 1.0f }, { "osc2Wave", 3.0f }, { "osc2Lvl", 0.5f }, { "osc2Freq", 0.04f },
-                                { "osc3Range", 3.0f }, { "osc3Wave", 2.0f }, { "osc3Lvl", 0.7f },
-                                { "cutoff", 189.0f }, { "res", 0.25f }, { "envAmt", 1.6f },
-                                { "fA", 30.0f }, { "fD", 410.0f }, { "fS", 0.3f },
-                                { "aA", 0.5f }, { "aD", 600.0f }, { "aS", 1.0f } } },
-            // fitted to the target stem (Change - "Change of Heart") from change_rec.wav
-            { "Heart Bass",   { { "cutoff", 405.11f }, { "res", 0.1701f }, { "envAmt", 0.5369f }, { "fA", 0.5164f }, { "fD", 21.5644f }, { "fS", 0.3777f }, { "aA", 1.3832f }, { "aD", 278.2665f }, { "aS", 0.5629f }, { "osc1Lvl", 0.2542f }, { "osc2Lvl", 0.7653f }, { "osc3Lvl", 0.4621f }, { "osc2Freq", 0.039f }, { "osc3Freq", 0.0274f }, { "tone", 748.3006f }, { "dyn", 0.0376f }, { "vintage", 0.0791f }, { "osc1Range", 1.0f }, { "osc1Wave", 3.0f }, { "osc2Range", 1.0f }, { "osc2Wave", 2.0f }, { "osc3Range", 1.0f }, { "osc3Wave", 3.0f }, { "keyTrk1", 1.0f }, { "keyTrk2", 0.0f }, { "decaySw", 1.0f } } },
+                                { "extSrc", 1.0f }, { "extOn", 1.0f }, { "extLvl", 0.4f } } },   // feedback: thicker lows
+            // the user's own (saved from the panel, 2026-11-12)
+            { "Baby Be Mine", { { "osc1Range", 0.0f }, { "osc1Wave", 1.0f }, { "osc3Ctl", 1.0f }, { "osc2Range", 0.0f }, { "osc2Freq", 0.0f }, { "osc2Wave", 5.0f }, { "osc3Range", 1.0f }, { "osc3Freq", -0.0938f }, { "osc3Wave", 2.0f }, { "osc1Lvl", 1.0f }, { "osc1On", 1.0f }, { "osc2Lvl", 0.8594f }, { "osc2On", 1.0f }, { "osc3Lvl", 0.5f }, { "osc3On", 0.0f }, { "extLvl", 0.3399f }, { "extOn", 1.0f }, { "extSrc", 1.0f }, { "noiseLvl", 0.1582f }, { "noiseOn", 0.0f }, { "noisePink", 0.0f }, { "cutoff", 88.8805f }, { "res", 0.6726f }, { "envAmt", 2.6874f }, { "keyTrk1", 1.0f }, { "keyTrk2", 1.0f }, { "fA", 0.5f }, { "fD", 512.595f }, { "fS", 0.4107f }, { "aA", 15.9371f }, { "aD", 720.459f }, { "aS", 1.0f }, { "decaySw", 0.0f }, { "dyn", 0.5917f } } },
+            { "Man in the Mirror", { { "osc1Range", 1.0f }, { "osc1Wave", 2.0f }, { "osc3Ctl", 0.0f }, { "osc2Range", 0.0f }, { "osc2Freq", -0.08f }, { "osc2Wave", 3.0f }, { "osc3Range", 0.0f }, { "osc3Freq", 0.0f }, { "osc3Wave", 3.0f }, { "osc1Lvl", 1.0f }, { "osc1On", 1.0f }, { "osc2Lvl", 1.0f }, { "osc2On", 1.0f }, { "osc3Lvl", 0.5f }, { "osc3On", 0.0f }, { "extLvl", 0.0f }, { "extOn", 0.0f }, { "extSrc", 0.0f }, { "noiseLvl", 0.0f }, { "noiseOn", 0.0f }, { "noisePink", 0.0f }, { "cutoff", 25.5f }, { "res", 0.655f }, { "envAmt", 4.838f }, { "keyTrk1", 0.0f }, { "keyTrk2", 0.0f }, { "fA", 66.6786f }, { "fD", 1389.49f }, { "fS", 0.44f }, { "aA", 15.9371f }, { "aD", 3587.6f }, { "aS", 0.75f }, { "decaySw", 0.0f }, { "dyn", 0.35f } } },
         };
         return p;
     }
@@ -302,12 +258,47 @@ void BassSynthProcessor::setCurrentProgram (int index)
     if (! juce::isPositiveAndBelow (index, getNumPrograms())) return;
     currentProgram = index;
     for (const auto& d : bsyn::spec::params)
-    {
-        if (juce::String (d.id) == "mode") continue;      // a preset is a sound; the working mode stays as chosen
-        if (auto* prm = apvts.getParameter (d.id)) prm->setValueNotifyingHost (prm->convertTo0to1 (d.def));
-    }
+        if (isPanelParam (d))
+            if (auto* prm = apvts.getParameter (d.id)) prm->setValueNotifyingHost (prm->convertTo0to1 (d.def));
     for (const auto& [id, v] : presets()[(size_t) index].values)
-        if (auto* prm = apvts.getParameter (id)) prm->setValueNotifyingHost (prm->convertTo0to1 (v));
+        if (const auto* d = bsyn::spec::find (id); d != nullptr && isPanelParam (*d))
+            if (auto* prm = apvts.getParameter (id)) prm->setValueNotifyingHost (prm->convertTo0to1 (v));
+}
+
+// A preset is the sound on the panel: Oscillators, Mixer, Filter and Loudness. Controllers (trigger, modulation)
+// and Setup (input, comp, output, mode, ...) belong to the player's rig and stay as they are.
+bool BassSynthProcessor::isPanelParam (const bsyn::spec::Param& d)
+{
+    const juce::String s (d.section);
+    return s == "Oscillators" || s == "Mixer" || s == "Filter" || s == "Loudness";
+}
+
+void BassSynthProcessor::getPresetState (juce::MemoryBlock& destData)
+{
+    auto state = apvts.copyState();
+    for (int i = state.getNumChildren(); --i >= 0;)
+    {
+        const auto* d = bsyn::spec::find (state.getChild (i).getProperty ("id").toString().toRawUTF8());
+        if (d == nullptr || ! isPanelParam (*d)) state.removeChild (i, nullptr);
+    }
+    if (auto xml = state.createXml())
+        copyXmlToBinary (*xml, destData);
+}
+
+bool BassSynthProcessor::setPresetState (const void* data, int sizeInBytes)
+{
+    const auto xml = getXmlFromBinary (data, sizeInBytes);
+    if (xml == nullptr || ! xml->hasTagName (apvts.state.getType())) return false;
+    // also takes the older files that hold the whole state: only their panel values are used
+    for (const auto* e : xml->getChildIterator())
+    {
+        const auto id = e->getStringAttribute ("id");
+        const auto* d = bsyn::spec::find (id.toRawUTF8());
+        if (d == nullptr || ! isPanelParam (*d) || ! e->hasAttribute ("value")) continue;
+        if (auto* prm = apvts.getParameter (id))
+            prm->setValueNotifyingHost (prm->convertTo0to1 ((float) e->getDoubleAttribute ("value")));
+    }
+    return true;
 }
 
 void BassSynthProcessor::getStateInformation (juce::MemoryBlock& destData)
